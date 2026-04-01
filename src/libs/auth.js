@@ -114,7 +114,7 @@ export const authOptions = {
      * the `session()` callback. So we have to add custom parameters in `token`
      * via `jwt()` callback to make them accessible in the `session()` callback
      */
-    async jwt({ token, user }) {
+    async jwt({ token, user, trigger, session: updatedSession }) {
       if (user) {
         // Rebuild token with only required fields to keep cookie size under proxy limits.
         return {
@@ -126,6 +126,14 @@ export const authOptions = {
           role: user.role ?? null,
           workspaceId: user.workspaceId ?? null
         }
+      }
+
+      // When updateSession() is called from the client, merge the new data into the token
+      if (trigger === 'update' && updatedSession?.user) {
+        const u = updatedSession.user
+
+        if (u.name !== undefined) token.name = u.name
+        if (u.image !== undefined) token.picture = u.image
       }
 
       return {
