@@ -6,6 +6,7 @@ import { authOptions } from '@/libs/auth'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
+import { createDashboardSchema, parseBody } from '@/libs/validations'
 
 function sanitizeDashboardTitle(value) {
   return String(value || 'Dashboard sem título')
@@ -109,16 +110,13 @@ export async function POST(req) {
     return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
   }
 
-  const body = await req.json()
-  const { iframeCode, workspaceId, allowedRoleIds, title: customTitle } = body
+  const parsed = parseBody(createDashboardSchema, await req.json())
 
-  if (!iframeCode || typeof iframeCode !== 'string') {
-    return NextResponse.json({ message: 'Código iframe é obrigatório' }, { status: 400 })
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
 
-  if (!workspaceId) {
-    return NextResponse.json({ message: 'Workspace é obrigatório' }, { status: 400 })
-  }
+  const { iframeCode, workspaceId, allowedRoleIds, title: customTitle } = parsed.data
 
   // Validate workspace exists
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
@@ -127,9 +125,9 @@ export async function POST(req) {
     return NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
   }
 
-  const parsed = parseIframe(iframeCode)
+  const iframeParsed = parseIframe(iframeCode)
 
-  if (!parsed.embedUrl) {
+  if (!iframeParsed.embedUrl) {
     return NextResponse.json(
       { message: 'Não foi possível extrair a URL do iframe. Verifique o código colado.' },
       { status: 400 }
@@ -138,8 +136,8 @@ export async function POST(req) {
 
   const dashboard = await prisma.dashboard.create({
     data: {
-      title: sanitizeDashboardTitle(customTitle || parsed.title),
-      embedUrl: parsed.embedUrl,
+      title: sanitizeDashboardTitle(customTitle || iframeParsed.title),
+      embedUrl: iframeParsed.embedUrl,
       iframeCode,
       workspaceId,
       allowedRoles: {

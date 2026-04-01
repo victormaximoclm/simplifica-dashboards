@@ -4,19 +4,24 @@ import bcrypt from 'bcryptjs'
 import { Prisma } from '@prisma/client'
 
 import { prisma } from '@/libs/prisma'
+import { setupLimiter } from '@/libs/rateLimit'
+import { setupSchema, parseBody } from '@/libs/validations'
 
 // POST /api/setup — Create the first super admin (only if no users exist)
 export async function POST(req) {
-  const body = await req.json()
-  const { name, email, password } = body
+  const { success } = setupLimiter.check(req)
 
-  if (!name || !email || !password) {
-    return NextResponse.json({ message: 'Nome, email e senha são obrigatórios.' }, { status: 400 })
+  if (!success) {
+    return NextResponse.json({ message: 'Muitas tentativas. Aguarde um momento.' }, { status: 429 })
   }
 
-  if (password.length < 6) {
-    return NextResponse.json({ message: 'A senha deve ter pelo menos 6 caracteres.' }, { status: 400 })
+  const parsed = parseBody(setupSchema, await req.json())
+
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
+
+  const { name, email, password } = parsed.data
 
   const hashedPassword = await bcrypt.hash(password, 10)
 

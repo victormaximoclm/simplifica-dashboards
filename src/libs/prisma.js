@@ -1,3 +1,4 @@
+import '@/libs/envCheck'
 import { PrismaClient } from '@prisma/client'
 
 const globalForPrisma = globalThis

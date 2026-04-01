@@ -9,6 +9,7 @@ import { sendInviteEmail } from '@/libs/mail'
 import { isHighAdmin, getAssignableRoles } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
+import { inviteUserSchema, parseBody } from '@/libs/validations'
 
 // POST /api/apps/users/invite - Invite user by email (high admins only)
 export async function POST(req) {
@@ -22,19 +23,13 @@ export async function POST(req) {
     return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
   }
 
-  const body = await req.json()
-  const { email, workspaceId, role, customRoleId } = body
+  const parsed = parseBody(inviteUserSchema, await req.json())
 
-  // Validate email format
-  const emailRegex = /^[^\s@]+@[^\s@]+\.[^\s@]+$/
-
-  if (!email || !emailRegex.test(email)) {
-    return NextResponse.json({ message: 'E-mail inválido' }, { status: 400 })
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
 
-  if (!workspaceId) {
-    return NextResponse.json({ message: 'Espaço de trabalho é obrigatório' }, { status: 400 })
-  }
+  const { email, workspaceId, role, customRoleId } = parsed.data
 
   // Check if workspace exists
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })

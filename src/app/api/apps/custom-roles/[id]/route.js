@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
 import { prisma } from '@/libs/prisma'
+import { createCustomRoleSchema, parseBody } from '@/libs/validations'
 
 // PUT /api/apps/custom-roles/[id] - Update custom role (superAdmin/subAdmin)
 export async function PUT(req, { params }) {
@@ -18,11 +19,14 @@ export async function PUT(req, { params }) {
   }
 
   const { id } = await params
-  const { name } = await req.json()
 
-  if (!name || !name.trim()) {
-    return NextResponse.json({ message: 'Nome do cargo é obrigatório' }, { status: 400 })
+  const parsed = parseBody(createCustomRoleSchema, await req.json())
+
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
+
+  const { name } = parsed.data
 
   const existing = await prisma.customRole.findUnique({ where: { id } })
 

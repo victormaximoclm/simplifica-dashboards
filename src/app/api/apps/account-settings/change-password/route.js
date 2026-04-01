@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs'
 
 import { authOptions } from '@/libs/auth'
 import { prisma } from '@/libs/prisma'
+import { changePasswordSchema, parseBody } from '@/libs/validations'
 
 // PUT change password
 export async function PUT(req) {
@@ -16,15 +17,13 @@ export async function PUT(req) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
-  const { currentPassword, newPassword } = await req.json()
+  const parsed = parseBody(changePasswordSchema, await req.json())
 
-  if (!currentPassword || !newPassword) {
-    return NextResponse.json({ message: 'Current password and new password are required' }, { status: 400 })
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
 
-  if (newPassword.length < 6) {
-    return NextResponse.json({ message: 'New password must be at least 6 characters' }, { status: 400 })
-  }
+  const { currentPassword, newPassword } = parsed.data
 
   const user = await prisma.user.findUnique({
     where: { email: session.user.email }

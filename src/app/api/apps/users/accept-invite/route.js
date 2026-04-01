@@ -3,6 +3,8 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 
 import { prisma } from '@/libs/prisma'
+import { setupLimiter } from '@/libs/rateLimit'
+import { acceptInviteSchema, parseBody } from '@/libs/validations'
 
 // GET /api/apps/users/accept-invite?token=xxx - Validate invite token
 export async function GET(req) {
@@ -45,16 +47,19 @@ export async function GET(req) {
 
 // POST /api/apps/users/accept-invite - Accept invite (set name + password)
 export async function POST(req) {
-  const body = await req.json()
-  const { token, name, password } = body
+  const { success } = setupLimiter.check(req)
 
-  if (!token || !name || !password) {
-    return NextResponse.json({ message: 'Todos os campos são obrigatórios' }, { status: 400 })
+  if (!success) {
+    return NextResponse.json({ message: 'Muitas tentativas. Aguarde um momento.' }, { status: 429 })
   }
 
-  if (password.length < 6) {
-    return NextResponse.json({ message: 'A senha deve ter no mínimo 6 caracteres' }, { status: 400 })
+  const parsed = parseBody(acceptInviteSchema, await req.json())
+
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
+
+  const { token, name, password } = parsed.data
 
   const user = await prisma.user.findUnique({
     where: { inviteToken: token },

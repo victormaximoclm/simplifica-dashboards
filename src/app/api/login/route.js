@@ -4,9 +4,26 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 
 import { prisma } from '@/libs/prisma'
+import { loginLimiter } from '@/libs/rateLimit'
+import { loginSchema, parseBody } from '@/libs/validations'
 
 export async function POST(req) {
-  const { email, password } = await req.json()
+  const { success } = loginLimiter.check(req)
+
+  if (!success) {
+    return NextResponse.json(
+      { message: ['Muitas tentativas. Aguarde um momento antes de tentar novamente.'] },
+      { status: 429 }
+    )
+  }
+
+  const parsed = parseBody(loginSchema, await req.json())
+
+  if (!parsed.success) {
+    return NextResponse.json({ message: [parsed.message] }, { status: 400 })
+  }
+
+  const { email, password } = parsed.data
 
   // Try Prisma database
   const dbUser = await prisma.user.findUnique({

@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/libs/auth'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
+import { createWorkspaceSchema, parseBody } from '@/libs/validations'
 
 // GET /api/apps/workspaces/[id] - Get single workspace
 export async function GET(req, { params }) {
@@ -50,11 +51,14 @@ export async function PUT(req, { params }) {
   }
 
   const { id } = await params
-  const { name } = await req.json()
 
-  if (!name || typeof name !== 'string' || name.trim().length === 0) {
-    return NextResponse.json({ message: 'Nome é obrigatório' }, { status: 400 })
+  const parsed = parseBody(createWorkspaceSchema, await req.json())
+
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
+
+  const { name } = parsed.data
 
   const slug = name
     .trim()

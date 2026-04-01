@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/libs/auth'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
+import { dismissNotificationSchema, markReadSchema, parseBody } from '@/libs/validations'
 
 // GET /api/apps/notifications - List notifications filtered by role
 export async function GET(req) {
@@ -94,8 +95,13 @@ export async function PATCH(req) {
     return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { notificationIds, readAll } = body
+  const parsed = parseBody(markReadSchema, await req.json())
+
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
+  }
+
+  const { notificationIds, readAll } = parsed.data
 
   const currentUser = await prisma.user.findUnique({
     where: { email: session.user.email },
@@ -158,11 +164,13 @@ export async function DELETE(req) {
     return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
   }
 
-  const { id } = await req.json()
+  const parsed = parseBody(dismissNotificationSchema, await req.json())
 
-  if (!id) {
-    return NextResponse.json({ message: 'ID da notificação é obrigatório' }, { status: 400 })
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
+
+  const { id } = parsed.data
 
   const currentUser = await prisma.user.findUnique({
     where: { email: session.user.email },

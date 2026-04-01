@@ -4,6 +4,7 @@ import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
 import { prisma } from '@/libs/prisma'
+import { createCustomRoleSchema, parseBody } from '@/libs/validations'
 
 // GET /api/apps/custom-roles - List all custom roles (global)
 export async function GET() {
@@ -35,11 +36,13 @@ export async function POST(req) {
     return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
   }
 
-  const { name } = await req.json()
+  const parsed = parseBody(createCustomRoleSchema, await req.json())
 
-  if (!name || !name.trim()) {
-    return NextResponse.json({ message: 'Nome do cargo é obrigatório' }, { status: 400 })
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
   }
+
+  const { name } = parsed.data
 
   // Check for duplicate name
   const existing = await prisma.customRole.findUnique({

@@ -7,6 +7,7 @@ import bcrypt from 'bcryptjs'
 
 import { authOptions } from '@/libs/auth'
 import { prisma } from '@/libs/prisma'
+import { updateProfileSchema, parseBody } from '@/libs/validations'
 
 // GET current user profile
 export async function GET() {
@@ -45,8 +46,13 @@ export async function PUT(req) {
     return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
   }
 
-  const body = await req.json()
-  const { name, image } = body
+  const parsed = parseBody(updateProfileSchema, await req.json())
+
+  if (!parsed.success) {
+    return NextResponse.json({ message: parsed.message }, { status: 400 })
+  }
+
+  const { name, image } = parsed.data
 
   // Only allow updating name and image via this endpoint
   const updateData = {}
