@@ -95,13 +95,12 @@ const AccountTab = ({ userData }) => {
         throw new Error(data.message || 'Erro ao salvar')
       }
 
-      // Update the session with new name/image
+      // Update the session with new name (image is fetched from DB automatically)
       await updateSession({
         ...session,
         user: {
           ...session.user,
-          name,
-          image: imagePreview
+          name
         }
       })
 

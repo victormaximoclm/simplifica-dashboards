@@ -64,7 +64,6 @@ export const authOptions = {
               id: safeUser?.id,
               name: safeUser?.name ?? null,
               email: safeUser?.email ?? null,
-              image: safeUser?.image ?? null,
               role: safeUser?.role ?? null,
               workspaceId: safeUser?.workspaceId ?? null
             }
@@ -117,12 +116,12 @@ export const authOptions = {
     async jwt({ token, user, trigger, session: updatedSession }) {
       if (user) {
         // Rebuild token with only required fields to keep cookie size under proxy limits.
+        // NEVER store image/picture here — base64 avatars would exceed cookie size limits (431 error).
         return {
           sub: user.id ? String(user.id) : token.sub,
           id: user.id ?? null,
           name: user.name ?? null,
           email: user.email ?? null,
-          picture: user.image ?? null,
           role: user.role ?? null,
           workspaceId: user.workspaceId ?? null
         }
@@ -133,7 +132,6 @@ export const authOptions = {
         const u = updatedSession.user
 
         if (u.name !== undefined) token.name = u.name
-        if (u.image !== undefined) token.picture = u.image
       }
 
       return {
@@ -141,7 +139,6 @@ export const authOptions = {
         id: token.id ?? null,
         name: token.name ?? null,
         email: token.email ?? null,
-        picture: token.picture ?? null,
         role: token.role ?? null,
         workspaceId: token.workspaceId ?? null
       }
@@ -151,9 +148,16 @@ export const authOptions = {
         // ** Add custom params to user in session which are added in `jwt()` callback via `token` parameter
         session.user.id = token.id || token.sub
         session.user.name = token.name
-        session.user.image = token.picture ?? null
         session.user.role = token.role
         session.user.workspaceId = token.workspaceId
+
+        // Fetch image from DB on each session call — never store in JWT to avoid oversized cookies
+        const dbUser = await prisma.user.findUnique({
+          where: { id: token.id || token.sub },
+          select: { image: true }
+        })
+
+        session.user.image = dbUser?.image ?? null
       }
 
       return session
