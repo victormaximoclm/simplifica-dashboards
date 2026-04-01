@@ -52,7 +52,7 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/src/prisma ./src/prisma
 
 # Install Prisma CLI with all its dependencies for entrypoint migrations
-RUN npm install --no-save prisma@6.19.0
+RUN npm install --no-save --legacy-peer-deps prisma@6.19.0
 
 # Copy seed file
 COPY --from=builder /app/src/prisma/seed.js ./src/prisma/seed.js
