@@ -7,6 +7,7 @@ WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
 COPY src/prisma/schema.prisma ./src/prisma/schema.prisma
+COPY src/assets/iconify-icons/bundle-icons-css.mjs ./src/assets/iconify-icons/bundle-icons-css.mjs
 
 RUN corepack enable pnpm && pnpm install --frozen-lockfile
 
