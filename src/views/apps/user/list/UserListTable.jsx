@@ -325,9 +325,11 @@ const UserListTable = ({ tableData, workspaces }) => {
           <div className='flex items-center'>
             {isHighAdmin && (
               <>
-                <IconButton onClick={() => openDeleteDialog(row.original)}>
-                  <i className='tabler-trash text-textSecondary' />
-                </IconButton>
+                {row.original.id !== session?.user?.id && (
+                  <IconButton onClick={() => openDeleteDialog(row.original)}>
+                    <i className='tabler-trash text-textSecondary' />
+                  </IconButton>
+                )}
                 <OptionMenu
                   iconButtonProps={{ size: 'medium' }}
                   iconClassName='text-textSecondary'
