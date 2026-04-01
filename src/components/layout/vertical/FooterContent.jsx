@@ -38,11 +38,7 @@ const FooterContent = () => {
           <Link href='' target='_blank' className='text-primary'>
             Licença
           </Link>
-          <Link
-            href='https://demos.pixinvent.com/vuexy-nextjs-admin-template/documentation'
-            target='_blank'
-            className='text-primary'
-          >
+          <Link href='' target='_blank' className='text-primary'>
             Documentação
           </Link>
           <Link href='' target='_blank' className='text-primary'>

@@ -162,10 +162,38 @@ const UserListTable = ({ tableData, workspaces }) => {
 
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState(null)
+  const [resendingInvite, setResendingInvite] = useState(null)
 
   const openDeleteDialog = user => {
     setUserToDelete(user)
     setDeleteDialogOpen(true)
+  }
+
+  const handleResendInvite = async user => {
+    setResendingInvite(user.id)
+
+    try {
+      const res = await fetch('/api/apps/users/invite', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          email: user.email,
+          ...(user.workspace?.id ? { workspaceId: user.workspace.id } : {}),
+          role: user.role,
+          customRoleId: user.customRole?.id || null
+        })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok && !data.emailError) {
+        console.error('Erro ao reenviar convite:', data.message)
+      }
+    } catch (err) {
+      console.error('Erro ao reenviar convite:', err)
+    } finally {
+      setResendingInvite(null)
+    }
   }
 
   const handleConfirmDelete = async () => {
@@ -349,7 +377,20 @@ const UserListTable = ({ tableData, workspaces }) => {
                           className: 'flex items-center gap-2 text-textSecondary',
                           onClick: () => handleEdit(row.original)
                         }
-                      }
+                      },
+                      ...(row.original.status === 'pending'
+                        ? [
+                            {
+                              text: resendingInvite === row.original.id ? 'Reenviando...' : 'Reenviar Convite',
+                              icon: 'tabler-mail-forward',
+                              menuItemProps: {
+                                className: 'flex items-center gap-2 text-textSecondary',
+                                disabled: resendingInvite === row.original.id,
+                                onClick: () => handleResendInvite(row.original)
+                              }
+                            }
+                          ]
+                        : [])
                     ]}
                   />
                 </>
@@ -361,7 +402,7 @@ const UserListTable = ({ tableData, workspaces }) => {
       })
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, filteredData]
+    [data, filteredData, callerRole, isHighAdmin, session]
   )
 
   const table = useReactTable({
