@@ -67,9 +67,9 @@ const DashboardHome = async ({ params }) => {
 
 const EmptyState = () => (
   <div className='flex flex-col items-center justify-center min-h-[60vh] gap-4'>
-    <i className='tabler-chart-bar-off text-6xl text-textDisabled' />
-    <h4 className='text-xl font-medium text-textPrimary'>Nenhum dashboard disponível</h4>
-    <p className='text-textSecondary text-center max-w-md'>
+    <i className='tabler-chart-bar-off text-6xl text-gray-400 dark:text-gray-600' />
+    <h4 className='text-xl font-medium text-gray-800 dark:text-gray-200'>Nenhum dashboard disponível</h4>
+    <p className='text-gray-600 dark:text-gray-400 text-center max-w-md'>
       Não há dashboards configurados para o seu espaço de trabalho. Entre em contato com o administrador para solicitar
       acesso.
     </p>

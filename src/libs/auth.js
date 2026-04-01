@@ -44,11 +44,11 @@ export const authOptions = {
           const data = await res.json()
 
           if (res.status === 401) {
-            throw new Error(JSON.stringify(data))
+            throw new Error(data?.message?.[0] ?? 'Email ou senha inválidos')
           }
 
           if (res.status === 403) {
-            throw new Error(JSON.stringify(data))
+            throw new Error(data?.message?.[0] ?? 'Acesso negado')
           }
 
           if (res.status === 200) {
@@ -57,7 +57,16 @@ export const authOptions = {
              * user data below. Below return statement will set the user object in the token and the same is set in
              * the session which will be accessible all over the app.
              */
-            return data
+            const safeUser = data?.user ?? data
+
+            // Keep credentials payload minimal to avoid oversized JWT cookies.
+            return {
+              id: safeUser?.id,
+              name: safeUser?.name ?? null,
+              email: safeUser?.email ?? null,
+              role: safeUser?.role ?? null,
+              workspaceId: safeUser?.workspaceId ?? null
+            }
           }
 
           return null
@@ -106,17 +115,25 @@ export const authOptions = {
      */
     async jwt({ token, user }) {
       if (user) {
-        /*
-         * For adding custom parameters to user in session, we first need to add those parameters
-         * in token which then will be available in the `session()` callback
-         */
-        token.name = user.name
-        token.role = user.role
-        token.workspaceId = user.workspaceId
-        token.id = user.id
+        // Rebuild token with only required fields to keep cookie size under proxy limits.
+        return {
+          sub: user.id ? String(user.id) : token.sub,
+          id: user.id ?? null,
+          name: user.name ?? null,
+          email: user.email ?? null,
+          role: user.role ?? null,
+          workspaceId: user.workspaceId ?? null
+        }
       }
 
-      return token
+      return {
+        sub: token.sub,
+        id: token.id ?? null,
+        name: token.name ?? null,
+        email: token.email ?? null,
+        role: token.role ?? null,
+        workspaceId: token.workspaceId ?? null
+      }
     },
     async session({ session, token }) {
       if (session.user) {

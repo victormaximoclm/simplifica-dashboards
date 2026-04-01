@@ -21,7 +21,7 @@ const transporter = nodemailer.createTransport({
 export async function sendInviteEmail({ to, inviteToken, workspaceName }) {
   const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
   const inviteUrl = `${appUrl}/accept-invite?token=${encodeURIComponent(inviteToken)}`
-  const logoUrl = `${appUrl}/images/logos/simplifica-email-logo.svg`
+  const logoUrl = `${appUrl}/images/icons/simplifica.png`
   const year = new Date().getFullYear()
   const safeWorkspaceName = escapeHtml(workspaceName || 'seu espaço de trabalho')
   const safeInviteUrl = escapeHtml(inviteUrl)
@@ -48,9 +48,9 @@ export async function sendInviteEmail({ to, inviteToken, workspaceName }) {
                 </tr>
                 <tr>
                   <td style="padding:8px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-                    <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;">Voce foi convidado(a) para a Simplifica</h1>
-                    <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#4b5563;">Voce recebeu um convite para acessar o workspace <strong style="color:#111827;">${safeWorkspaceName}</strong>.</p>
-                    <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#4b5563;">Clique no botao abaixo para aceitar o convite e definir sua senha.</p>
+                    <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;">Você foi convidado(a) para a Simplifica</h1>
+                    <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#4b5563;">Você recebeu um convite para acessar o workspace <strong style="color:#111827;">${safeWorkspaceName}</strong>.</p>
+                    <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#4b5563;">Clique no botão abaixo para aceitar o convite e definir sua senha.</p>
                   </td>
                 </tr>
                 <tr>
@@ -62,7 +62,7 @@ export async function sendInviteEmail({ to, inviteToken, workspaceName }) {
                 </tr>
                 <tr>
                   <td style="padding:16px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;color:#4b5563;">
-                    <p style="margin:0 0 8px 0;font-size:13px;line-height:1.6;">Se o botao nao funcionar, copie e cole este link no navegador:</p>
+                    <p style="margin:0 0 8px 0;font-size:13px;line-height:1.6;">Se o botão não funcionar, copie e cole este link no navegador:</p>
                     <p style="margin:0 0 20px 0;font-size:13px;line-height:1.6;word-break:break-all;">
                       <a href="${safeInviteUrl}" style="color:#E66C37;text-decoration:underline;">${safeInviteUrl}</a>
                     </p>
@@ -71,7 +71,7 @@ export async function sendInviteEmail({ to, inviteToken, workspaceName }) {
                 <tr>
                   <td style="padding:0 28px 22px 28px;font-family:Arial,Helvetica,sans-serif;color:#6b7280;">
                     <p style="margin:0 0 6px 0;font-size:12px;line-height:1.5;">Este convite expira em <strong>7 dias</strong>.</p>
-                    <p style="margin:0;font-size:12px;line-height:1.5;">Se voce nao esperava este e-mail, pode ignora-lo com seguranca.</p>
+                    <p style="margin:0;font-size:12px;line-height:1.5;">Se você não esperava este e-mail, pode ignorá-lo com segurança.</p>
                   </td>
                 </tr>
               </table>
