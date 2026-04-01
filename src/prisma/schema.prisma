@@ -95,8 +95,9 @@ model User {
   customRole        CustomRole? @relation(fields: [customRoleId], references: [id])
   accounts              Account[]
   sessions              Session[]
-  createdNotifications  Notification[]     @relation("NotificationCreator")
-  readNotifications     NotificationRead[]
+  createdNotifications    Notification[]        @relation("NotificationCreator")
+  readNotifications       NotificationRead[]
+  dismissedNotifications  NotificationDismiss[]
 }
 
 model Notification {
@@ -109,6 +110,7 @@ model Notification {
   createdById String?
   createdBy   User?     @relation("NotificationCreator", fields: [createdById], references: [id], onDelete: SetNull)
   readBy      NotificationRead[]
+  dismissedBy NotificationDismiss[]
   createdAt   DateTime  @default(now())
 }
 
@@ -119,6 +121,17 @@ model NotificationRead {
   userId         String
   user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
   readAt         DateTime     @default(now())
+
+  @@unique([notificationId, userId])
+}
+
+model NotificationDismiss {
+  id             String       @id @default(cuid())
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  dismissedAt    DateTime     @default(now())
 
   @@unique([notificationId, userId])
 }

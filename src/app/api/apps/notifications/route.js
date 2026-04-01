@@ -32,22 +32,31 @@ export async function GET(req) {
 
   let where = {}
 
+  // Only show notifications from the last 14 days
+  const expiryDate = new Date()
+
+  expiryDate.setDate(expiryDate.getDate() - 14)
+
+  const baseCreatedAt = { gte: expiryDate }
+
   if (isHighAdmin(userRole)) {
-    // Super Admin / Sub Admin: see ALL notifications from ALL workspaces
-    where = {}
+    where = { createdAt: baseCreatedAt }
   } else if (userRole === 'admin') {
-    // Admin: see all types from their workspace EXCEPT pending status (high admin only)
     where = {
       workspaceId: userWorkspaceId,
-      type: { not: 'user_status_pending' }
+      type: { not: 'user_status_pending' },
+      createdAt: baseCreatedAt
     }
   } else {
-    // Regular user: only dashboard_created from their workspace
     where = {
       workspaceId: userWorkspaceId,
-      type: { in: ['dashboard_created', 'dashboard_deleted'] }
+      type: { in: ['dashboard_created', 'dashboard_deleted'] },
+      createdAt: baseCreatedAt
     }
   }
+
+  // Exclude notifications dismissed by this user
+  where.dismissedBy = { none: { userId: currentUser.id } }
 
   const notifications = await prisma.notification.findMany({
     where,
@@ -139,4 +148,49 @@ export async function PATCH(req) {
   })
 
   return NextResponse.json({ message: 'OK' })
+}
+
+// DELETE /api/apps/notifications - Dismiss a notification for the current user
+export async function DELETE(req) {
+  const session = await getServerSession(authOptions)
+
+  if (!session) {
+    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+  }
+
+  const { id } = await req.json()
+
+  if (!id) {
+    return NextResponse.json({ message: 'ID da notificação é obrigatório' }, { status: 400 })
+  }
+
+  const currentUser = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true }
+  })
+
+  if (!currentUser) {
+    return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+  }
+
+  // Verify notification exists
+  const notification = await prisma.notification.findUnique({ where: { id }, select: { id: true } })
+
+  if (!notification) {
+    return NextResponse.json({ message: 'Notificação não encontrada' }, { status: 404 })
+  }
+
+  // Create dismiss record (hide only for this user)
+  await prisma.notificationDismiss
+    .create({
+      data: {
+        notificationId: id,
+        userId: currentUser.id
+      }
+    })
+    .catch(() => {
+      // Already dismissed — ignore duplicate
+    })
+
+  return NextResponse.json({ message: 'Notificação ocultada' })
 }

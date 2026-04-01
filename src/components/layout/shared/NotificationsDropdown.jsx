@@ -135,9 +135,23 @@ const NotificationDropdown = () => {
     }
   }
 
-  const handleRemoveNotification = (event, index) => {
+  const handleRemoveNotification = async (event, index) => {
     event.stopPropagation()
-    setNotifications(prev => prev.filter((_, i) => i !== index))
+    const notification = notifications[index]
+
+    try {
+      const res = await fetch('/api/apps/notifications', {
+        method: 'DELETE',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ id: notification.id })
+      })
+
+      if (res.ok) {
+        setNotifications(prev => prev.filter((_, i) => i !== index))
+      }
+    } catch (err) {
+      console.error('Erro ao remover notificação:', err)
+    }
   }
 
   useEffect(() => {
