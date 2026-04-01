@@ -1,11 +1,13 @@
 #!/bin/sh
 set -e
 
+PRISMA_CLI="node /app/prisma-cli/node_modules/prisma/build/index.js"
+
 echo "==> Running Prisma migrations..."
-node_modules/.bin/prisma db push --schema src/prisma/schema.prisma 2>&1 || {
+$PRISMA_CLI db push --schema src/prisma/schema.prisma 2>&1 || {
   echo "==> WARNING: prisma db push failed, retrying in 5s..."
   sleep 5
-  node_modules/.bin/prisma db push --schema src/prisma/schema.prisma 2>&1
+  $PRISMA_CLI db push --schema src/prisma/schema.prisma 2>&1
 }
 
 # Run production seed (creates super admin if not exists)
