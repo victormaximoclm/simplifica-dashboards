@@ -136,30 +136,6 @@ Mailpit (inbox de teste) estará em `http://localhost:8025`.
 
 ---
 
-## Comandos Úteis
-
-```bash
-# Rebuildar apenas a aplicação
-docker compose up -d --build app
-
-# Ver logs em tempo real
-docker compose logs -f app
-
-# Parar todos os serviços
-docker compose down
-
-# Parar e remover volumes (CUIDADO: apaga dados do banco)
-docker compose down -v
-
-# Acessar o banco via psql
-docker compose exec postgres psql -U simplifica -d simplifica
-
-# Rodar migration manualmente dentro do container
-docker compose exec app npx prisma db push --schema src/prisma/schema.prisma
-```
-
----
-
 ## Variáveis de Ambiente — Referência Completa
 
 Veja o arquivo [`.env.example`](.env.example) para a lista completa com descrições.
