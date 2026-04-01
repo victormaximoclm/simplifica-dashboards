@@ -48,7 +48,7 @@ export async function sendInviteEmail({ to, inviteToken, workspaceName }) {
                 </tr>
                 <tr>
                   <td style="padding:8px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-                    <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;">Você foi convidado(a) para a Simplifica</h1>
+                    <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;">Você foi convidado(a) para a Simplifica - Dashboards</h1>
                     <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#4b5563;">Você recebeu um convite para acessar o workspace <strong style="color:#111827;">${safeWorkspaceName}</strong>.</p>
                     <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#4b5563;">Clique no botão abaixo para aceitar o convite e definir sua senha.</p>
                   </td>
