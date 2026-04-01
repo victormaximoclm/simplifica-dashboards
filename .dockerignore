@@ -1,0 +1,14 @@
+node_modules
+.next
+.git
+.gitignore
+.env
+.env.local
+.env*.local
+pgdata
+*.md
+docker-compose*.yml
+Dockerfile
+.vscode
+.idea
+coverage

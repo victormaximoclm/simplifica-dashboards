@@ -1,0 +1,17 @@
+# Extensão do docker-compose para desenvolvimento local.
+# Uso: docker compose -f docker-compose.yml -f docker-compose.dev.yml up
+services:
+  postgres:
+    ports:
+      - '5433:5432'
+
+  mailpit:
+    image: axllent/mailpit:latest
+    container_name: simplifica-mailpit
+    restart: unless-stopped
+    ports:
+      - '1025:1025'
+      - '8025:8025'
+    environment:
+      MP_SMTP_AUTH_ACCEPT_ANY: 1
+      MP_SMTP_AUTH_ALLOW_INSECURE: 1

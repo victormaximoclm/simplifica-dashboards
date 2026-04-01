@@ -1,0 +1,40 @@
+services:
+  postgres:
+    image: postgres:16-alpine
+    container_name: simplifica-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${DB_USER:-simplifica}
+      POSTGRES_PASSWORD: ${DB_PASSWORD:-simplifica123}
+      POSTGRES_DB: ${DB_NAME:-simplifica}
+    ports:
+      - '${DB_PORT_EXTERNAL:-5433}:5432'
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ['CMD-SHELL', 'pg_isready -U ${DB_USER:-simplifica}']
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  app:
+    build:
+      context: .
+      dockerfile: Dockerfile
+      args:
+        NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+        NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+    container_name: simplifica-app
+    restart: unless-stopped
+    ports:
+      - '3000:3000'
+    env_file:
+      - .env
+    environment:
+      DATABASE_URL: postgresql://${DB_USER:-simplifica}:${DB_PASSWORD:-simplifica123}@postgres:5432/${DB_NAME:-simplifica}?schema=public
+    depends_on:
+      postgres:
+        condition: service_healthy
+
+volumes:
+  pgdata:

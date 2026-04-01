@@ -1,0 +1,132 @@
+datasource db {
+  provider = "postgresql"
+  url      = env("DATABASE_URL")
+}
+
+generator client {
+  provider        = "prisma-client-js"
+  binaryTargets   = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-1.1.x", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+}
+
+model Workspace {
+  id            String         @id @default(cuid())
+  name          String
+  slug          String         @unique
+  createdAt     DateTime       @default(now())
+  updatedAt     DateTime       @updatedAt
+  users         User[]
+  dashboards    Dashboard[]
+  notifications Notification[]
+}
+
+model CustomRole {
+  id          String    @id @default(cuid())
+  name        String    @unique
+  users       User[]
+  dashboardVisibility DashboardVisibility[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model Dashboard {
+  id          String    @id @default(cuid())
+  title       String
+  embedUrl    String
+  iframeCode  String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  allowedRoles DashboardVisibility[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+}
+
+model DashboardVisibility {
+  id           String     @id @default(cuid())
+  dashboardId  String
+  customRoleId String
+  dashboard    Dashboard  @relation(fields: [dashboardId], references: [id], onDelete: Cascade)
+  customRole   CustomRole @relation(fields: [customRoleId], references: [id], onDelete: Cascade)
+
+  @@unique([dashboardId, customRoleId])
+}
+
+model Account {
+  id                 String  @id @default(cuid())
+  userId             String
+  type               String
+  provider           String
+  providerAccountId  String
+  refresh_token      String?
+  access_token       String?
+  expires_at         Int?
+  token_type         String?
+  scope              String?
+  id_token           String?
+  session_state      String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model User {
+  id                String    @id @default(cuid())
+  name              String?
+  email             String?   @unique
+  emailVerified     DateTime?
+  image             String?
+  password          String?
+  role              String    @default("user")
+  status            String    @default("pending")
+  inviteToken       String?   @unique
+  inviteTokenExpiry DateTime?
+  lastLoginAt       DateTime?
+  workspaceId       String?
+  workspace         Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customRoleId      String?
+  customRole        CustomRole? @relation(fields: [customRoleId], references: [id])
+  accounts              Account[]
+  sessions              Session[]
+  createdNotifications  Notification[]     @relation("NotificationCreator")
+  readNotifications     NotificationRead[]
+}
+
+model Notification {
+  id          String    @id @default(cuid())
+  type        String    // user_invited, user_role_changed, user_status_changed, user_deleted, dashboard_created, dashboard_deleted
+  title       String
+  message     String
+  workspaceId String?
+  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?     @relation("NotificationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  readBy      NotificationRead[]
+  createdAt   DateTime  @default(now())
+}
+
+model NotificationRead {
+  id             String       @id @default(cuid())
+  notificationId String
+  notification   Notification @relation(fields: [notificationId], references: [id], onDelete: Cascade)
+  userId         String
+  user           User         @relation(fields: [userId], references: [id], onDelete: Cascade)
+  readAt         DateTime     @default(now())
+
+  @@unique([notificationId, userId])
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
