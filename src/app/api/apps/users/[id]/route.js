@@ -32,8 +32,8 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
   }
 
-  if (session.user.role === 'subAdmin' && targetUser.role === 'superAdmin') {
-    return NextResponse.json({ message: 'SubAdmin não pode modificar SuperAdmin' }, { status: 403 })
+  if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
+    return NextResponse.json({ message: 'SubAdmin não pode modificar SuperAdmin ou SubAdmin' }, { status: 403 })
   }
 
   const updateData = {}
@@ -155,8 +155,8 @@ export async function DELETE(req, { params }) {
     return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
   }
 
-  if (session.user.role === 'subAdmin' && targetUser.role === 'superAdmin') {
-    return NextResponse.json({ message: 'SubAdmin não pode deletar SuperAdmin' }, { status: 403 })
+  if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
+    return NextResponse.json({ message: 'SubAdmin não pode deletar SuperAdmin ou SubAdmin' }, { status: 403 })
   }
 
   // Prevent deleting own account

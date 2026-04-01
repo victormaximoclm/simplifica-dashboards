@@ -180,18 +180,18 @@ const RoleCards = () => {
       <Card sx={{ mt: 6 }}>
         <CardContent>
           <div className='flex items-center justify-between mbe-4'>
-            <Typography variant='h5'>Cargos Personalizados</Typography>
+            <Typography variant='h5'>Funções Personalizadas</Typography>
             <Button
               variant='contained'
               size='small'
               startIcon={<i className='tabler-plus' />}
               onClick={handleOpenCreate}
             >
-              Novo Cargo
+              Nova Função
             </Button>
           </div>
           <Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>
-            Cargos globais que podem ser atribuídos a usuários de qualquer espaço de trabalho para controlar a
+            Funções globais que podem ser atribuídas a usuários de qualquer espaço de trabalho para controlar a
             visibilidade dos dashboards.
           </Typography>
           <TableContainer>
@@ -209,7 +209,7 @@ const RoleCards = () => {
                   <TableRow>
                     <TableCell colSpan={4} align='center'>
                       <Typography variant='body2' color='text.secondary' sx={{ py: 4 }}>
-                        Nenhum cargo personalizado criado ainda.
+                        Nenhuma função personalizada criada ainda.
                       </Typography>
                     </TableCell>
                   </TableRow>
@@ -250,7 +250,7 @@ const RoleCards = () => {
 
       {/* Create / Edit Dialog */}
       <Dialog open={dialogOpen} onClose={() => setDialogOpen(false)} maxWidth='sm' fullWidth>
-        <DialogTitle>{editingRole ? 'Editar Cargo' : 'Novo Cargo'}</DialogTitle>
+        <DialogTitle>{editingRole ? 'Editar Função' : 'Nova Função'}</DialogTitle>
         <DialogContent>
           {error && (
             <Alert severity='error' sx={{ mb: 2 }}>
@@ -259,7 +259,7 @@ const RoleCards = () => {
           )}
           <Box display='flex' flexDirection='column' gap={3} mt={1}>
             <TextField
-              label='Nome do Cargo'
+              label='Nome da Função'
               value={formData.name}
               onChange={e => setFormData(prev => ({ ...prev, name: e.target.value }))}
               placeholder='Ex: Recepção, Faturamento, Enfermagem...'
@@ -278,13 +278,13 @@ const RoleCards = () => {
 
       {/* Delete Confirmation */}
       <Dialog open={deleteDialogOpen} onClose={() => setDeleteDialogOpen(false)}>
-        <DialogTitle>Excluir Cargo</DialogTitle>
+        <DialogTitle>Excluir Função</DialogTitle>
         <DialogContent>
           <Typography>
-            Tem certeza que deseja excluir o cargo <strong>{deletingRole?.name}</strong>?
+            Tem certeza que deseja excluir a função <strong>{deletingRole?.name}</strong>?
           </Typography>
           <Typography variant='body2' color='text.secondary' sx={{ mt: 1 }}>
-            Cargos com usuários vinculados não podem ser excluídos.
+            Funções com usuários vinculados não podem ser excluídas.
           </Typography>
         </DialogContent>
         <DialogActions>

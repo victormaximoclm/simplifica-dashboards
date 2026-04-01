@@ -10,17 +10,24 @@ import IconButton from '@mui/material/IconButton'
 import MenuItem from '@mui/material/MenuItem'
 import Typography from '@mui/material/Typography'
 import Divider from '@mui/material/Divider'
+import Alert from '@mui/material/Alert'
+import InputAdornment from '@mui/material/InputAdornment'
 
 // Component Imports
 import CustomTextField from '@core/components/mui/TextField'
 
-const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, onSave }) => {
+const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, callerEmail, onSave }) => {
   const [role, setRole] = useState('')
   const [workspaceId, setWorkspaceId] = useState('')
   const [status, setStatus] = useState('')
   const [customRoleId, setCustomRoleId] = useState('')
   const [customRoles, setCustomRoles] = useState([])
   const [loading, setLoading] = useState(false)
+  const [newPassword, setNewPassword] = useState('')
+  const [showPassword, setShowPassword] = useState(false)
+  const [passwordMsg, setPasswordMsg] = useState(null)
+  const [passwordErr, setPasswordErr] = useState(null)
+  const [passwordLoading, setPasswordLoading] = useState(false)
 
   useEffect(() => {
     if (user) {
@@ -28,6 +35,9 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, onSav
       setWorkspaceId(user.workspace?.id || '')
       setStatus(user.status || 'pending')
       setCustomRoleId(user.customRole?.id || '')
+      setNewPassword('')
+      setPasswordMsg(null)
+      setPasswordErr(null)
     }
   }, [user])
 
@@ -73,6 +83,47 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, onSav
   }
 
   if (!user) return null
+
+  const isHighAdminCaller = callerRole === 'superAdmin' || callerRole === 'subAdmin'
+  const isSelf = user.email === callerEmail
+
+  // SubAdmin can only reset passwords for admin/user, not superAdmin/subAdmin
+  const canResetPassword =
+    isHighAdminCaller &&
+    !isSelf &&
+    !(callerRole === 'subAdmin' && (user.role === 'superAdmin' || user.role === 'subAdmin'))
+
+  const handleResetPassword = async () => {
+    setPasswordMsg(null)
+    setPasswordErr(null)
+
+    if (!newPassword || newPassword.length < 6) {
+      setPasswordErr('Nova senha deve ter pelo menos 6 caracteres')
+
+      return
+    }
+
+    setPasswordLoading(true)
+
+    try {
+      const res = await fetch(`/api/apps/users/${user.id}/reset-password`, {
+        method: 'PUT',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ newPassword })
+      })
+
+      const data = await res.json()
+
+      if (!res.ok) throw new Error(data.message || 'Erro ao alterar senha')
+
+      setPasswordMsg('Senha alterada com sucesso')
+      setNewPassword('')
+    } catch (err) {
+      setPasswordErr(err.message)
+    } finally {
+      setPasswordLoading(false)
+    }
+  }
 
   return (
     <Drawer
@@ -142,6 +193,39 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, onSav
           <MenuItem value='inactive'>Inativo</MenuItem>
           {user.status === 'pending' && <MenuItem value='pending'>Pendente</MenuItem>}
         </CustomTextField>
+        {canResetPassword && (
+          <>
+            <Divider />
+            <Typography variant='subtitle2'>Redefinir Senha</Typography>
+            {passwordErr && <Alert severity='error'>{passwordErr}</Alert>}
+            {passwordMsg && <Alert severity='success'>{passwordMsg}</Alert>}
+            <CustomTextField
+              fullWidth
+              type={showPassword ? 'text' : 'password'}
+              label='Nova Senha'
+              placeholder='Mínimo 6 caracteres'
+              value={newPassword}
+              onChange={e => setNewPassword(e.target.value)}
+              InputProps={{
+                endAdornment: (
+                  <InputAdornment position='end'>
+                    <IconButton onClick={() => setShowPassword(!showPassword)} edge='end'>
+                      <i className={showPassword ? 'tabler-eye-off' : 'tabler-eye'} />
+                    </IconButton>
+                  </InputAdornment>
+                )
+              }}
+            />
+            <Button
+              variant='tonal'
+              color='warning'
+              onClick={handleResetPassword}
+              disabled={passwordLoading || !newPassword}
+            >
+              {passwordLoading ? 'Alterando...' : 'Alterar Senha'}
+            </Button>
+          </>
+        )}
         <div className='flex items-center gap-4'>
           <Button variant='contained' type='submit' disabled={loading}>
             {loading ? 'Salvando...' : 'Salvar'}

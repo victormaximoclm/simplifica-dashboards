@@ -39,7 +39,7 @@ export const createWorkspaceSchema = v.object({
 // ── Users ───────────────────────────────────
 export const inviteUserSchema = v.object({
   email: v.pipe(v.string(), v.email('E-mail inválido')),
-  workspaceId: v.pipe(v.string(), v.minLength(1, 'Espaço de trabalho é obrigatório')),
+  workspaceId: v.optional(v.nullable(v.string())),
   role: v.optional(v.string()),
   customRoleId: v.optional(v.nullable(v.string()))
 })

@@ -31,16 +31,25 @@ export async function POST(req) {
 
   const { email, workspaceId, role, customRoleId } = parsed.data
 
-  // Check if workspace exists
-  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
-
-  if (!workspace) {
-    return NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
-  }
-
   // Validate role assignment permissions
   const assignedRole = role || 'user'
   const assignable = getAssignableRoles(session.user.role)
+
+  // subAdmin role does not require a workspace
+  const needsWorkspace = assignedRole !== 'subAdmin'
+  let workspace = null
+
+  if (needsWorkspace) {
+    if (!workspaceId) {
+      return NextResponse.json({ message: 'Espaço de trabalho é obrigatório' }, { status: 400 })
+    }
+
+    workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
+
+    if (!workspace) {
+      return NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
+    }
+  }
 
   if (!assignable.includes(assignedRole)) {
     return NextResponse.json({ message: 'Você não tem permissão para atribuir este cargo' }, { status: 403 })
@@ -60,11 +69,17 @@ export async function POST(req) {
 
     await prisma.user.update({
       where: { email },
-      data: { inviteToken, inviteTokenExpiry, workspaceId, role: role || 'user', customRoleId: customRoleId || null }
+      data: {
+        inviteToken,
+        inviteTokenExpiry,
+        ...(needsWorkspace ? { workspaceId } : {}),
+        role: assignedRole,
+        customRoleId: customRoleId || null
+      }
     })
 
     try {
-      await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace.name })
+      await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simplifica' })
     } catch (err) {
       console.error('Erro ao enviar e-mail:', err)
 
@@ -87,9 +102,9 @@ export async function POST(req) {
   const user = await prisma.user.create({
     data: {
       email,
-      role: role || 'user',
+      role: assignedRole,
       status: 'pending',
-      workspaceId,
+      ...(needsWorkspace ? { workspaceId } : {}),
       customRoleId: customRoleId || null,
       inviteToken,
       inviteTokenExpiry
@@ -105,7 +120,7 @@ export async function POST(req) {
   })
 
   try {
-    await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace.name })
+    await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simplifica' })
   } catch (err) {
     console.error('Erro ao enviar e-mail:', err)
 
@@ -125,8 +140,8 @@ export async function POST(req) {
   await createNotification({
     type: 'user_invited',
     title: 'Novo convite enviado',
-    message: `${session.user.name || session.user.email} convidou ${email} para ${workspace.name}`,
-    workspaceId,
+    message: `${session.user.name || session.user.email} convidou ${email}${workspace ? ` para ${workspace.name}` : ''}`,
+    workspaceId: workspaceId || null,
     createdById: inviter?.id
   })
 

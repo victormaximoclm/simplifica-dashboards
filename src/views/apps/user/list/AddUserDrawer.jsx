@@ -62,7 +62,8 @@ const AddUserDrawer = ({ open, handleClose, workspaces, callerRole, onInviteSent
       return
     }
 
-    if (!workspaceId) {
+    // Workspace is required for admin and user, not for subAdmin
+    if (role !== 'subAdmin' && !workspaceId) {
       setError('Selecione um espaço de trabalho')
 
       return
@@ -74,7 +75,12 @@ const AddUserDrawer = ({ open, handleClose, workspaces, callerRole, onInviteSent
       const res = await fetch('/api/apps/users/invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ email, workspaceId, role, customRoleId: role === 'user' ? customRoleId : null })
+        body: JSON.stringify({
+          email,
+          ...(role !== 'subAdmin' ? { workspaceId } : {}),
+          role,
+          customRoleId: role === 'user' ? customRoleId : null
+        })
       })
 
       const data = await res.json()
@@ -127,22 +133,24 @@ const AddUserDrawer = ({ open, handleClose, workspaces, callerRole, onInviteSent
           onChange={e => setEmail(e.target.value)}
           autoFocus
         />
-        <CustomTextField
-          select
-          fullWidth
-          label='Espaço de Trabalho'
-          value={workspaceId}
-          onChange={e => setWorkspaceId(e.target.value)}
-        >
-          <MenuItem value='' disabled>
-            Selecione...
-          </MenuItem>
-          {(workspaces || []).map(ws => (
-            <MenuItem key={ws.id} value={ws.id}>
-              {ws.name}
+        {role !== 'subAdmin' && (
+          <CustomTextField
+            select
+            fullWidth
+            label='Espaço de Trabalho'
+            value={workspaceId}
+            onChange={e => setWorkspaceId(e.target.value)}
+          >
+            <MenuItem value='' disabled>
+              Selecione...
             </MenuItem>
-          ))}
-        </CustomTextField>
+            {(workspaces || []).map(ws => (
+              <MenuItem key={ws.id} value={ws.id}>
+                {ws.name}
+              </MenuItem>
+            ))}
+          </CustomTextField>
+        )}
         <CustomTextField select fullWidth label='Cargo' value={role} onChange={e => setRole(e.target.value)}>
           {callerRole === 'superAdmin' && <MenuItem value='subAdmin'>Sub Admin</MenuItem>}
           <MenuItem value='admin'>Admin</MenuItem>

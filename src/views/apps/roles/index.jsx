@@ -16,10 +16,10 @@ const Roles = () => {
           className='mbe-1'
           sx={theme => ({ ...(theme.palette.mode === 'light' && { color: '#2F2B3D' }) })}
         >
-          Cargos
+          Funções
         </Typography>
         <Typography sx={theme => ({ ...(theme.palette.mode === 'light' && { color: '#808390' }) })}>
-          Gerencie os cargos do sistema. Super Admin e Admin são cargos fixos. Cargos personalizados são globais e
+          Gerencie as funções do sistema. Super Admin e Admin são funções fixas. Funções personalizadas são globais e
           controlam a visibilidade dos dashboards.
         </Typography>
       </Grid>

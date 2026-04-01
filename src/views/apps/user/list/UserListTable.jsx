@@ -321,33 +321,42 @@ const UserListTable = ({ tableData, workspaces }) => {
       }),
       columnHelper.accessor('actions', {
         header: 'Ações',
-        cell: ({ row }) => (
-          <div className='flex items-center'>
-            {isHighAdmin && (
-              <>
-                {row.original.id !== session?.user?.id && (
-                  <IconButton onClick={() => openDeleteDialog(row.original)}>
-                    <i className='tabler-trash text-textSecondary' />
-                  </IconButton>
-                )}
-                <OptionMenu
-                  iconButtonProps={{ size: 'medium' }}
-                  iconClassName='text-textSecondary'
-                  options={[
-                    {
-                      text: 'Editar',
-                      icon: 'tabler-edit',
-                      menuItemProps: {
-                        className: 'flex items-center gap-2 text-textSecondary',
-                        onClick: () => handleEdit(row.original)
+        cell: ({ row }) => {
+          const targetRole = row.original.role
+          const isSelf = row.original.id === session?.user?.id
+
+          // SubAdmin cannot manage SuperAdmin or SubAdmin targets
+          const canManage =
+            isHighAdmin && !(callerRole === 'subAdmin' && (targetRole === 'superAdmin' || targetRole === 'subAdmin'))
+
+          return (
+            <div className='flex items-center'>
+              {canManage && (
+                <>
+                  {!isSelf && (
+                    <IconButton onClick={() => openDeleteDialog(row.original)}>
+                      <i className='tabler-trash text-textSecondary' />
+                    </IconButton>
+                  )}
+                  <OptionMenu
+                    iconButtonProps={{ size: 'medium' }}
+                    iconClassName='text-textSecondary'
+                    options={[
+                      {
+                        text: 'Editar',
+                        icon: 'tabler-edit',
+                        menuItemProps: {
+                          className: 'flex items-center gap-2 text-textSecondary',
+                          onClick: () => handleEdit(row.original)
+                        }
                       }
-                    }
-                  ]}
-                />
-              </>
-            )}
-          </div>
-        ),
+                    ]}
+                  />
+                </>
+              )}
+            </div>
+          )
+        },
         enableSorting: false
       })
     ],
@@ -513,6 +522,7 @@ const UserListTable = ({ tableData, workspaces }) => {
           user={editingUser}
           workspaces={workspaces || []}
           callerRole={callerRole}
+          callerEmail={session?.user?.email}
           onSave={handleEditSave}
         />
       )}
