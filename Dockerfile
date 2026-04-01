@@ -52,7 +52,12 @@ COPY --from=builder --chown=nextjs:nodejs /app/.next/static ./.next/static
 COPY --from=builder /app/src/prisma ./src/prisma
 
 # Install Prisma CLI in isolation (avoids conflicts with standalone package.json)
-RUN cd /tmp && npm init -y && npm install prisma@6.19.0 && cp -r /tmp/node_modules/prisma /app/node_modules/prisma && cp -r /tmp/node_modules/@prisma /app/node_modules/@prisma && cp -r /tmp/node_modules/.bin/prisma /app/node_modules/.bin/prisma && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
+RUN cd /tmp && npm init -y && npm install prisma@6.19.0 \
+    && cp -r /tmp/node_modules/prisma /app/node_modules/prisma \
+    && cp -r /tmp/node_modules/@prisma /app/node_modules/@prisma \
+    && mkdir -p /app/node_modules/.bin \
+    && ln -s ../prisma/build/index.js /app/node_modules/.bin/prisma \
+    && rm -rf /tmp/node_modules /tmp/package.json /tmp/package-lock.json
 
 # Copy seed file
 COPY --from=builder /app/src/prisma/seed.js ./src/prisma/seed.js
