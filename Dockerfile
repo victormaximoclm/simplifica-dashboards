@@ -50,6 +50,7 @@ COPY --from=builder /app/src/prisma ./src/prisma
 COPY --from=builder /app/node_modules/.pnpm/@prisma+client@6.19.1_prisma@6.19.0_typescript@5.9.3__typescript@5.9.3/node_modules/@prisma/client ./node_modules/@prisma/client
 COPY --from=builder /app/node_modules/.pnpm/prisma@6.19.0_typescript@5.9.3/node_modules/prisma ./node_modules/prisma
 COPY --from=builder /app/node_modules/.bin/prisma ./node_modules/.bin/prisma
+COPY --from=builder /app/node_modules/.pnpm/@prisma+engines@6.19.0/node_modules/@prisma/engines ./node_modules/@prisma/engines
 
 # Copy seed file
 COPY --from=builder /app/src/prisma/seed.js ./src/prisma/seed.js
