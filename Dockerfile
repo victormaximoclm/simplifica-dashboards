@@ -34,7 +34,7 @@ RUN pnpm build
 # Extract Prisma CLI packages to a clean directory (version-independent)
 RUN mkdir -p /prisma-cli/node_modules/@prisma /prisma-cli/node_modules/.bin \
     && PRISMA_DIR=$(node -e "console.log(require.resolve('prisma/package.json').replace('/package.json',''))") \
-    && ENGINES_DIR=$(node -e "console.log(require.resolve('@prisma/engines/package.json').replace('/package.json',''))") \
+    && ENGINES_DIR=$(find /app/node_modules -type d -path "*/@prisma/engines" | head -1) \
     && cp -rL "$PRISMA_DIR" /prisma-cli/node_modules/prisma \
     && cp -rL "$ENGINES_DIR" /prisma-cli/node_modules/@prisma/engines \
     && ln -s ../prisma/build/index.js /prisma-cli/node_modules/.bin/prisma
