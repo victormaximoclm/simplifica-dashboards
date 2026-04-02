@@ -447,7 +447,7 @@ const UserListTable = ({ tableData, workspaces }) => {
   return (
     <>
       <Card>
-        <CardHeader title='Filters' className='pbe-4' />
+        <CardHeader title='Filtros' className='pbe-4' />
         <TableFilters setData={setFilteredData} tableData={data} workspaces={workspaces || []} />
         <div className='flex justify-between flex-col items-start md:flex-row md:items-center p-6 border-bs gap-4'>
           <CustomTextField
@@ -512,7 +512,7 @@ const UserListTable = ({ tableData, workspaces }) => {
               <tbody>
                 <tr>
                   <td colSpan={table.getVisibleFlatColumns().length} className='text-center'>
-                    Sem Data Disponível
+                    Sem Dados Disponíveis
                   </td>
                 </tr>
               </tbody>

@@ -87,6 +87,9 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, calle
   const isHighAdminCaller = callerRole === 'superAdmin' || callerRole === 'subAdmin'
   const isSelf = user.email === callerEmail
 
+  // Super Admin cannot change their own role
+  const canChangeRole = !(callerRole === 'superAdmin' && isSelf)
+
   // SubAdmin can only reset passwords for admin/user, not superAdmin/subAdmin
   const canResetPassword =
     isHighAdminCaller &&
@@ -144,7 +147,14 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, calle
       <form onSubmit={handleSubmit} className='flex flex-col gap-6 p-6'>
         <CustomTextField fullWidth label='Nome' value={user.name || ''} disabled />
         <CustomTextField fullWidth label='Email' value={user.email || ''} disabled />
-        <CustomTextField select fullWidth label='Cargo do Sistema' value={role} onChange={e => setRole(e.target.value)}>
+        <CustomTextField
+          select
+          fullWidth
+          label='Cargo do Sistema'
+          value={role}
+          onChange={e => setRole(e.target.value)}
+          disabled={!canChangeRole}
+        >
           {callerRole === 'superAdmin' && <MenuItem value='subAdmin'>Sub Admin</MenuItem>}
           <MenuItem value='admin'>Admin</MenuItem>
           <MenuItem value='user'>Usuário</MenuItem>

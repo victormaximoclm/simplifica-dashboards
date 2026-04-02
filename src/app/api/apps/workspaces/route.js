@@ -40,7 +40,7 @@ export async function POST(req) {
     return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
   }
 
-  if (session.user.role !== 'superAdmin') {
+  if (!isHighAdmin(session.user.role)) {
     return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
   }
 

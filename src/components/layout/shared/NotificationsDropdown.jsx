@@ -70,6 +70,7 @@ const NotificationDropdown = () => {
   const [open, setOpen] = useState(false)
   const [notifications, setNotifications] = useState([])
   const [loading, setLoading] = useState(true)
+  const [expandedId, setExpandedId] = useState(null)
 
   const anchorRef = useRef(null)
   const ref = useRef(null)
@@ -104,7 +105,10 @@ const NotificationDropdown = () => {
     return () => clearInterval(interval)
   }, [fetchNotifications])
 
-  const handleClose = () => setOpen(false)
+  const handleClose = () => {
+    setOpen(false)
+    setExpandedId(null)
+  }
   const handleToggle = () => setOpen(prev => !prev)
 
   const markAsRead = async notificationId => {
@@ -119,6 +123,11 @@ const NotificationDropdown = () => {
     } catch (err) {
       console.error('Erro ao marcar notificação:', err)
     }
+  }
+
+  const handleExpand = notification => {
+    setExpandedId(prev => (prev === notification.id ? null : notification.id))
+    if (!notification.read) markAsRead(notification.id)
   }
 
   const markAllAsRead = async () => {
@@ -249,52 +258,78 @@ const NotificationDropdown = () => {
                     ) : (
                       notifications.map((notification, index) => {
                         const config = typeConfig[notification.type] || { icon: 'tabler-bell', color: 'primary' }
+                        const expanded = expandedId === notification.id
 
                         return (
                           <div
                             key={notification.id}
-                            className={classnames('flex plb-3 pli-4 gap-3 cursor-pointer hover:bg-actionHover group', {
-                              'border-be': index !== notifications.length - 1
-                            })}
-                            onClick={() => !notification.read && markAsRead(notification.id)}
+                            className={classnames(
+                              'flex flex-col plb-3 pli-4 gap-2 cursor-pointer hover:bg-actionHover group',
+                              {
+                                'border-be': index !== notifications.length - 1
+                              }
+                            )}
+                            onClick={() => handleExpand(notification)}
                           >
-                            <CustomAvatar color={config.color} skin='light-static' size={38}>
-                              <i className={classnames(config.icon, 'text-[22px]')} />
-                            </CustomAvatar>
-                            <div className='flex flex-col flex-auto overflow-hidden'>
-                              <Typography variant='body2' className='font-medium mbe-0.5' color='text.primary' noWrap>
-                                {notification.title}
-                              </Typography>
-                              <Typography variant='caption' color='text.secondary' className='mbe-1' noWrap>
-                                {notification.message}
-                              </Typography>
-                              <div className='flex items-center gap-2'>
-                                <Typography variant='caption' color='text.disabled'>
-                                  {timeAgo(notification.createdAt)}
+                            <div className='flex gap-3'>
+                              <CustomAvatar color={config.color} skin='light-static' size={38}>
+                                <i className={classnames(config.icon, 'text-[22px]')} />
+                              </CustomAvatar>
+                              <div className='flex flex-col flex-auto overflow-hidden'>
+                                <Typography
+                                  variant='body2'
+                                  className='font-medium mbe-0.5'
+                                  color='text.primary'
+                                  {...(!expanded && { noWrap: true })}
+                                >
+                                  {notification.title}
                                 </Typography>
-                                {notification.workspace && (
-                                  <Chip
-                                    label={notification.workspace.name}
-                                    size='small'
-                                    variant='outlined'
-                                    sx={{ height: 18, fontSize: '0.625rem' }}
-                                  />
-                                )}
+                                <Typography
+                                  variant='caption'
+                                  color='text.secondary'
+                                  className='mbe-1'
+                                  {...(!expanded && { noWrap: true })}
+                                >
+                                  {notification.message}
+                                </Typography>
+                                <div className='flex items-center gap-2'>
+                                  <Typography variant='caption' color='text.disabled'>
+                                    {timeAgo(notification.createdAt)}
+                                  </Typography>
+                                  {notification.workspace && (
+                                    <Chip
+                                      label={notification.workspace.name}
+                                      size='small'
+                                      variant='outlined'
+                                      sx={{ height: 18, fontSize: '0.625rem' }}
+                                    />
+                                  )}
+                                </div>
+                              </div>
+                              <div className='flex flex-col items-end gap-2'>
+                                <Badge
+                                  variant='dot'
+                                  color={notification.read ? 'secondary' : 'primary'}
+                                  className={classnames('mbs-1 mie-1', {
+                                    'invisible group-hover:visible': notification.read
+                                  })}
+                                />
+                                <i
+                                  className='tabler-x text-xl invisible group-hover:visible'
+                                  onClick={e => handleRemoveNotification(e, index)}
+                                />
                               </div>
                             </div>
-                            <div className='flex flex-col items-end gap-2'>
-                              <Badge
-                                variant='dot'
-                                color={notification.read ? 'secondary' : 'primary'}
-                                className={classnames('mbs-1 mie-1', {
-                                  'invisible group-hover:visible': notification.read
-                                })}
-                              />
-                              <i
-                                className='tabler-x text-xl invisible group-hover:visible'
-                                onClick={e => handleRemoveNotification(e, index)}
-                              />
-                            </div>
+                            {expanded && (
+                              <div className='mt-2 p-2 rounded bg-actionHover'>
+                                <Typography variant='body2' color='text.primary'>
+                                  {notification.title}
+                                </Typography>
+                                <Typography variant='body2' color='text.secondary'>
+                                  {notification.message}
+                                </Typography>
+                              </div>
+                            )}
                           </div>
                         )
                       })

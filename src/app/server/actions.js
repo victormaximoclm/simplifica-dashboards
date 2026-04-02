@@ -12,13 +12,14 @@ import { db as permissionData } from '@/fake-db/apps/permissions'
 import { db as profileData } from '@/fake-db/pages/userProfile'
 import { authOptions } from '@/libs/auth'
 import { prisma } from '@/libs/prisma'
+import { isHighAdmin } from '@/utils/roleHelpers'
 
 export const getUserData = async () => {
   const session = await getServerSession(authOptions)
 
   if (!session) return []
 
-  const where = session.user.role === 'superAdmin' ? {} : { workspaceId: session.user.workspaceId }
+  const where = isHighAdmin(session.user.role) ? {} : { workspaceId: session.user.workspaceId }
 
   const users = await prisma.user.findMany({
     where,
@@ -44,14 +45,14 @@ export const getUserStats = async () => {
 
   if (!session) return { totalUsers: 0, totalWorkspaces: 0, activeUsers: 0, pendingUsers: 0 }
 
-  const isSuperAdmin = session.user.role === 'superAdmin'
-  const where = isSuperAdmin ? {} : { workspaceId: session.user.workspaceId }
+  const highAdmin = isHighAdmin(session.user.role)
+  const where = highAdmin ? {} : { workspaceId: session.user.workspaceId }
 
   const [totalUsers, activeUsers, pendingUsers, totalWorkspaces] = await Promise.all([
     prisma.user.count({ where }),
     prisma.user.count({ where: { ...where, status: 'active' } }),
     prisma.user.count({ where: { ...where, status: 'pending' } }),
-    isSuperAdmin ? prisma.workspace.count() : Promise.resolve(1)
+    highAdmin ? prisma.workspace.count() : Promise.resolve(1)
   ])
 
   return { totalUsers, totalWorkspaces, activeUsers, pendingUsers }
@@ -72,7 +73,7 @@ export const getWorkspaces = async () => {
 
   if (!session) return []
 
-  if (session.user.role !== 'superAdmin') {
+  if (!isHighAdmin(session.user.role)) {
     // Regular user: return only their workspace
     if (!session.user.workspaceId) return []
 
@@ -84,7 +85,7 @@ export const getWorkspaces = async () => {
     return workspace ? [workspace] : []
   }
 
-  // SuperAdmin: return all workspaces
+  // High admin (superAdmin/subAdmin): return all workspaces
   return prisma.workspace.findMany({
     include: { _count: { select: { users: true } } },
     orderBy: { createdAt: 'desc' }
@@ -96,7 +97,7 @@ export const getWorkspaceById = async id => {
 
   if (!session) return null
 
-  if (session.user.role !== 'superAdmin' && session.user.workspaceId !== id) {
+  if (!isHighAdmin(session.user.role) && session.user.workspaceId !== id) {
     return null
   }
 

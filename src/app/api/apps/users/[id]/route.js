@@ -36,6 +36,13 @@ export async function PUT(req, { params }) {
     return NextResponse.json({ message: 'SubAdmin não pode modificar SuperAdmin ou SubAdmin' }, { status: 403 })
   }
 
+  // Super Admin cannot change their own role
+  const currentUser = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } })
+
+  if (currentUser && currentUser.id === id && session.user.role === 'superAdmin' && role && role !== 'superAdmin') {
+    return NextResponse.json({ message: 'Super Admin não pode alterar o próprio cargo' }, { status: 403 })
+  }
+
   const updateData = {}
 
   if (role && typeof role === 'string') {

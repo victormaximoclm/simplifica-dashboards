@@ -176,6 +176,11 @@ const Login = ({ mode }) => {
             onSubmit={handleSubmit(onSubmit)}
             className='flex flex-col gap-6'
           >
+            {errorState !== null && (
+              <Alert severity='error' onClose={() => setErrorState(null)}>
+                {errorState?.message?.[0] || errorState?.message || 'Email ou senha inválidos'}
+              </Alert>
+            )}
             <Controller
               name='email'
               control={control}
@@ -192,9 +197,9 @@ const Login = ({ mode }) => {
                     field.onChange(e.target.value)
                     errorState !== null && setErrorState(null)
                   }}
-                  {...((errors.email || errorState !== null) && {
+                  {...(errors.email && {
                     error: true,
-                    helperText: errors?.email?.message || errorState?.message[0]
+                    helperText: errors?.email?.message
                   })}
                 />
               )}
