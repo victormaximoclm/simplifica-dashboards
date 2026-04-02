@@ -1,3 +1,4 @@
+export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 
 import { getServerSession } from 'next-auth'
@@ -7,7 +8,77 @@ import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { dismissNotificationSchema, markReadSchema, parseBody } from '@/libs/validations'
 
-// GET /api/apps/notifications - List notifications filtered by role
+/** Tipos visíveis para Admin: convite, remoção de usuário, dashboard criado/removido (não vê mudanças de cargo/status de usuário). */
+const ADMIN_NOTIFICATION_TYPES = ['user_invited', 'user_deleted', 'dashboard_created', 'dashboard_deleted']
+
+const NOTIFICATION_MAX_AGE_DAYS = 14
+
+/**
+ * Filtro base de visibilidade por perfil (sem janela de 14 dias nem exclusão de dismissed).
+ * - superAdmin / subAdmin: sem restrição — veem todas as notificações de todos os workspaces.
+ * - admin: apenas notificações do próprio workspaceId da sessão; só tipos administrativos definidos.
+ * - user: apenas workspace do usuário; só tipo dashboard_updated; exige dashboardId e que o cargo do usuário
+ *   esteja em DashboardVisibility (join implícito via relação dashboard.allowedRoles).
+ */
+async function buildNotificationAccessWhere(session, currentUserDbId) {
+  const role = session.user.role
+  const sessionWorkspaceId = session.user.workspaceId
+
+  if (isHighAdmin(role)) {
+    return {}
+  }
+
+  if (role === 'admin') {
+    if (!sessionWorkspaceId) {
+      return { id: { in: [] } }
+    }
+
+    return {
+      workspaceId: sessionWorkspaceId,
+      type: { in: ADMIN_NOTIFICATION_TYPES }
+    }
+  }
+
+  if (role === 'user') {
+    const u = await prisma.user.findUnique({
+      where: { id: currentUserDbId },
+      select: { workspaceId: true, customRoleId: true }
+    })
+
+    if (!u?.workspaceId || !u.customRoleId) {
+      return { id: { in: [] } }
+    }
+
+    return {
+      workspaceId: u.workspaceId,
+      type: 'dashboard_updated',
+      dashboardId: { not: null },
+      dashboard: {
+        allowedRoles: {
+          some: { customRoleId: u.customRoleId }
+        }
+      }
+    }
+  }
+
+  return { id: { in: [] } }
+}
+
+function buildListWhere(accessWhere, currentUserDbId) {
+  const expiryDate = new Date()
+
+  expiryDate.setDate(expiryDate.getDate() - NOTIFICATION_MAX_AGE_DAYS)
+
+  return {
+    AND: [
+      accessWhere,
+      { createdAt: { gte: expiryDate } },
+      { dismissedBy: { none: { userId: currentUserDbId } } }
+    ]
+  }
+}
+
+// GET /api/apps/notifications — lista já filtrada no servidor; mesma forma de resposta de antes
 export async function GET(req) {
   const session = await getServerSession(authOptions)
 
@@ -18,10 +89,6 @@ export async function GET(req) {
   const { searchParams } = new URL(req.url)
   const limit = Math.min(parseInt(searchParams.get('limit') || '30', 10), 100)
 
-  const userRole = session.user.role
-  const userWorkspaceId = session.user.workspaceId
-
-  // Determine user ID for read status
   const currentUser = await prisma.user.findUnique({
     where: { email: session.user.email },
     select: { id: true }
@@ -31,33 +98,8 @@ export async function GET(req) {
     return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
   }
 
-  let where = {}
-
-  // Only show notifications from the last 14 days
-  const expiryDate = new Date()
-
-  expiryDate.setDate(expiryDate.getDate() - 14)
-
-  const baseCreatedAt = { gte: expiryDate }
-
-  if (isHighAdmin(userRole)) {
-    where = { createdAt: baseCreatedAt }
-  } else if (userRole === 'admin') {
-    where = {
-      workspaceId: userWorkspaceId,
-      type: { not: 'user_status_pending' },
-      createdAt: baseCreatedAt
-    }
-  } else {
-    where = {
-      workspaceId: userWorkspaceId,
-      type: { in: ['dashboard_created', 'dashboard_deleted'] },
-      createdAt: baseCreatedAt
-    }
-  }
-
-  // Exclude notifications dismissed by this user
-  where.dismissedBy = { none: { userId: currentUser.id } }
+  const accessWhere = await buildNotificationAccessWhere(session, currentUser.id)
+  const where = buildListWhere(accessWhere, currentUser.id)
 
   const notifications = await prisma.notification.findMany({
     where,
@@ -87,7 +129,7 @@ export async function GET(req) {
   return NextResponse.json(result)
 }
 
-// PATCH /api/apps/notifications - Mark notifications as read
+// PATCH — marcar como lida(s); só IDs que o usuário tem permissão para ver
 export async function PATCH(req) {
   const session = await getServerSession(authOptions)
 
@@ -112,39 +154,62 @@ export async function PATCH(req) {
     return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
   }
 
-  let ids = notificationIds || []
+  const accessWhere = await buildNotificationAccessWhere(session, currentUser.id)
+
+  const expiryDate = new Date()
+
+  expiryDate.setDate(expiryDate.getDate() - NOTIFICATION_MAX_AGE_DAYS)
+
+  let ids = []
 
   if (readAll) {
-    // Get all unread notification IDs for this user
-    const userRole = session.user.role
-    const userWorkspaceId = session.user.workspaceId
-
-    let where = {}
-
-    if (isHighAdmin(userRole)) {
-      where = {}
-    } else if (userRole === 'admin') {
-      where = { workspaceId: userWorkspaceId }
-    } else {
-      where = {
-        workspaceId: userWorkspaceId,
-        type: { in: ['dashboard_created', 'dashboard_deleted'] }
-      }
+    const whereReadAll = {
+      AND: [
+        accessWhere,
+        { createdAt: { gte: expiryDate } },
+        { dismissedBy: { none: { userId: currentUser.id } } }
+      ]
     }
 
     const allNotifications = await prisma.notification.findMany({
-      where,
+      where: whereReadAll,
       select: { id: true }
     })
 
     ids = allNotifications.map(n => n.id)
+  } else {
+    ids = notificationIds || []
+
+    if (ids.length === 0) {
+      return NextResponse.json({ message: 'OK' })
+    }
+
+    const allowed = await prisma.notification.findMany({
+      where: {
+        AND: [
+          accessWhere,
+          { id: { in: ids } },
+          { createdAt: { gte: expiryDate } },
+          { dismissedBy: { none: { userId: currentUser.id } } }
+        ]
+      },
+      select: { id: true }
+    })
+
+    const allowedSet = new Set(allowed.map(a => a.id))
+
+    if (ids.some(i => !allowedSet.has(i))) {
+      return NextResponse.json(
+        { message: 'Uma ou mais notificações não existem ou você não tem permissão para alterá-las.' },
+        { status: 403 }
+      )
+    }
   }
 
   if (ids.length === 0) {
     return NextResponse.json({ message: 'OK' })
   }
 
-  // Upsert read records (skip existing)
   await prisma.notificationRead.createMany({
     data: ids.map(notificationId => ({
       notificationId,
@@ -156,7 +221,7 @@ export async function PATCH(req) {
   return NextResponse.json({ message: 'OK' })
 }
 
-// DELETE /api/apps/notifications - Dismiss a notification for the current user
+// DELETE — ocultar para o usuário; só se a notificação estiver no escopo de visibilidade
 export async function DELETE(req) {
   const session = await getServerSession(authOptions)
 
@@ -181,14 +246,28 @@ export async function DELETE(req) {
     return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
   }
 
-  // Verify notification exists
-  const notification = await prisma.notification.findUnique({ where: { id }, select: { id: true } })
+  const accessWhere = await buildNotificationAccessWhere(session, currentUser.id)
+
+  const expiryDate = new Date()
+
+  expiryDate.setDate(expiryDate.getDate() - NOTIFICATION_MAX_AGE_DAYS)
+
+  const notification = await prisma.notification.findFirst({
+    where: {
+      AND: [
+        accessWhere,
+        { id },
+        { createdAt: { gte: expiryDate } },
+        { dismissedBy: { none: { userId: currentUser.id } } }
+      ]
+    },
+    select: { id: true }
+  })
 
   if (!notification) {
     return NextResponse.json({ message: 'Notificação não encontrada' }, { status: 404 })
   }
 
-  // Create dismiss record (hide only for this user)
   await prisma.notificationDismiss
     .create({
       data: {
@@ -196,9 +275,7 @@ export async function DELETE(req) {
         userId: currentUser.id
       }
     })
-    .catch(() => {
-      // Already dismissed — ignore duplicate
-    })
+    .catch(() => {})
 
   return NextResponse.json({ message: 'Notificação ocultada' })
 }

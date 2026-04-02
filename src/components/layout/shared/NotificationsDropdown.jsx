@@ -43,7 +43,8 @@ const typeConfig = {
   user_status_pending: { icon: 'tabler-user-pause', color: 'warning' },
   user_deleted: { icon: 'tabler-user-minus', color: 'error' },
   dashboard_created: { icon: 'tabler-layout-dashboard', color: 'primary' },
-  dashboard_deleted: { icon: 'tabler-layout-off', color: 'error' }
+  dashboard_deleted: { icon: 'tabler-layout-off', color: 'error' },
+  dashboard_updated: { icon: 'tabler-refresh', color: 'primary' }
 }
 
 function timeAgo(dateStr) {
@@ -84,7 +85,7 @@ const NotificationDropdown = () => {
 
   const fetchNotifications = useCallback(async () => {
     try {
-      const res = await fetch('/api/apps/notifications')
+      const res = await fetch('/api/apps/notifications', { cache: 'no-store' })
 
       if (res.ok) {
         const data = await res.json()

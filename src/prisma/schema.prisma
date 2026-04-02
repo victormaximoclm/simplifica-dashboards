@@ -36,6 +36,7 @@ model Dashboard {
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   allowedRoles DashboardVisibility[]
+  notifications Notification[]
   createdAt   DateTime  @default(now())
   updatedAt   DateTime  @updatedAt
 }
@@ -98,20 +99,25 @@ model User {
   createdNotifications    Notification[]        @relation("NotificationCreator")
   readNotifications       NotificationRead[]
   dismissedNotifications  NotificationDismiss[]
+  passwordResetToken PasswordResetToken?
 }
 
 model Notification {
   id          String    @id @default(cuid())
-  type        String    // user_invited, user_role_changed, user_status_changed, user_deleted, dashboard_created, dashboard_deleted
+  type        String    // user_invited, user_role_changed, user_status_changed, user_status_pending, user_deleted, dashboard_created, dashboard_deleted, dashboard_updated
   title       String
   message     String
   workspaceId String?
+  dashboardId String?
   workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: SetNull)
   createdById String?
   createdBy   User?     @relation("NotificationCreator", fields: [createdById], references: [id], onDelete: SetNull)
   readBy      NotificationRead[]
   dismissedBy NotificationDismiss[]
   createdAt   DateTime  @default(now())
+
+  @@index([dashboardId])
 }
 
 model NotificationRead {
@@ -142,4 +148,12 @@ model VerificationToken {
   expires    DateTime
 
   @@unique([identifier, token])
+}
+
+model PasswordResetToken {
+  id        String   @id @default(cuid())
+  userId    String  @unique
+  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String  @unique
+  expiresAt DateTime
 }

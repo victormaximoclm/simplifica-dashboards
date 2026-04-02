@@ -83,7 +83,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
       }
     }
 
-    fetch(url)
+    fetch(url, { cache: 'no-store' })
       .then(res => (res.ok ? res.json() : []))
       .then(data => setDashboards(data))
       .catch(() => setDashboards([]))
@@ -98,8 +98,12 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
 
     fetchDashboards()
     window.addEventListener('workspace-changed', fetchDashboards)
+    window.addEventListener('dashboards-changed', fetchDashboards)
 
-    return () => window.removeEventListener('workspace-changed', fetchDashboards)
+    return () => {
+      window.removeEventListener('workspace-changed', fetchDashboards)
+      window.removeEventListener('dashboards-changed', fetchDashboards)
+    }
   }, [fetchDashboards, session])
 
   return (

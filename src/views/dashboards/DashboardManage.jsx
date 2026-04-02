@@ -48,12 +48,18 @@ const DashboardManage = ({ workspaces }) => {
   })
 
   const fetchDashboards = useCallback(async () => {
-    const res = await fetch('/api/apps/dashboards')
+    const res = await fetch('/api/apps/dashboards', { cache: 'no-store' })
 
     if (res.ok) {
       setDashboards(await res.json())
     }
   }, [])
+
+  const notifyDashboardsChanged = () => {
+    if (typeof window !== 'undefined') {
+      window.dispatchEvent(new Event('dashboards-changed'))
+    }
+  }
 
   const fetchCustomRoles = useCallback(async () => {
     const res = await fetch('/api/apps/custom-roles')
@@ -123,7 +129,8 @@ const DashboardManage = ({ workspaces }) => {
       setDialogOpen(false)
       setSuccess(editingDashboard ? 'Dashboard atualizado!' : 'Dashboard criado!')
       resetForm()
-      fetchDashboards()
+      await fetchDashboards()
+      notifyDashboardsChanged()
       setTimeout(() => setSuccess(''), 3000)
     } else {
       const data = await res.json()
@@ -139,7 +146,8 @@ const DashboardManage = ({ workspaces }) => {
       setDeleteDialogOpen(false)
       setDeletingId(null)
       setSuccess('Dashboard excluído!')
-      fetchDashboards()
+      await fetchDashboards()
+      notifyDashboardsChanged()
       setTimeout(() => setSuccess(''), 3000)
     }
   }

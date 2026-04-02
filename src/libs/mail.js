@@ -1,5 +1,7 @@
 import nodemailer from 'nodemailer'
 
+import { i18n } from '@/configs/i18n'
+
 const escapeHtml = value =>
   String(value)
     .replace(/&/g, '&amp;')
@@ -10,7 +12,7 @@ const escapeHtml = value =>
 
 const transporter = nodemailer.createTransport({
   host: process.env.SMTP_HOST || 'smtp.ethereal.email',
-  port: parseInt(process.env.SMTP_PORT || '587'),
+  port: parseInt(process.env.SMTP_PORT || '587', 10),
   secure: process.env.SMTP_SECURE === 'true',
   auth: {
     user: process.env.SMTP_USER || '',
@@ -18,9 +20,21 @@ const transporter = nodemailer.createTransport({
   }
 })
 
+/** Envio genérico (ex.: recuperação de senha). */
+export async function sendMail({ to, subject, html, text }) {
+  return transporter.sendMail({
+    from: process.env.SMTP_FROM || '"Plataforma" <noreply@plataforma.com>',
+    to,
+    subject,
+    html,
+    ...(text ? { text } : {})
+  })
+}
+
 export async function sendInviteEmail({ to, inviteToken, workspaceName }) {
-  const appUrl = process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000'
-  const inviteUrl = `${appUrl}/accept-invite?token=${encodeURIComponent(inviteToken)}`
+  const appUrl = (process.env.NEXT_PUBLIC_APP_URL || 'http://localhost:3000').replace(/\/$/, '')
+  const locale = i18n.defaultLocale
+  const inviteUrl = `${appUrl}/${locale}/accept-invite?token=${encodeURIComponent(inviteToken)}`
   const logoUrl = `${appUrl}/images/icons/simplifica.png`
   const year = new Date().getFullYear()
   const safeWorkspaceName = escapeHtml(workspaceName || 'seu espaço de trabalho')

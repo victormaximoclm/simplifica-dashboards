@@ -111,12 +111,12 @@ const Register = ({ mode }) => {
             <Typography>Make your app management easy and fun!</Typography>
           </div>
           <form noValidate autoComplete='off' onSubmit={e => e.preventDefault()} className='flex flex-col gap-6'>
-            <CustomTextField autoFocus fullWidth label='Username' placeholder='Enter your username' />
-            <CustomTextField fullWidth label='Email' placeholder='Enter your email' />
+            <CustomTextField autoFocus fullWidth label='Nome de usuário' placeholder='Digite seu nome de usuário' />
+            <CustomTextField fullWidth label='Email' placeholder='Digite seu email' />
             <CustomTextField
               fullWidth
-              label='Password'
-              placeholder='············'
+              label='Senha'
+              placeholder='Mínimo 6 caracteres'
               type={isPasswordShown ? 'text' : 'password'}
               slotProps={{
                 input: {
@@ -136,7 +136,7 @@ const Register = ({ mode }) => {
                 <>
                   <span>I agree to </span>
                   <Link className='text-primary' href='/' onClick={e => e.preventDefault()}>
-                    privacy policy & terms
+                    política de privacidade e termos
                   </Link>
                 </>
               }

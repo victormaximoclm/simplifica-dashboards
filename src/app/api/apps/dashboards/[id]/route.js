@@ -1,3 +1,4 @@
+export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 
 import { getServerSession } from 'next-auth'
@@ -154,6 +155,17 @@ export async function PUT(req, { params }) {
     where: { id },
     data: updateData,
     include: dashboardIncludes
+  })
+
+  const editor = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } })
+
+  await createNotification({
+    type: 'dashboard_updated',
+    title: 'Dashboard atualizado',
+    message: `${session.user.name || session.user.email} atualizou o dashboard "${dashboard.title}"`,
+    workspaceId: dashboard.workspaceId,
+    dashboardId: dashboard.id,
+    createdById: editor?.id
   })
 
   return NextResponse.json(dashboard)

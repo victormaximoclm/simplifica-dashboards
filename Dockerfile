@@ -1,3 +1,4 @@
+# Multi-stage: deps → build (standalone) → runner com Prisma CLI para db push no entrypoint.
 FROM node:20-alpine AS base
 
 # ── Dependencies ─────────────────────────────

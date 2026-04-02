@@ -31,7 +31,16 @@ services:
     env_file:
       - .env
     environment:
+      NODE_ENV: production
+      HOSTNAME: 0.0.0.0
+      PORT: 3000
       DATABASE_URL: postgresql://${DB_USER:-simplifica}:${DB_PASSWORD:-simplifica123}@postgres:5432/${DB_NAME:-simplifica}?schema=public
+      API_URL: ${API_URL:-http://localhost:3000/api}
+      NEXTAUTH_URL: ${NEXTAUTH_URL:-http://localhost:3000}
+      NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-troque_este_segredo_em_producao}
+      NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
+      NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+      SEED_ON_START: ${SEED_ON_START:-false}
     depends_on:
       postgres:
         condition: service_healthy

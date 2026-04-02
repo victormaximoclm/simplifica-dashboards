@@ -49,6 +49,9 @@ const MaskImg = styled('img')({
   zIndex: -1
 })
 
+import Alert from '@mui/material/Alert'
+import { useState } from 'react'
+
 const ForgotPassword = ({ mode }) => {
   // Vars
   const darkImg = '/images/pages/auth-mask-dark.png'
@@ -63,6 +66,35 @@ const ForgotPassword = ({ mode }) => {
   const hidden = useMediaQuery(theme.breakpoints.down('md'))
   const authBackground = useImageVariant(mode, lightImg, darkImg)
   const characterIllustration = useImageVariant(mode, lightIllustration, darkIllustration)
+
+  // State
+  const [email, setEmail] = useState('')
+  const [error, setError] = useState('')
+  const [success, setSuccess] = useState('')
+  const [loading, setLoading] = useState(false)
+
+  const handleSubmit = async e => {
+    e.preventDefault()
+    setError('')
+    setSuccess('')
+    if (!email) {
+      setError('Digite seu e-mail.')
+      return
+    }
+    setLoading(true)
+    const res = await fetch('/api/auth/forgot-password', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ email })
+    })
+    const data = await res.json()
+    setLoading(false)
+    if (res.ok) {
+      setSuccess(data.message || 'Se o email estiver cadastrado, enviaremos instruções.')
+    } else {
+      setError(data.message || 'Erro ao enviar email.')
+    }
+  }
 
   return (
     <div className='flex bs-full justify-center'>
@@ -89,9 +121,19 @@ const ForgotPassword = ({ mode }) => {
             <Typography variant='h4'>Esqueci minha senha 🔒</Typography>
             <Typography>Digite seu e-mail e enviaremos instruções para redefinir sua senha</Typography>
           </div>
-          <form noValidate autoComplete='off' onSubmit={e => e.preventDefault()} className='flex flex-col gap-6'>
-            <CustomTextField autoFocus fullWidth label='Email' placeholder='Digite seu e-mail' />
-            <Button fullWidth variant='contained' type='submit'>
+          {error && <Alert severity='error'>{error}</Alert>}
+          {success && <Alert severity='success'>{success}</Alert>}
+          <form noValidate autoComplete='off' onSubmit={handleSubmit} className='flex flex-col gap-6'>
+            <CustomTextField
+              autoFocus
+              fullWidth
+              label='Email'
+              placeholder='Digite seu e-mail'
+              value={email}
+              onChange={e => setEmail(e.target.value)}
+              disabled={loading}
+            />
+            <Button fullWidth variant='contained' type='submit' disabled={loading}>
               Enviar link de redefinição
             </Button>
             <Typography className='flex justify-center items-center' color='primary.main'>

@@ -1,3 +1,4 @@
+export const runtime = 'nodejs'
 // Next Imports
 import { NextResponse } from 'next/server'
 

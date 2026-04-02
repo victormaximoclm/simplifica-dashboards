@@ -1,7 +1,7 @@
 'use client'
 
 // React Imports
-import { useState } from 'react'
+import { useState, useEffect } from 'react'
 
 // Next Imports
 import Link from 'next/link'
@@ -20,7 +20,7 @@ import Divider from '@mui/material/Divider'
 import Alert from '@mui/material/Alert'
 
 // Third-party Imports
-import { signIn } from 'next-auth/react'
+import { signIn, signOut } from 'next-auth/react'
 import { Controller, useForm } from 'react-hook-form'
 import { valibotResolver } from '@hookform/resolvers/valibot'
 import { email, object, minLength, string, pipe, nonEmpty } from 'valibot'
@@ -65,12 +65,8 @@ const MaskImg = styled('img')({
 })
 
 const schema = object({
-  email: pipe(string(), minLength(1, 'This field is required'), email('Email is invalid')),
-  password: pipe(
-    string(),
-    nonEmpty('This field is required'),
-    minLength(5, 'Password must be at least 5 characters long')
-  )
+  email: pipe(string(), minLength(1, 'Email é obrigatório'), email('Email inválido')),
+  password: pipe(string(), nonEmpty('Senha é obrigatória'), minLength(5, 'Senha deve ter pelo menos 5 caracteres'))
 })
 
 const getSafeRedirectPath = redirectTo => {
@@ -124,6 +120,20 @@ const Login = ({ mode }) => {
     borderedDarkIllustration
   )
 
+  useEffect(() => {
+    const msg = searchParams.get('error')
+    if (!msg) return
+
+    const decoded = decodeURIComponent(msg)
+    const mustClearSession = decoded.includes('inativ') || decoded.includes('removida') || decoded.includes('removido')
+
+    if (mustClearSession) {
+      signOut({ redirect: false }).then(() => setErrorState({ message: decoded }))
+    } else {
+      setErrorState({ message: decoded })
+    }
+  }, [searchParams])
+
   const handleClickShowPassword = () => setIsPasswordShown(show => !show)
 
   const onSubmit = async data => {
@@ -136,14 +146,22 @@ const Login = ({ mode }) => {
     if (res && res.ok && res.error === null) {
       // Vars
       const redirectURL = getSafeRedirectPath(searchParams.get('redirectTo'))
-
       router.replace(getLocalizedUrl(redirectURL, locale))
     } else {
+      // Trata diferentes formatos de erro
+      let errorMsg = 'Email ou senha inválidos'
       if (res?.error) {
-        const error = JSON.parse(res.error)
-
-        setErrorState(error)
+        try {
+          const error = JSON.parse(res.error)
+          if (typeof error === 'string') errorMsg = error
+          else if (Array.isArray(error?.message)) errorMsg = error.message.join(' ')
+          else if (typeof error?.message === 'string') errorMsg = error.message
+          else errorMsg = JSON.stringify(error)
+        } catch {
+          errorMsg = res.error
+        }
       }
+      setErrorState({ message: errorMsg })
     }
   }
 
@@ -178,7 +196,7 @@ const Login = ({ mode }) => {
           >
             {errorState !== null && (
               <Alert severity='error' onClose={() => setErrorState(null)}>
-                {errorState?.message?.[0] || errorState?.message || 'Email ou senha inválidos'}
+                {errorState?.message || 'Email ou senha inválidos'}
               </Alert>
             )}
             <Controller
@@ -192,7 +210,7 @@ const Login = ({ mode }) => {
                   fullWidth
                   type='email'
                   label='Email'
-                  placeholder='Enter your email'
+                  placeholder='Digite seu email'
                   onChange={e => {
                     field.onChange(e.target.value)
                     errorState !== null && setErrorState(null)
