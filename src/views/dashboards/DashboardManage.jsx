@@ -41,7 +41,8 @@ const DashboardManage = ({ workspaces }) => {
   const [success, setSuccess] = useState('')
 
   const [formData, setFormData] = useState({
-    iframeCode: '',
+    reportId: '',
+    pbWorkspaceId: '',
     title: '',
     workspaceId: '',
     allowedRoleIds: []
@@ -78,7 +79,7 @@ const DashboardManage = ({ workspaces }) => {
   const filteredRoles = customRoles
 
   const resetForm = () => {
-    setFormData({ iframeCode: '', title: '', workspaceId: '', allowedRoleIds: [] })
+    setFormData({ reportId: '', pbWorkspaceId: '', title: '', workspaceId: '', allowedRoleIds: [] })
     setEditingDashboard(null)
     setError('')
   }
@@ -92,7 +93,8 @@ const DashboardManage = ({ workspaces }) => {
     setEditingDashboard(dashboard)
 
     setFormData({
-      iframeCode: dashboard.iframeCode,
+      reportId: dashboard.reportId,
+      pbWorkspaceId: dashboard.pbWorkspaceId,
       title: dashboard.title,
       workspaceId: dashboard.workspaceId,
       allowedRoleIds: (dashboard.allowedRoles || []).map(ar => ar.customRoleId)
@@ -104,9 +106,13 @@ const DashboardManage = ({ workspaces }) => {
   const handleSubmit = async () => {
     setError('')
 
-    if (!formData.iframeCode.trim()) {
-      setError('Cole o código iframe do Power BI')
-
+    const uuidRegex = /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i
+    if (!uuidRegex.test(formData.reportId)) {
+      setError('Report ID inválido — cole o UUID do relatório no Power BI')
+      return
+    }
+    if (!uuidRegex.test(formData.pbWorkspaceId)) {
+      setError('Workspace ID inválido — cole o UUID do workspace no Power BI')
       return
     }
 
@@ -247,21 +253,30 @@ const DashboardManage = ({ workspaces }) => {
           )}
           <Box display='flex' flexDirection='column' gap={3} mt={1}>
             <TextField
-              label='Título (opcional - será extraído do iframe)'
+              label='Título do Dashboard'
               value={formData.title}
               onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
               fullWidth
+              required
             />
             <TextField
-              label='Código iframe do Power BI'
-              value={formData.iframeCode}
-              onChange={e => setFormData(prev => ({ ...prev, iframeCode: e.target.value }))}
-              placeholder='<iframe title="..." src="https://app.powerbi.com/view?r=..." ...></iframe>'
-              multiline
-              rows={4}
+              label='Report ID (Power BI)'
+              value={formData.reportId}
+              onChange={e => setFormData(prev => ({ ...prev, reportId: e.target.value }))}
+              placeholder='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
               fullWidth
-              helperText='Cole o código iframe gerado pelo Power BI'
+              helperText='Encontre na URL do relatório: app.powerbi.com/groups/{workspaceId}/reports/{reportId}'
             />
+
+            <TextField
+              label='Workspace ID (Power BI)'
+              value={formData.pbWorkspaceId}
+              onChange={e => setFormData(prev => ({ ...prev, pbWorkspaceId: e.target.value }))}
+              placeholder='xxxxxxxx-xxxx-xxxx-xxxx-xxxxxxxxxxxx'
+              fullWidth
+              helperText='Encontre na URL do relatório: app.powerbi.com/groups/{workspaceId}/reports/{reportId}'
+            />
+
             <TextField
               select
               label='Workspace'

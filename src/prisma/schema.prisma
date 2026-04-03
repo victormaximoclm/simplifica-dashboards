@@ -31,8 +31,8 @@ model CustomRole {
 model Dashboard {
   id          String    @id @default(cuid())
   title       String
-  embedUrl    String
-  iframeCode  String
+  reportId    String
+  pbWorkspaceId String
   workspaceId String
   workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   allowedRoles DashboardVisibility[]

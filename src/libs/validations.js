@@ -46,10 +46,24 @@ export const inviteUserSchema = v.object({
 
 // ── Dashboards ──────────────────────────────
 export const createDashboardSchema = v.object({
-  iframeCode: v.pipe(v.string(), v.minLength(1, 'Código iframe é obrigatório')),
+  reportId: v.pipe(
+    v.string(),
+    v.minLength(1, 'ID do relatório é obrigatório'),
+    v.regex(/^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i, 'Report ID inválido — deve ser um UUID')
+  ),
+
+  pbWorkspaceId: v.pipe(
+    v.string(),
+    v.minLength(1, 'ID do workspace do Power BI é obrigatório'),
+    v.regex(
+      /^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$/i,
+      'ID do workspace do Power BI inválido — deve ser um UUID'
+    )
+  ),
+
   workspaceId: v.pipe(v.string(), v.minLength(1, 'Workspace é obrigatório')),
   allowedRoleIds: v.optional(v.array(v.string())),
-  title: v.optional(v.string())
+  title: v.optional(v.string(), v.minLength(1, 'Título do dashboard não pode ser vazio'))
 })
 
 // ── Custom Roles ────────────────────────────

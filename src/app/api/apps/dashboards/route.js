@@ -9,38 +9,6 @@ import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
 import { createDashboardSchema, parseBody } from '@/libs/validations'
 
-function sanitizeDashboardTitle(value) {
-  return String(value || 'Dashboard sem título')
-    .replace(/[<>]/g, '')
-    .trim()
-    .slice(0, 120)
-}
-
-function validateEmbedUrl(rawUrl) {
-  try {
-    const url = new URL(String(rawUrl || '').trim())
-
-    if (!['http:', 'https:'].includes(url.protocol)) {
-      return null
-    }
-
-    return url.toString()
-  } catch {
-    return null
-  }
-}
-
-function parseIframe(iframeCode) {
-  const srcMatch = iframeCode.match(/src\s*=\s*["']([^"']+)["']/i)
-  const titleMatch = iframeCode.match(/title\s*=\s*["']([^"']+)["']/i)
-  const embedUrl = srcMatch ? validateEmbedUrl(srcMatch[1]) : null
-
-  return {
-    embedUrl,
-    title: sanitizeDashboardTitle(titleMatch ? titleMatch[1] : 'Dashboard sem título')
-  }
-}
-
 const dashboardIncludes = {
   workspace: { select: { id: true, name: true } },
   allowedRoles: {
@@ -102,44 +70,22 @@ export async function GET(req) {
 // POST /api/apps/dashboards - Create dashboard (superAdmin only)
 export async function POST(req) {
   const session = await getServerSession(authOptions)
-
-  if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
-  }
-
-  if (!isHighAdmin(session.user.role)) {
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-  }
+  if (!session) return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+  if (!isHighAdmin(session.user.role)) return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
   const parsed = parseBody(createDashboardSchema, await req.json())
+  if (!parsed.success) return NextResponse.json({ message: parsed.message }, { status: 400 })
 
-  if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
-  }
+  const { reportId, pbWorkspaceId, workspaceId, allowedRoleIds, title } = parsed.data
 
-  const { iframeCode, workspaceId, allowedRoleIds, title: customTitle } = parsed.data
-
-  // Validate workspace exists
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
-
-  if (!workspace) {
-    return NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
-  }
-
-  const iframeParsed = parseIframe(iframeCode)
-
-  if (!iframeParsed.embedUrl) {
-    return NextResponse.json(
-      { message: 'Não foi possível extrair a URL do iframe. Verifique o código colado.' },
-      { status: 400 }
-    )
-  }
+  if (!workspace) return NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
 
   const dashboard = await prisma.dashboard.create({
     data: {
-      title: sanitizeDashboardTitle(customTitle || iframeParsed.title),
-      embedUrl: iframeParsed.embedUrl,
-      iframeCode,
+      title,
+      reportId,
+      pbWorkspaceId,
       workspaceId,
       allowedRoles: {
         create: (allowedRoleIds || []).map(customRoleId => ({ customRoleId }))
@@ -148,8 +94,10 @@ export async function POST(req) {
     include: dashboardIncludes
   })
 
-  // Emit notification
-  const creator = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } })
+  const creator = await prisma.user.findUnique({
+    where: { email: session.user.email },
+    select: { id: true }
+  })
 
   await createNotification({
     type: 'dashboard_created',
