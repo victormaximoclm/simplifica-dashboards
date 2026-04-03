@@ -33,7 +33,7 @@ const FooterContent = () => {
           Simplifica Soluções em Gestão
         </Link>
       </p>
-      {!isBreakpointReached && (
+      {/* {!isBreakpointReached && (
         <div className='flex items-center gap-4'>
           <Link href='' target='_blank' className='text-primary'>
             Licença
@@ -45,7 +45,7 @@ const FooterContent = () => {
             Support
           </Link>
         </div>
-      )}
+      )} */}
     </div>
   )
 }
