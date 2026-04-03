@@ -1,51 +1,68 @@
-// Simple in-memory rate limiter for API routes.
-// Each key (e.g. IP) is tracked in a Map with a sliding window.
-// For multi-instance deployments, replace with Redis-backed solution.
+export const runtime = 'nodejs'
+import { NextResponse } from 'next/server'
+import { getServerSession } from 'next-auth'
+import { authOptions } from '@/libs/auth'
+import { prisma } from '@/libs/prisma'
+import { apiLimiter } from '@/libs/rateLimit'
 
-const stores = new Map()
+export async function GET(req, { params }) {
+  const { id } = await params
 
-/**
- * Creates a rate limiter with the given options.
- * @param {{ interval: number, limit: number }} opts
- *   interval – window size in ms (e.g. 60_000 for 1 min)
- *   limit    – max requests per window
- */
-export function createRateLimit({ interval = 60_000, limit = 10 } = {}) {
-  // Reuse or create store for this config
-  const key = `${interval}:${limit}`
+  const { success } = apiLimiter.check(req)
+  if (!success) return NextResponse.json({ message: 'Muitas requisições' }, { status: 429 })
 
-  if (!stores.has(key)) {
-    stores.set(key, new Map())
-  }
+  const session = await getServerSession(authOptions)
+  if (!session) return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
-  const tokenStore = stores.get(key)
+  const dashboard = await prisma.dashboard.findUnique({
+    where: { id }
+  })
+  if (!dashboard) return NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
 
-  return {
-    /** @param {Request} req  @returns {{ success: boolean, remaining: number }} */
-    check(req) {
-      const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
+  try {
+    // 1. Autenticar no Azure AD
+    const aadRes = await fetch(`https://login.microsoftonline.com/${process.env.POWERBI_TENANT_ID}/oauth2/v2.0/token`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/x-www-form-urlencoded' },
+      body: new URLSearchParams({
+        grant_type: 'client_credentials',
+        client_id: process.env.POWERBI_CLIENT_ID,
+        client_secret: process.env.POWERBI_CLIENT_SECRET,
+        scope: process.env.POWERBI_SCOPE
+      })
+    })
+    const aadToken = await aadRes.json()
+    if (!aadToken.access_token) throw new Error('Falha ao autenticar no Azure AD')
 
-      const now = Date.now()
-      const record = tokenStore.get(ip)
+    const authHeader = { Authorization: `Bearer ${aadToken.access_token}` }
 
-      if (!record || now - record.start > interval) {
-        tokenStore.set(ip, { start: now, count: 1 })
+    // 2. Buscar embedUrl do report
+    const reportRes = await fetch(
+      `https://api.powerbi.com/v1.0/myorg/groups/${dashboard.pbWorkspaceId}/reports/${dashboard.reportId}`,
+      { headers: authHeader }
+    )
+    const reportData = await reportRes.json()
+    if (!reportData.embedUrl) throw new Error('Report não encontrado ou sem permissão')
 
-        return { success: true, remaining: limit - 1 }
+    // 3. Gerar Embed Token
+    const tokenRes = await fetch(
+      `https://api.powerbi.com/v1.0/myorg/groups/${dashboard.pbWorkspaceId}/reports/${dashboard.reportId}/GenerateToken`,
+      {
+        method: 'POST',
+        headers: { ...authHeader, 'Content-Type': 'application/json' },
+        body: JSON.stringify({ accessLevel: 'View' })
       }
+    )
+    const tokenData = await tokenRes.json()
+    if (!tokenData.token) throw new Error('Falha ao gerar embed token')
 
-      record.count += 1
-
-      if (record.count > limit) {
-        return { success: false, remaining: 0 }
-      }
-
-      return { success: true, remaining: limit - record.count }
-    }
+    return NextResponse.json({
+      embedToken: tokenData.token,
+      embedUrl: reportData.embedUrl,
+      reportId: dashboard.reportId
+    })
+  } catch (error) {
+    console.error('[embed-token]', error.message)
+    return NextResponse.json({ message: 'Erro ao gerar token de embed' }, { status: 500 })
   }
 }
-
-// Pre-configured limiters
-export const loginLimiter = createRateLimit({ interval: 60_000, limit: 8 }) // 8 attempts/min
-export const setupLimiter = createRateLimit({ interval: 60_000, limit: 5 }) // 5 attempts/min
-export const apiLimiter = createRateLimit({ interval: 60_000, limit: 60 }) // 60 req/min
