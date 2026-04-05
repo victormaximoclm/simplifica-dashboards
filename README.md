@@ -1,6 +1,15 @@
-# Simplifica Dashboards
+ Simplifica Dashboards resolve isso permitindo:
 
-Plataforma de gerenciamento de dashboards multi-workspace com controle de acesso baseado em cargos.
+- 🔐 Autenticação de usuários (login seguro)
+- 🧑‍🤝‍🧑 Controle de acesso por cargos (RBAC)
+- 🏢 Multi-workspaces (equipes separadas)
+- 📊 Integração com dashboards externos (ex: Power BI via iframe/API)
+- 📧 Sistema de envio de emails (SMTP)
+
+## 🖼️ Preview
+
+
+
 
 ## Stack
 
@@ -112,27 +121,6 @@ pnpm dev
 
 A aplicação estará em `http://localhost:3000`.
 Mailpit (inbox de teste) estará em `http://localhost:8025`.
-
----
-
-## Estrutura de Arquivos Relevantes
-
-```
-├── .env.example            # Template de variáveis de ambiente
-├── Dockerfile              # Build multi-stage para produção
-├── docker-compose.yml      # Produção: app + PostgreSQL
-├── docker-compose.dev.yml  # Extensão para desenvolvimento (Mailpit)
-├── docker-entrypoint.sh    # Entrypoint: migra banco + inicia app
-├── next.config.mjs         # Configuração do Next.js
-├── src/
-│   ├── prisma/
-│   │   ├── schema.prisma   # Schema do banco de dados
-│   │   └── seed.js         # Script de seed (dados iniciais)
-│   ├── libs/
-│   │   ├── auth.js         # Configuração do NextAuth.js
-│   │   └── mail.js         # Configuração de SMTP/email
-│   └── ...
-```
 
 ---
 
