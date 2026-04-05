@@ -1,4 +1,4 @@
-# 🚀 Simplifica Dashboards
+# 🚀 SaaS Dashboards
 
 SaaS para gerenciamento seguro de dashboards (ex: Power BI) com controle de acesso por usuário e workspace.
 
@@ -11,7 +11,7 @@ Empresas que utilizam dashboards enfrentam dificuldades como:
 
 ## ✅ Solução
 
-O Simplifica Dashboards resolve isso permitindo:
+O SaaS Dashboards resolve isso permitindo:
 
 - 🔐 Autenticação de usuários (login seguro)
 - 🧑‍🤝‍🧑 Controle de acesso por cargos (RBAC)
