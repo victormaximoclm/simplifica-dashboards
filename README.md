@@ -4,10 +4,10 @@ SaaS para gerenciamento seguro de dashboards (ex: Power BI) com controle de aces
 
 ## 💡 Problema
 
-Empresas que utilizam dashboards enfrentam dificuldades como:
+Empresas que utilizam dashboards, ou desenvolvem para clientes enfrentam dificuldades como:
 - Links públicos inseguros (risco de vazamento de dados - LGPD)
 - Falta de controle de acesso por usuário
-- Dificuldade em organizar múltiplos dashboards por equipe
+- Dificuldade em organizar múltiplos dashboards por equipe e por empresa cliente
 
 ## ✅ Solução
 
