@@ -92,7 +92,7 @@ const DashboardManage = ({ workspaces }) => {
     setEditingDashboard(dashboard)
 
     setFormData({
-      iframeCode: dashboard.iframeCode,
+      iframeCode: '',
       title: dashboard.title,
       workspaceId: dashboard.workspaceId,
       allowedRoleIds: (dashboard.allowedRoles || []).map(ar => ar.customRoleId)
@@ -104,7 +104,7 @@ const DashboardManage = ({ workspaces }) => {
   const handleSubmit = async () => {
     setError('')
 
-    if (!formData.iframeCode.trim()) {
+    if (!editingDashboard && !formData.iframeCode.trim()) {
       setError('Cole o código iframe do Power BI')
 
       return
@@ -122,7 +122,10 @@ const DashboardManage = ({ workspaces }) => {
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
+      body: JSON.stringify({
+        ...formData,
+        iframeCode: formData.iframeCode.trim() || undefined
+      })
     })
 
     if (res.ok) {
@@ -262,6 +265,11 @@ const DashboardManage = ({ workspaces }) => {
               fullWidth
               helperText='Cole o código iframe gerado pelo Power BI'
             />
+            {editingDashboard && (
+              <Alert severity='info' variant='outlined'>
+                Só preencha o iframe se quiser trocar a origem do dashboard.
+              </Alert>
+            )}
             <TextField
               select
               label='Workspace'

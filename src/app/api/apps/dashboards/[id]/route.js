@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { dashboardIncludes, getAuthorizedDashboard, stripDashboardSensitiveFields } from '@/libs/dashboardAccess'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
@@ -19,7 +20,7 @@ function validateEmbedUrl(rawUrl) {
   try {
     const url = new URL(String(rawUrl || '').trim())
 
-    if (!['http:', 'https:'].includes(url.protocol)) {
+    if (url.protocol !== 'https:' || url.hostname !== 'app.powerbi.com') {
       return null
     }
 
@@ -40,59 +41,17 @@ function parseIframe(iframeCode) {
   }
 }
 
-const dashboardIncludes = {
-  workspace: { select: { id: true, name: true } },
-  allowedRoles: {
-    include: { customRole: { select: { id: true, name: true } } }
-  }
-}
-
 // GET /api/apps/dashboards/:id
 export async function GET(req, { params }) {
   const { id } = await params
   const session = await getServerSession(authOptions)
+  const access = await getAuthorizedDashboard({ dashboardId: id, session })
 
-  if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+  if (!access.ok) {
+    return NextResponse.json({ message: access.message }, { status: access.status })
   }
 
-  const dashboard = await prisma.dashboard.findUnique({
-    where: { id },
-    include: dashboardIncludes
-  })
-
-  if (!dashboard) {
-    return NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
-  }
-
-  // High admins (superAdmin, subAdmin): access to everything
-  if (isHighAdmin(session.user.role)) {
-    return NextResponse.json(dashboard)
-  }
-
-  // Must be in same workspace
-  if (dashboard.workspaceId !== session.user.workspaceId) {
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-  }
-
-  // Admin sees all dashboards in their workspace
-  if (session.user.role === 'admin') {
-    return NextResponse.json(dashboard)
-  }
-
-  // Regular user: check if their customRoleId is in allowedRoles
-  const user = await prisma.user.findUnique({
-    where: { id: session.user.id },
-    select: { customRoleId: true }
-  })
-
-  const hasAccess = user?.customRoleId && dashboard.allowedRoles.some(ar => ar.customRoleId === user.customRoleId)
-
-  if (!hasAccess) {
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-  }
-
-  return NextResponse.json(dashboard)
+  return NextResponse.json(stripDashboardSensitiveFields(access.dashboard))
 }
 
 // PUT /api/apps/dashboards/:id (superAdmin only)
@@ -168,7 +127,7 @@ export async function PUT(req, { params }) {
     createdById: editor?.id
   })
 
-  return NextResponse.json(dashboard)
+  return NextResponse.json(stripDashboardSensitiveFields(dashboard))
 }
 
 // DELETE /api/apps/dashboards/:id (superAdmin only)

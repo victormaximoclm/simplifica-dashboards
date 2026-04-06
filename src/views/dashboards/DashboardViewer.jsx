@@ -14,16 +14,6 @@ import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
 import Chip from '@mui/material/Chip'
 
-const isSafeEmbedUrl = url => {
-  try {
-    const parsed = new URL(String(url || '').trim())
-
-    return parsed.protocol === 'http:' || parsed.protocol === 'https:'
-  } catch {
-    return false
-  }
-}
-
 const DashboardViewer = () => {
   const params = useParams()
   const router = useRouter()
@@ -93,14 +83,6 @@ const DashboardViewer = () => {
 
   if (!dashboard) return null
 
-  if (!isSafeEmbedUrl(dashboard.embedUrl)) {
-    return (
-      <Alert severity='error' sx={{ m: 2 }}>
-        URL de dashboard inválida.
-      </Alert>
-    )
-  }
-
   return (
     <Card>
       <CardContent>
@@ -125,7 +107,7 @@ const DashboardViewer = () => {
         >
           <iframe
             title={dashboard.title}
-            src={dashboard.embedUrl}
+            src={`/api/embed/dashboard/${dashboard.id}`}
             style={{
               position: 'absolute',
               top: 0,
@@ -134,6 +116,7 @@ const DashboardViewer = () => {
               height: '100%',
               border: 0
             }}
+            referrerPolicy='same-origin'
             allowFullScreen
           />
         </Box>

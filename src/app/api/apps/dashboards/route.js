@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { dashboardIncludes, stripDashboardSensitiveFields } from '@/libs/dashboardAccess'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
@@ -20,7 +21,7 @@ function validateEmbedUrl(rawUrl) {
   try {
     const url = new URL(String(rawUrl || '').trim())
 
-    if (!['http:', 'https:'].includes(url.protocol)) {
+    if (url.protocol !== 'https:' || url.hostname !== 'app.powerbi.com') {
       return null
     }
 
@@ -38,13 +39,6 @@ function parseIframe(iframeCode) {
   return {
     embedUrl,
     title: sanitizeDashboardTitle(titleMatch ? titleMatch[1] : 'Dashboard sem título')
-  }
-}
-
-const dashboardIncludes = {
-  workspace: { select: { id: true, name: true } },
-  allowedRoles: {
-    include: { customRole: { select: { id: true, name: true } } }
   }
 }
 
@@ -96,7 +90,7 @@ export async function GET(req) {
     orderBy: { createdAt: 'desc' }
   })
 
-  return NextResponse.json(dashboards)
+  return NextResponse.json(dashboards.map(stripDashboardSensitiveFields))
 }
 
 // POST /api/apps/dashboards - Create dashboard (superAdmin only)
@@ -159,5 +153,5 @@ export async function POST(req) {
     createdById: creator?.id
   })
 
-  return NextResponse.json(dashboard, { status: 201 })
+  return NextResponse.json(stripDashboardSensitiveFields(dashboard), { status: 201 })
 }

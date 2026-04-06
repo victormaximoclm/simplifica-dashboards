@@ -21,15 +21,20 @@ export function createRateLimit({ interval = 60_000, limit = 10 } = {}) {
   const tokenStore = stores.get(key)
 
   return {
-    /** @param {Request} req  @returns {{ success: boolean, remaining: number }} */
-    check(req) {
+    /**
+     * @param {Request} req
+     * @param {string} [customKey]
+     * @returns {{ success: boolean, remaining: number }}
+     */
+    check(req, customKey) {
       const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
+      const keyValue = String(customKey || ip)
 
       const now = Date.now()
-      const record = tokenStore.get(ip)
+      const record = tokenStore.get(keyValue)
 
       if (!record || now - record.start > interval) {
-        tokenStore.set(ip, { start: now, count: 1 })
+        tokenStore.set(keyValue, { start: now, count: 1 })
 
         return { success: true, remaining: limit - 1 }
       }
