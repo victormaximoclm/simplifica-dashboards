@@ -80,7 +80,7 @@ export async function POST(req) {
     })
 
     try {
-      await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simplifica' })
+      await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simpla Insight' })
     } catch (err) {
       console.error('Erro ao enviar e-mail:', err)
 
@@ -121,7 +121,7 @@ export async function POST(req) {
   })
 
   try {
-    await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simplifica' })
+    await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simpla Insight' })
   } catch (err) {
     console.error('Erro ao enviar e-mail:', err)
 

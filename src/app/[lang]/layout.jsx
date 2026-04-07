@@ -25,9 +25,9 @@ import '@/app/globals.css'
 import '@assets/iconify-icons/generated-icons.css'
 
 export const metadata = {
-  title: 'Simplifica - Dashboards',
+  title: 'Simpla Insights',
   description:
-    'Simplifica - Dashboards interativos e fáceis de usar. Transforme seus dados em insights visuais poderosos.'
+    'Simpla Insights - Dashboards interativos e fáceis de usar. Transforme seus dados em insights visuais poderosos.'
 }
 
 const RootLayout = async props => {

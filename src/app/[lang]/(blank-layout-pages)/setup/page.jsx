@@ -5,7 +5,7 @@ import Setup from '@views/Setup'
 import { getServerMode } from '@core/utils/serverHelpers'
 
 export const metadata = {
-  title: 'Configuração Inicial - Simplifica Dashboards',
+  title: 'Configuração Inicial - Simpla Insight',
   description: 'Crie a conta de Super Administrador'
 }
 

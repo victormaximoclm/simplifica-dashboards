@@ -30,7 +30,7 @@ const FooterContent = () => {
         <span className={textClass}>{`© ${new Date().getFullYear()}, Todos direitos reservados `}</span>
         <span className={textClass}>{` a `}</span>
         <Link href='https://simplificagest.com' target='_blank' className='text-primary'>
-          Simplifica Soluções em Gestão
+          Simplifica Soluções em Gestão e Consultoria
         </Link>
       </p>
       {/* {!isBreakpointReached && (
