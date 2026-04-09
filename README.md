@@ -5,6 +5,7 @@ SaaS para gerenciamento seguro de dashboards (ex: Power BI) com controle de aces
 ## 💡 Problema
 
 Empresas que utilizam dashboards, ou desenvolvem para clientes enfrentam dificuldades como:
+
 - Falta de controle de acesso por usuário
 - Dificuldade em organizar múltiplos dashboards por equipe e por empresa cliente
 
@@ -15,11 +16,14 @@ O SaaS Dashboards resolve isso permitindo:
 - 🔐 Autenticação de usuários (login seguro)
 - 🧑‍🤝‍🧑 Controle de acesso por cargos (RBAC)
 - 🏢 Multi-workspaces (equipes separadas)
-- 📊 Integração com dashboards externos (ex: Power BI via iframe/API)
+- 📊 Integração com dashboards externos (ex: Power BI via iframe)
 - 📧 Sistema de envio de emails (SMTP)
+- 🧾 Auditoria (dois painéis): **Acesso** e **Ações Críticas** (para Super Admin / Sub Admin)
+- 🧱 Camada de segurança para embed
 
 ## 🖼️ Preview
 
+Em breve.
 
 ## Stack
 
@@ -29,6 +33,8 @@ O SaaS Dashboards resolve isso permitindo:
 - **ORM:** Prisma
 - **Autenticação:** NextAuth.js
 - **Containerização:** Docker + Docker Compose
+- **Observabilidade:** logs estruturados com `requestId` + Error Tracking interno (banco)
+- **Rate limit:** Redis (com fallback em memória para dev)
 
 ---
 
@@ -37,6 +43,38 @@ O SaaS Dashboards resolve isso permitindo:
 - [Docker](https://docs.docker.com/get-docker/) >= 24
 - [Docker Compose](https://docs.docker.com/compose/install/) >= 2.20
 - (Apenas para desenvolvimento local sem Docker) Node.js >= 20 e pnpm >= 9
+
+---
+
+## Auditoria (Audit Logs)
+
+O sistema possui **dois audits** (visões separadas), pensados para auditoria rápida e sem ruído.
+
+- **Audit de Acesso**: logins e acessos relevantes.
+- **Audit de Ações Críticas**: ações administrativas em usuários e workspaces (ex.: criar/editar/deletar, convites e reset de senha).
+
+Ambos suportam:
+
+- Filtro por **Workspace**
+- Filtro por **Usuário**
+- Filtro por **Período**
+- Coluna com **nome legível do recurso** (ex.: título do dashboard) para facilitar auditoria
+
+> Observação: a auditoria é focada em ações com intenção do usuário (não é analytics).
+
+---
+
+## Power BI (Embed)
+
+Este projeto funciona bem com dashboards do tipo **“Publicar na Web”** (públicos por natureza). O objetivo aqui é:
+
+- **Não expor** o link do Power BI no frontend/código-fonte
+- **Obrigar** autenticação e permissão antes de abrir o dashboard dentro do SaaS
+
+Fluxo simplificado:
+
+- Frontend usa `<iframe src="/api/embed/dashboard/:id" />`
+- Backend valida sessão + RBAC e responde com um redirect para o Power BI (sem entregar o `embedUrl` para o frontend)
 
 ---
 
@@ -67,6 +105,7 @@ Edite o `.env` e preencha **todas** as variáveis. No mínimo:
 | `NEXT_PUBLIC_APP_URL` | URL pública da aplicação (ex: `https://app.exemplo.com`) |
 | `NEXT_PUBLIC_API_URL` | URL pública + `/api`                                     |
 | `API_URL`             | Igual a `NEXT_PUBLIC_API_URL`                            |
+| `REDIS_URL`           | Redis para rate limit (recomendado em produção)          |
 | `SMTP_HOST`           | Servidor SMTP                                            |
 | `SMTP_PORT`           | Porta SMTP (587 para TLS, 465 para SSL)                  |
 | `SMTP_USER`           | Usuário SMTP                                             |
