@@ -1,4 +1,11 @@
 services:
+  redis:
+    image: redis:7-alpine
+    container_name: simplifica-redis
+    restart: unless-stopped
+    ports:
+      - '6379:6379'
+
   postgres:
     image: postgres:16-alpine
     container_name: simplifica-postgres
@@ -40,8 +47,11 @@ services:
       NEXTAUTH_SECRET: ${NEXTAUTH_SECRET:-troque_este_segredo_em_producao}
       NEXT_PUBLIC_APP_URL: ${NEXT_PUBLIC_APP_URL:-http://localhost:3000}
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
+      REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       SEED_ON_START: ${SEED_ON_START:-false}
     depends_on:
+      redis:
+        condition: service_started
       postgres:
         condition: service_healthy
 

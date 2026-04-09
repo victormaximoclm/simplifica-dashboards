@@ -4,7 +4,9 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { createAuditLog } from '@/libs/auditService'
 import { dashboardIncludes, stripDashboardSensitiveFields } from '@/libs/dashboardAccess'
+import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
@@ -44,10 +46,14 @@ function parseIframe(iframeCode) {
 
 // GET /api/apps/dashboards - List dashboards for current user
 export async function GET(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    logger.warn('dashboards-list-unauthorized', { requestId })
+    const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const { searchParams } = new URL(req.url)
@@ -80,7 +86,10 @@ export async function GET(req) {
       }
     } else {
       // User without custom role sees nothing
-      return NextResponse.json([])
+      logger.debug('dashboards-list-empty-custom-role', { requestId, userId: session.user.id })
+      const response = NextResponse.json([])
+      response.headers.set('x-request-id', requestId)
+      return response
     }
   }
 
@@ -90,25 +99,37 @@ export async function GET(req) {
     orderBy: { createdAt: 'desc' }
   })
 
-  return NextResponse.json(dashboards.map(stripDashboardSensitiveFields))
+  logger.debug('dashboards-list-success', { requestId, userId: session.user.id, count: dashboards.length })
+  const response = NextResponse.json(dashboards.map(stripDashboardSensitiveFields))
+  response.headers.set('x-request-id', requestId)
+  return response
 }
 
 // POST /api/apps/dashboards - Create dashboard (superAdmin only)
 export async function POST(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    logger.warn('dashboard-create-unauthorized', { requestId })
+    const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    logger.warn('dashboard-create-forbidden', { requestId, userId: session.user.id, role: session.user.role })
+    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const parsed = parseBody(createDashboardSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    const response = NextResponse.json({ message: parsed.message }, { status: 400 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const { iframeCode, workspaceId, allowedRoleIds, title: customTitle } = parsed.data
@@ -117,16 +138,20 @@ export async function POST(req) {
   const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
 
   if (!workspace) {
-    return NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+    const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const iframeParsed = parseIframe(iframeCode)
 
   if (!iframeParsed.embedUrl) {
-    return NextResponse.json(
+    const response = NextResponse.json(
       { message: 'Não foi possível extrair a URL do iframe. Verifique o código colado.' },
       { status: 400 }
     )
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const dashboard = await prisma.dashboard.create({
@@ -153,5 +178,23 @@ export async function POST(req) {
     createdById: creator?.id
   })
 
-  return NextResponse.json(stripDashboardSensitiveFields(dashboard), { status: 201 })
+  logger.info('dashboard-create-success', {
+    requestId,
+    userId: session.user.id,
+    dashboardId: dashboard.id,
+    workspaceId
+  })
+  await createAuditLog({
+    userId: session.user.id,
+    tenantId: dashboard.workspaceId,
+    action: 'DASHBOARD_CREATE',
+    resource: 'dashboard',
+    resourceId: dashboard.id,
+    after: { title: dashboard.title, workspaceId: dashboard.workspaceId, allowedRoleCount: dashboard.allowedRoles.length },
+    metadata: { requestId },
+    requestId
+  })
+  const response = NextResponse.json(stripDashboardSensitiveFields(dashboard), { status: 201 })
+  response.headers.set('x-request-id', requestId)
+  return response
 }

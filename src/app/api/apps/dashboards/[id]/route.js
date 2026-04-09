@@ -4,7 +4,9 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { createAuditLog } from '@/libs/auditService'
 import { dashboardIncludes, getAuthorizedDashboard, stripDashboardSensitiveFields } from '@/libs/dashboardAccess'
+import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
@@ -44,27 +46,39 @@ function parseIframe(iframeCode) {
 // GET /api/apps/dashboards/:id
 export async function GET(req, { params }) {
   const { id } = await params
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
   const access = await getAuthorizedDashboard({ dashboardId: id, session })
 
   if (!access.ok) {
-    return NextResponse.json({ message: access.message }, { status: access.status })
+    logger.warn('dashboard-read-denied', { requestId, dashboardId: id, status: access.status })
+    const response = NextResponse.json({ message: access.message }, { status: access.status })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
-  return NextResponse.json(stripDashboardSensitiveFields(access.dashboard))
+  logger.debug('dashboard-read-success', { requestId, dashboardId: id, userId: session?.user?.id })
+  const response = NextResponse.json(stripDashboardSensitiveFields(access.dashboard))
+  response.headers.set('x-request-id', requestId)
+  return response
 }
 
 // PUT /api/apps/dashboards/:id (superAdmin only)
 export async function PUT(req, { params }) {
   const { id } = await params
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const body = await req.json()
@@ -73,7 +87,9 @@ export async function PUT(req, { params }) {
   const existing = await prisma.dashboard.findUnique({ where: { id } })
 
   if (!existing) {
-    return NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
+    const response = NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const updateData = {}
@@ -82,7 +98,9 @@ export async function PUT(req, { params }) {
     const parsed = parseIframe(iframeCode)
 
     if (!parsed.embedUrl) {
-      return NextResponse.json({ message: 'Não foi possível extrair a URL do iframe' }, { status: 400 })
+      const response = NextResponse.json({ message: 'Não foi possível extrair a URL do iframe' }, { status: 400 })
+      response.headers.set('x-request-id', requestId)
+      return response
     }
 
     updateData.iframeCode = iframeCode
@@ -96,7 +114,9 @@ export async function PUT(req, { params }) {
     const ws = await prisma.workspace.findUnique({ where: { id: workspaceId } })
 
     if (!ws) {
-      return NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+      const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+      response.headers.set('x-request-id', requestId)
+      return response
     }
 
     updateData.workspaceId = workspaceId
@@ -127,26 +147,47 @@ export async function PUT(req, { params }) {
     createdById: editor?.id
   })
 
-  return NextResponse.json(stripDashboardSensitiveFields(dashboard))
+  logger.info('dashboard-update-success', { requestId, dashboardId: dashboard.id, userId: session.user.id })
+  await createAuditLog({
+    userId: session.user.id,
+    tenantId: dashboard.workspaceId,
+    action: 'DASHBOARD_UPDATE',
+    resource: 'dashboard',
+    resourceId: dashboard.id,
+    before: { title: existing.title, workspaceId: existing.workspaceId },
+    after: { title: dashboard.title, workspaceId: dashboard.workspaceId },
+    metadata: { requestId },
+    requestId
+  })
+  const response = NextResponse.json(stripDashboardSensitiveFields(dashboard))
+  response.headers.set('x-request-id', requestId)
+  return response
 }
 
 // DELETE /api/apps/dashboards/:id (superAdmin only)
 export async function DELETE(req, { params }) {
   const { id } = await params
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const existing = await prisma.dashboard.findUnique({ where: { id } })
 
   if (!existing) {
-    return NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
+    const response = NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   await prisma.dashboard.delete({ where: { id } })
@@ -162,5 +203,18 @@ export async function DELETE(req, { params }) {
     createdById: deleter?.id
   })
 
-  return NextResponse.json({ message: 'Dashboard excluído' })
+  logger.info('dashboard-delete-success', { requestId, dashboardId: id, userId: session.user.id })
+  await createAuditLog({
+    userId: session.user.id,
+    tenantId: existing.workspaceId,
+    action: 'DASHBOARD_DELETE',
+    resource: 'dashboard',
+    resourceId: id,
+    before: { title: existing.title, workspaceId: existing.workspaceId },
+    metadata: { requestId },
+    requestId
+  })
+  const response = NextResponse.json({ message: 'Dashboard excluído' })
+  response.headers.set('x-request-id', requestId)
+  return response
 }

@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { dismissNotificationSchema, markReadSchema, parseBody } from '@/libs/validations'
@@ -80,10 +81,11 @@ function buildListWhere(accessWhere, currentUserDbId) {
 
 // GET /api/apps/notifications — lista já filtrada no servidor; mesma forma de resposta de antes
 export async function GET(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Não autorizado' }, { status: 401, requestId })
   }
 
   const { searchParams } = new URL(req.url)
@@ -95,7 +97,7 @@ export async function GET(req) {
   })
 
   if (!currentUser) {
-    return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+    return jsonWithRequestId({ message: 'Usuário não encontrado' }, { status: 404, requestId })
   }
 
   const accessWhere = await buildNotificationAccessWhere(session, currentUser.id)
@@ -126,21 +128,23 @@ export async function GET(req) {
     createdAt: n.createdAt
   }))
 
-  return NextResponse.json(result)
+  logger.debug('notifications-list-success', { requestId, userId: currentUser.id, count: result.length })
+  return jsonWithRequestId(result, { requestId })
 }
 
 // PATCH — marcar como lida(s); só IDs que o usuário tem permissão para ver
 export async function PATCH(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Não autorizado' }, { status: 401, requestId })
   }
 
   const parsed = parseBody(markReadSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    return jsonWithRequestId({ message: parsed.message }, { status: 400, requestId })
   }
 
   const { notificationIds, readAll } = parsed.data
@@ -151,7 +155,7 @@ export async function PATCH(req) {
   })
 
   if (!currentUser) {
-    return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+    return jsonWithRequestId({ message: 'Usuário não encontrado' }, { status: 404, requestId })
   }
 
   const accessWhere = await buildNotificationAccessWhere(session, currentUser.id)
@@ -181,7 +185,7 @@ export async function PATCH(req) {
     ids = notificationIds || []
 
     if (ids.length === 0) {
-      return NextResponse.json({ message: 'OK' })
+      return jsonWithRequestId({ message: 'OK' }, { requestId })
     }
 
     const allowed = await prisma.notification.findMany({
@@ -199,15 +203,15 @@ export async function PATCH(req) {
     const allowedSet = new Set(allowed.map(a => a.id))
 
     if (ids.some(i => !allowedSet.has(i))) {
-      return NextResponse.json(
+      return jsonWithRequestId(
         { message: 'Uma ou mais notificações não existem ou você não tem permissão para alterá-las.' },
-        { status: 403 }
+        { status: 403, requestId }
       )
     }
   }
 
   if (ids.length === 0) {
-    return NextResponse.json({ message: 'OK' })
+    return jsonWithRequestId({ message: 'OK' }, { requestId })
   }
 
   await prisma.notificationRead.createMany({
@@ -218,21 +222,23 @@ export async function PATCH(req) {
     skipDuplicates: true
   })
 
-  return NextResponse.json({ message: 'OK' })
+  logger.info('notifications-mark-read-success', { requestId, userId: currentUser.id, count: ids.length, readAll: Boolean(readAll) })
+  return jsonWithRequestId({ message: 'OK' }, { requestId })
 }
 
 // DELETE — ocultar para o usuário; só se a notificação estiver no escopo de visibilidade
 export async function DELETE(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Não autorizado' }, { status: 401, requestId })
   }
 
   const parsed = parseBody(dismissNotificationSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    return jsonWithRequestId({ message: parsed.message }, { status: 400, requestId })
   }
 
   const { id } = parsed.data
@@ -243,7 +249,7 @@ export async function DELETE(req) {
   })
 
   if (!currentUser) {
-    return NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+    return jsonWithRequestId({ message: 'Usuário não encontrado' }, { status: 404, requestId })
   }
 
   const accessWhere = await buildNotificationAccessWhere(session, currentUser.id)
@@ -265,7 +271,7 @@ export async function DELETE(req) {
   })
 
   if (!notification) {
-    return NextResponse.json({ message: 'Notificação não encontrada' }, { status: 404 })
+    return jsonWithRequestId({ message: 'Notificação não encontrada' }, { status: 404, requestId })
   }
 
   await prisma.notificationDismiss
@@ -277,5 +283,6 @@ export async function DELETE(req) {
     })
     .catch(() => {})
 
-  return NextResponse.json({ message: 'Notificação ocultada' })
+  logger.info('notification-dismiss-success', { requestId, userId: currentUser.id, notificationId: id })
+  return jsonWithRequestId({ message: 'Notificação ocultada' }, { requestId })
 }

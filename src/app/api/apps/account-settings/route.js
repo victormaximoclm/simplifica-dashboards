@@ -7,15 +7,17 @@ import { getServerSession } from 'next-auth'
 import bcrypt from 'bcryptjs'
 
 import { authOptions } from '@/libs/auth'
+import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { updateProfileSchema, parseBody } from '@/libs/validations'
 
 // GET current user profile
-export async function GET() {
+export async function GET(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Unauthorized' }, { status: 401, requestId })
   }
 
   const user = await prisma.user.findUnique({
@@ -33,24 +35,26 @@ export async function GET() {
   })
 
   if (!user) {
-    return NextResponse.json({ message: 'User not found' }, { status: 404 })
+    return jsonWithRequestId({ message: 'User not found' }, { status: 404, requestId })
   }
 
-  return NextResponse.json(user)
+  logger.info('account-settings-read-success', { requestId, userId: user.id })
+  return jsonWithRequestId(user, { requestId })
 }
 
 // PUT update current user profile
 export async function PUT(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Unauthorized' }, { status: 401, requestId })
   }
 
   const parsed = parseBody(updateProfileSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    return jsonWithRequestId({ message: parsed.message }, { status: 400, requestId })
   }
 
   const { name, image } = parsed.data
@@ -73,25 +77,28 @@ export async function PUT(req) {
     }
   })
 
-  return NextResponse.json(user)
+  logger.info('account-settings-update-success', { requestId, userId: user.id })
+  return jsonWithRequestId(user, { requestId })
 }
 
 // DELETE current user account
-export async function DELETE() {
+export async function DELETE(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Unauthorized' }, { status: 401, requestId })
   }
 
   // Prevent superAdmin from being deleted via this route
   if (session.user.role === 'superAdmin') {
-    return NextResponse.json({ message: 'SuperAdmin accounts cannot be self-deleted' }, { status: 403 })
+    return jsonWithRequestId({ message: 'SuperAdmin accounts cannot be self-deleted' }, { status: 403, requestId })
   }
 
   await prisma.user.delete({
     where: { email: session.user.email }
   })
 
-  return NextResponse.json({ message: 'Account deleted successfully' })
+  logger.info('account-settings-delete-success', { requestId, userEmail: session.user.email })
+  return jsonWithRequestId({ message: 'Account deleted successfully' }, { requestId })
 }

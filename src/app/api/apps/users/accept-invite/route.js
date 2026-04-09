@@ -3,17 +3,19 @@ import { NextResponse } from 'next/server'
 
 import bcrypt from 'bcryptjs'
 
+import { applyRateLimitHeaders, getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { setupLimiter } from '@/libs/rateLimit'
 import { acceptInviteSchema, parseBody } from '@/libs/validations'
 
 // GET /api/apps/users/accept-invite?token=xxx - Validate invite token
 export async function GET(req) {
+  const requestId = getRequestId(req)
   const { searchParams } = new URL(req.url)
   const token = searchParams.get('token')
 
   if (!token) {
-    return NextResponse.json({ message: 'Token não fornecido' }, { status: 400 })
+    return jsonWithRequestId({ message: 'Token não fornecido' }, { status: 400, requestId })
   }
 
   const user = await prisma.user.findUnique({
@@ -29,35 +31,37 @@ export async function GET(req) {
   })
 
   if (!user) {
-    return NextResponse.json({ message: 'Token inválido' }, { status: 404 })
+    return jsonWithRequestId({ message: 'Token inválido' }, { status: 404, requestId })
   }
 
   if (user.inviteTokenExpiry && new Date() > user.inviteTokenExpiry) {
-    return NextResponse.json({ message: 'Token expirado' }, { status: 410 })
+    return jsonWithRequestId({ message: 'Token expirado' }, { status: 410, requestId })
   }
 
   if (user.status === 'active') {
-    return NextResponse.json({ message: 'Convite já aceito' }, { status: 409 })
+    return jsonWithRequestId({ message: 'Convite já aceito' }, { status: 409, requestId })
   }
 
-  return NextResponse.json({
+  return jsonWithRequestId({
     email: user.email,
     workspaceName: user.workspace?.name || ''
-  })
+  }, { requestId })
 }
 
 // POST /api/apps/users/accept-invite - Accept invite (set name + password)
 export async function POST(req) {
-  const { success } = setupLimiter.check(req)
+  const requestId = getRequestId(req)
+  const rate = await setupLimiter.check(req)
+  const withRate = response => applyRateLimitHeaders(response, rate)
 
-  if (!success) {
-    return NextResponse.json({ message: 'Muitas tentativas. Aguarde um momento.' }, { status: 429 })
+  if (!rate.success) {
+    return withRate(jsonWithRequestId({ message: 'Muitas tentativas. Aguarde um momento.' }, { status: 429, requestId }))
   }
 
   const parsed = parseBody(acceptInviteSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    return withRate(jsonWithRequestId({ message: parsed.message }, { status: 400, requestId }))
   }
 
   const { token, name, password } = parsed.data
@@ -68,15 +72,15 @@ export async function POST(req) {
   })
 
   if (!user) {
-    return NextResponse.json({ message: 'Token inválido' }, { status: 404 })
+    return withRate(jsonWithRequestId({ message: 'Token inválido' }, { status: 404, requestId }))
   }
 
   if (user.inviteTokenExpiry && new Date() > user.inviteTokenExpiry) {
-    return NextResponse.json({ message: 'Token expirado' }, { status: 410 })
+    return withRate(jsonWithRequestId({ message: 'Token expirado' }, { status: 410, requestId }))
   }
 
   if (user.status === 'active') {
-    return NextResponse.json({ message: 'Convite já aceito' }, { status: 409 })
+    return withRate(jsonWithRequestId({ message: 'Convite já aceito' }, { status: 409, requestId }))
   }
 
   const hashedPassword = await bcrypt.hash(password, 10)
@@ -92,5 +96,6 @@ export async function POST(req) {
     }
   })
 
-  return NextResponse.json({ message: 'Conta criada com sucesso! Faça login.' })
+  logger.info('invite-accept-success', { requestId, userId: user.id })
+  return withRate(jsonWithRequestId({ message: 'Conta criada com sucesso! Faça login.' }, { requestId }))
 }

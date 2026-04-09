@@ -4,22 +4,25 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 import { Prisma } from '@prisma/client'
 
+import { applyRateLimitHeaders, getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { setupLimiter } from '@/libs/rateLimit'
 import { setupSchema, parseBody } from '@/libs/validations'
 
 // POST /api/setup — Create the first super admin (only if no users exist)
 export async function POST(req) {
-  const { success } = setupLimiter.check(req)
+  const requestId = getRequestId(req)
+  const rate = await setupLimiter.check(req)
+  const withRate = response => applyRateLimitHeaders(response, rate)
 
-  if (!success) {
-    return NextResponse.json({ message: 'Muitas tentativas. Aguarde um momento.' }, { status: 429 })
+  if (!rate.success) {
+    return withRate(jsonWithRequestId({ message: 'Muitas tentativas. Aguarde um momento.' }, { status: 429, requestId }))
   }
 
   const parsed = parseBody(setupSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    return withRate(jsonWithRequestId({ message: parsed.message }, { status: 400, requestId }))
   }
 
   const { name, email, password } = parsed.data
@@ -57,7 +60,7 @@ export async function POST(req) {
       break
     } catch (error) {
       if (error.message === 'SETUP_ALREADY_DONE') {
-        return NextResponse.json({ message: 'A configuração inicial já foi realizada.' }, { status: 403 })
+        return withRate(jsonWithRequestId({ message: 'A configuração inicial já foi realizada.' }, { status: 403, requestId }))
       }
 
       // Retry once Prisma reports serialization conflict
@@ -70,8 +73,9 @@ export async function POST(req) {
   }
 
   if (!user) {
-    return NextResponse.json({ message: 'Não foi possível concluir a configuração inicial.' }, { status: 409 })
+    return withRate(jsonWithRequestId({ message: 'Não foi possível concluir a configuração inicial.' }, { status: 409, requestId }))
   }
 
-  return NextResponse.json({ message: 'Super Admin criado com sucesso!', userId: user.id }, { status: 201 })
+  logger.info('setup-success', { requestId, userId: user.id })
+  return withRate(jsonWithRequestId({ message: 'Super Admin criado com sucesso!', userId: user.id }, { status: 201, requestId }))
 }

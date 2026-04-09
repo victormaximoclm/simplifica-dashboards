@@ -159,6 +159,16 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
                 {dictionary['navigation'].workspaces}
               </MenuItem>
             )}
+            {isHighAdmin && (
+              <>
+                <MenuItem href={`/${locale}/apps/audit-logs`} icon={<i className='tabler-shield-search' />}>
+                  {dictionary['navigation'].auditAccess || dictionary['navigation'].auditLogs || 'Audit de Acesso'}
+                </MenuItem>
+                <MenuItem href={`/${locale}/apps/audit-actions`} icon={<i className='tabler-alert-triangle' />}>
+                  {dictionary['navigation'].auditActions || 'Audit de Ações'}
+                </MenuItem>
+              </>
+            )}
           </MenuSection>
         )}
       </Menu>

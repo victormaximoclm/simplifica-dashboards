@@ -2,7 +2,9 @@
 import CredentialProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import { PrismaAdapter } from '@auth/prisma-adapter'
+import crypto from 'crypto'
 
+import { createAuditLog } from '@/libs/auditService'
 import { prisma } from '@/libs/prisma'
 
 const providers = [
@@ -17,7 +19,8 @@ const providers = [
         const res = await fetch(`${process.env.API_URL}/login`, {
           method: 'POST',
           headers: {
-            'Content-Type': 'application/json'
+            'Content-Type': 'application/json',
+            'x-request-id': crypto.randomUUID()
           },
           body: JSON.stringify({ email, password })
         })
@@ -121,6 +124,25 @@ export const authOptions = {
       }
 
       return session
+    }
+  },
+  events: {
+    async signIn({ user, account }) {
+      if (!user?.id) return
+      const dbUser = await prisma.user.findUnique({
+        where: { id: user.id },
+        select: { workspaceId: true }
+      })
+
+      await createAuditLog({
+        userId: user.id,
+        tenantId: dbUser?.workspaceId || null,
+        action: 'USER_LOGIN',
+        resource: 'session',
+        metadata: {
+          method: account?.provider || 'credentials'
+        }
+      })
     }
   }
 }

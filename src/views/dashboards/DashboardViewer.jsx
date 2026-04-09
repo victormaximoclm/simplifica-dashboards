@@ -1,6 +1,6 @@
 'use client'
 
-import { useState, useEffect } from 'react'
+import { useState, useEffect, useRef } from 'react'
 
 import { useParams, useRouter } from 'next/navigation'
 
@@ -13,6 +13,8 @@ import Box from '@mui/material/Box'
 import CircularProgress from '@mui/material/CircularProgress'
 import Alert from '@mui/material/Alert'
 import Chip from '@mui/material/Chip'
+import Skeleton from '@mui/material/Skeleton'
+import Button from '@mui/material/Button'
 
 const DashboardViewer = () => {
   const params = useParams()
@@ -21,6 +23,11 @@ const DashboardViewer = () => {
   const [dashboard, setDashboard] = useState(null)
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
+  const [iframeLoaded, setIframeLoaded] = useState(false)
+  const [iframeError, setIframeError] = useState(false)
+  const [iframeTimedOut, setIframeTimedOut] = useState(false)
+  const [iframeReloadKey, setIframeReloadKey] = useState(0)
+  const viewAuditSentRef = useRef('')
 
   const dashboardId = params?.id
   const locale = params?.lang || 'br'
@@ -65,6 +72,32 @@ const DashboardViewer = () => {
     }
   }, [dashboardId, isHighAdmin, locale, router])
 
+  useEffect(() => {
+    if (!dashboard) return
+
+    setIframeLoaded(false)
+    setIframeError(false)
+    setIframeTimedOut(false)
+
+    const timeoutId = setTimeout(() => {
+      setIframeTimedOut(true)
+    }, 10000)
+
+    return () => clearTimeout(timeoutId)
+  }, [dashboard, iframeReloadKey])
+
+  useEffect(() => {
+    if (!dashboard?.id) return
+    if (viewAuditSentRef.current === dashboard.id) return
+
+    viewAuditSentRef.current = dashboard.id
+    fetch('/api/audit/dashboard-view', {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ dashboardId: dashboard.id })
+    }).catch(() => {})
+  }, [dashboard?.id])
+
   if (loading) {
     return (
       <Box display='flex' justifyContent='center' alignItems='center' minHeight='60vh'>
@@ -82,6 +115,10 @@ const DashboardViewer = () => {
   }
 
   if (!dashboard) return null
+
+  const handleReloadIframe = () => {
+    setIframeReloadKey(prev => prev + 1)
+  }
 
   return (
     <Card>
@@ -105,7 +142,64 @@ const DashboardViewer = () => {
             borderColor: 'divider'
           }}
         >
+          {!iframeLoaded && !iframeError && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 2,
+                display: 'flex',
+                flexDirection: 'column',
+                justifyContent: 'center',
+                px: 3,
+                bgcolor: 'background.paper'
+              }}
+            >
+              <Skeleton variant='text' width='45%' height={38} sx={{ mb: 1 }} />
+              <Skeleton variant='rectangular' width='100%' height='55%' sx={{ borderRadius: 1, mb: 2 }} />
+              <Typography variant='body2' color='text.secondary'>
+                {iframeTimedOut
+                  ? 'O dashboard está demorando mais que o normal para carregar.'
+                  : 'Conectando ao Power BI e carregando visualizações...'}
+              </Typography>
+              {iframeTimedOut && (
+                <Box sx={{ mt: 2 }}>
+                  <Button size='small' variant='outlined' onClick={handleReloadIframe}>
+                    Recarregar painel
+                  </Button>
+                </Box>
+              )}
+            </Box>
+          )}
+
+          {iframeError && (
+            <Box
+              sx={{
+                position: 'absolute',
+                inset: 0,
+                zIndex: 3,
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                p: 2,
+                bgcolor: 'background.paper'
+              }}
+            >
+              <Alert
+                severity='warning'
+                action={
+                  <Button color='inherit' size='small' onClick={handleReloadIframe}>
+                    Tentar novamente
+                  </Button>
+                }
+              >
+                Não foi possível carregar o dashboard agora.
+              </Alert>
+            </Box>
+          )}
+
           <iframe
+            key={iframeReloadKey}
             title={dashboard.title}
             src={`/api/embed/dashboard/${dashboard.id}`}
             style={{
@@ -114,10 +208,14 @@ const DashboardViewer = () => {
               left: 0,
               width: '100%',
               height: '100%',
-              border: 0
+              border: 0,
+              opacity: iframeLoaded ? 1 : 0,
+              transition: 'opacity 260ms ease'
             }}
             referrerPolicy='same-origin'
             allowFullScreen
+            onLoad={() => setIframeLoaded(true)}
+            onError={() => setIframeError(true)}
           />
         </Box>
       </CardContent>

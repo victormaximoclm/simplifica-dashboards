@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { createAuditLog } from '@/libs/auditService'
 import { getAuthorizedDashboard } from '@/libs/dashboardAccess'
 import {
   EMBED_TOKEN_COOKIE,
@@ -11,6 +12,7 @@ import {
   isSameOriginReferer,
   setEmbedSecurityHeaders
 } from '@/libs/embedSecurity'
+import { applyRateLimitHeaders, getRequestId, logger } from '@/libs/logger'
 import { createRateLimit } from '@/libs/rateLimit'
 
 const embedIpLimiter = createRateLimit({ interval: 60_000, limit: 60 })
@@ -27,42 +29,81 @@ function buildPowerBiTarget(embedUrl) {
 
 export async function GET(req, { params }) {
   const { id } = await params
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    await createAuditLog({
+      action: 'EMBED_ACCESS_BLOCKED',
+      resource: 'dashboard',
+      resourceId: id,
+      metadata: {
+        requestId,
+        reason: 'NO_SESSION',
+        ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+        referer: req.headers.get('referer') || null
+      },
+      requestId
+    })
+    const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
-  const ipRate = embedIpLimiter.check(req)
-  const userRate = embedUserLimiter.check(req, `user:${session.user.id}`)
+  const ipRate = await embedIpLimiter.check(req)
+  const userRate = await embedUserLimiter.check(req, `user:${session.user.id}`)
 
   if (!ipRate.success || !userRate.success) {
-    console.warn('[embed-rate-limit]', {
+    logger.warn('embed-rate-limit', {
+      requestId,
       dashboardId: id,
       userId: session.user.id,
       ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
     })
-    return NextResponse.json({ message: 'Muitas requisições' }, { status: 429 })
+    const response = NextResponse.json({ message: 'Muitas requisições' }, { status: 429 })
+    response.headers.set('x-request-id', requestId)
+    return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
   }
 
   if (!isSameOriginReferer(req) || !req.headers.get('cookie')) {
-    console.warn('[embed-invalid-access]', {
+    logger.warn('embed-invalid-access', {
+      requestId,
       dashboardId: id,
       userId: session.user.id,
       referer: req.headers.get('referer') || null
     })
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    await createAuditLog({
+      userId: session.user.id,
+      tenantId: session.user.workspaceId || null,
+      action: 'EMBED_ACCESS_BLOCKED',
+      resource: 'dashboard',
+      resourceId: id,
+      metadata: {
+        requestId,
+        reason: 'INVALID_REFERER_OR_COOKIE',
+        ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown',
+        referer: req.headers.get('referer') || null
+      },
+      requestId
+    })
+    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
   }
 
   const access = await getAuthorizedDashboard({ dashboardId: id, session })
 
   if (!access.ok) {
-    return NextResponse.json({ message: access.message }, { status: access.status })
+    const response = NextResponse.json({ message: access.message }, { status: access.status })
+    response.headers.set('x-request-id', requestId)
+    return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
   }
 
   const targetUrl = buildPowerBiTarget(access.dashboard.embedUrl)
   if (!targetUrl) {
-    return NextResponse.json({ message: 'Origem do dashboard não permitida' }, { status: 400 })
+    const response = NextResponse.json({ message: 'Origem do dashboard não permitida' }, { status: 400 })
+    response.headers.set('x-request-id', requestId)
+    return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
   }
 
   const internalToken = createEmbedToken({
@@ -82,14 +123,16 @@ export async function GET(req, { params }) {
     maxAge: 5 * 60
   })
   response.headers.set('Cache-Control', 'private, no-store, max-age=0')
+  response.headers.set('x-request-id', requestId)
 
   setEmbedSecurityHeaders(response)
 
-  console.info('[embed-access]', {
+  logger.debug('embed-access', {
+    requestId,
     dashboardId: id,
     userId: session.user.id,
     status: 302
   })
 
-  return response
+  return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
 }

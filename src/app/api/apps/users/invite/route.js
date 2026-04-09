@@ -6,6 +6,8 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { createAuditLog } from '@/libs/auditService'
+import { getRequestId, logger } from '@/libs/logger'
 import { sendInviteEmail } from '@/libs/mail'
 import { isHighAdmin, getAssignableRoles } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
@@ -14,20 +16,27 @@ import { inviteUserSchema, parseBody } from '@/libs/validations'
 
 // POST /api/apps/users/invite - Invite user by email (high admins only)
 export async function POST(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const parsed = parseBody(inviteUserSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    const response = NextResponse.json({ message: parsed.message }, { status: 400 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const { email, workspaceId, role, customRoleId } = parsed.data
@@ -42,18 +51,24 @@ export async function POST(req) {
 
   if (needsWorkspace) {
     if (!workspaceId) {
-      return NextResponse.json({ message: 'Espaço de trabalho é obrigatório' }, { status: 400 })
+      const response = NextResponse.json({ message: 'Espaço de trabalho é obrigatório' }, { status: 400 })
+      response.headers.set('x-request-id', requestId)
+      return response
     }
 
     workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
 
     if (!workspace) {
-      return NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
+      const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
+      response.headers.set('x-request-id', requestId)
+      return response
     }
   }
 
   if (!assignable.includes(assignedRole)) {
-    return NextResponse.json({ message: 'Você não tem permissão para atribuir este cargo' }, { status: 403 })
+    const response = NextResponse.json({ message: 'Você não tem permissão para atribuir este cargo' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   // Check if user already exists
@@ -61,7 +76,9 @@ export async function POST(req) {
 
   if (existingUser) {
     if (existingUser.status === 'active') {
-      return NextResponse.json({ message: 'Este e-mail já está cadastrado e ativo' }, { status: 409 })
+      const response = NextResponse.json({ message: 'Este e-mail já está cadastrado e ativo' }, { status: 409 })
+      response.headers.set('x-request-id', requestId)
+      return response
     }
 
     // User exists but is pending — resend invite
@@ -82,18 +99,37 @@ export async function POST(req) {
     try {
       await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simpla Insight' })
     } catch (err) {
-      console.error('Erro ao enviar e-mail:', err)
+      logger.error('invite-email-send-failed', {
+        requestId,
+        userId: session.user.id,
+        email,
+        error: err instanceof Error ? err.message : 'unknown'
+      })
 
-      return NextResponse.json(
+      const response = NextResponse.json(
         {
           message: 'Convite criado, mas houve falha ao enviar e-mail. Tente reenviar o convite.',
           emailError: true
         },
         { status: 201 }
       )
+      response.headers.set('x-request-id', requestId)
+      return response
     }
 
-    return NextResponse.json({ message: 'Convite reenviado com sucesso' })
+    logger.info('invite-resent-success', { requestId, userId: session.user.id, email })
+    await createAuditLog({
+      userId: session.user.id,
+      tenantId: workspaceId || existingUser.workspaceId || null,
+      action: 'USER_INVITE_RESEND',
+      resource: 'user',
+      resourceId: existingUser.id,
+      metadata: { requestId, email, assignedRole },
+      requestId
+    })
+    const response = NextResponse.json({ message: 'Convite reenviado com sucesso' })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   // Create new user with pending status
@@ -123,9 +159,14 @@ export async function POST(req) {
   try {
     await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simpla Insight' })
   } catch (err) {
-    console.error('Erro ao enviar e-mail:', err)
+    logger.error('invite-email-send-failed', {
+      requestId,
+      userId: session.user.id,
+      email,
+      error: err instanceof Error ? err.message : 'unknown'
+    })
 
-    return NextResponse.json(
+    const response = NextResponse.json(
       {
         message: 'Usuário criado, mas houve falha ao enviar e-mail. Tente reenviar o convite.',
         user,
@@ -133,6 +174,8 @@ export async function POST(req) {
       },
       { status: 201 }
     )
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   // Emit notification
@@ -146,5 +189,18 @@ export async function POST(req) {
     createdById: inviter?.id
   })
 
-  return NextResponse.json({ message: 'Convite enviado com sucesso', user }, { status: 201 })
+  logger.info('invite-create-success', { requestId, userId: session.user.id, invitedUserId: user.id, email })
+  await createAuditLog({
+    userId: session.user.id,
+    tenantId: workspaceId || user.workspace?.id || null,
+    action: 'USER_INVITE',
+    resource: 'user',
+    resourceId: user.id,
+    after: { role: user.role, status: user.status, workspaceId: user.workspace?.id || null },
+    metadata: { requestId, email },
+    requestId
+  })
+  const response = NextResponse.json({ message: 'Convite enviado com sucesso', user }, { status: 201 })
+  response.headers.set('x-request-id', requestId)
+  return response
 }

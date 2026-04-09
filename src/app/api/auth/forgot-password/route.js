@@ -3,20 +3,26 @@ import { NextResponse } from 'next/server'
 import crypto from 'crypto'
 
 import { i18n } from '@/configs/i18n'
+import { getRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { sendMail } from '@/libs/mail'
 
 export async function POST(req) {
+  const requestId = getRequestId(req)
   const { email } = await req.json()
   if (!email) {
-    return NextResponse.json({ message: 'Email é obrigatório.' }, { status: 400 })
+    const response = NextResponse.json({ message: 'Email é obrigatório.' }, { status: 400 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const user = await prisma.user.findFirst({
     where: { email: { equals: email.trim(), mode: 'insensitive' } }
   })
   if (!user) {
-    return NextResponse.json({ message: 'Se o email estiver cadastrado, enviaremos instruções.' })
+    const response = NextResponse.json({ message: 'Se o email estiver cadastrado, enviaremos instruções.' })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   const token = crypto.randomBytes(32).toString('hex')
@@ -38,5 +44,8 @@ export async function POST(req) {
     html: `<p>Olá,</p><p>Recebemos uma solicitação para redefinir sua senha.</p><p><a href="${resetLink}">Clique aqui para criar uma nova senha</a></p><p>Se não foi você, ignore este email.</p>`
   })
 
-  return NextResponse.json({ message: 'Se o email estiver cadastrado, enviaremos instruções.' })
+  logger.info('forgot-password-requested', { requestId, userId: user.id, email: user.email })
+  const response = NextResponse.json({ message: 'Se o email estiver cadastrado, enviaremos instruções.' })
+  response.headers.set('x-request-id', requestId)
+  return response
 }

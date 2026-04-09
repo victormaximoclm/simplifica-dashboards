@@ -7,21 +7,23 @@ import { getServerSession } from 'next-auth'
 import bcrypt from 'bcryptjs'
 
 import { authOptions } from '@/libs/auth'
+import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { changePasswordSchema, parseBody } from '@/libs/validations'
 
 // PUT change password
 export async function PUT(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Unauthorized' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Unauthorized' }, { status: 401, requestId })
   }
 
   const parsed = parseBody(changePasswordSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    return jsonWithRequestId({ message: parsed.message }, { status: 400, requestId })
   }
 
   const { currentPassword, newPassword } = parsed.data
@@ -31,14 +33,14 @@ export async function PUT(req) {
   })
 
   if (!user) {
-    return NextResponse.json({ message: 'User not found' }, { status: 404 })
+    return jsonWithRequestId({ message: 'User not found' }, { status: 404, requestId })
   }
 
   // Check current password (bcrypt only)
   const isValid = user.password ? await bcrypt.compare(currentPassword, user.password) : false
 
   if (!isValid) {
-    return NextResponse.json({ message: 'Current password is incorrect' }, { status: 400 })
+    return jsonWithRequestId({ message: 'Current password is incorrect' }, { status: 400, requestId })
   }
 
   // Hash the new password
@@ -49,5 +51,6 @@ export async function PUT(req) {
     data: { password: hashedPassword }
   })
 
-  return NextResponse.json({ message: 'Password changed successfully' })
+  logger.info('account-password-change-success', { requestId, userId: user.id })
+  return jsonWithRequestId({ message: 'Password changed successfully' }, { requestId })
 }

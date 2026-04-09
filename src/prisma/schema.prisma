@@ -17,6 +17,8 @@ model Workspace {
   users         User[]
   dashboards    Dashboard[]
   notifications Notification[]
+  auditLogs     AuditLog[]
+  errorEvents   ErrorEvent[]
 }
 
 model CustomRole {
@@ -100,6 +102,51 @@ model User {
   readNotifications       NotificationRead[]
   dismissedNotifications  NotificationDismiss[]
   passwordResetToken PasswordResetToken?
+  auditLogs          AuditLog[]
+  errorEvents        ErrorEvent[]
+}
+
+model AuditLog {
+  id         String    @id @default(cuid())
+  userId     String?
+  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenantId   String?
+  tenant     Workspace? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  action     String
+  entityType String
+  entityId   String?
+  before     Json?
+  after      Json?
+  metadata   Json?
+  createdAt  DateTime  @default(now())
+
+  @@index([createdAt])
+  @@index([action])
+  @@index([entityType])
+  @@index([tenantId])
+  @@index([userId])
+}
+
+model ErrorEvent {
+  id        String     @id @default(cuid())
+  source    String
+  level     String     @default("error")
+  message   String
+  stack     String?
+  path      String?
+  method    String?
+  requestId String?
+  userId    String?
+  user      User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
+  tenantId  String?
+  tenant    Workspace? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
+  metadata  Json?
+  createdAt DateTime   @default(now())
+
+  @@index([createdAt])
+  @@index([source])
+  @@index([requestId])
+  @@index([userId])
 }
 
 model Notification {

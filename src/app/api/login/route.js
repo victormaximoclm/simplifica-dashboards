@@ -5,23 +5,31 @@ import { NextResponse } from 'next/server'
 import bcrypt from 'bcryptjs'
 
 import { prisma } from '@/libs/prisma'
+import { applyRateLimitHeaders, getRequestId, logger } from '@/libs/logger'
 import { loginLimiter } from '@/libs/rateLimit'
 import { loginSchema, parseBody } from '@/libs/validations'
 
 export async function POST(req) {
-  const { success } = loginLimiter.check(req)
+  const requestId = getRequestId(req)
+  const rate = await loginLimiter.check(req)
+  const withRate = response => applyRateLimitHeaders(response, rate)
 
-  if (!success) {
-    return NextResponse.json(
+  if (!rate.success) {
+    logger.warn('login-rate-limited', { requestId })
+    const response = NextResponse.json(
       { message: ['Muitas tentativas. Aguarde um momento antes de tentar novamente.'] },
       { status: 429 }
     )
+    response.headers.set('x-request-id', requestId)
+    return withRate(response)
   }
 
   const parsed = parseBody(loginSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: [parsed.message] }, { status: 400 })
+    const response = NextResponse.json({ message: [parsed.message] }, { status: 400 })
+    response.headers.set('x-request-id', requestId)
+    return withRate(response)
   }
 
   const { email, password } = parsed.data
@@ -44,18 +52,22 @@ export async function POST(req) {
   if (dbUser) {
     // Block inactive users
     if (dbUser.status === 'inactive') {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: ['Sua conta está inativa. Contate o administrador.'] },
         { status: 403, statusText: 'Forbidden' }
       )
+      response.headers.set('x-request-id', requestId)
+      return withRate(response)
     }
 
     // Block pending users (haven't accepted invite yet)
     if (dbUser.status === 'pending') {
-      return NextResponse.json(
+      const response = NextResponse.json(
         { message: ['Aceite o convite enviado ao seu email antes de fazer login.'] },
         { status: 403, statusText: 'Forbidden' }
       )
+      response.headers.set('x-request-id', requestId)
+      return withRate(response)
     }
 
     // Check password (bcrypt only)
@@ -70,12 +82,18 @@ export async function POST(req) {
 
       const { password: _, status: __, ...filteredUserData } = dbUser
 
-      return NextResponse.json(filteredUserData)
+      logger.info('login-success', { requestId, userId: filteredUserData.id })
+      const response = NextResponse.json(filteredUserData)
+      response.headers.set('x-request-id', requestId)
+      return withRate(response)
     }
   }
 
-  return NextResponse.json(
+  logger.warn('login-invalid-credentials', { requestId, email })
+  const response = NextResponse.json(
     { message: ['Email ou senha inválidos'] },
     { status: 401, statusText: 'Unauthorized Access' }
   )
+  response.headers.set('x-request-id', requestId)
+  return withRate(response)
 }

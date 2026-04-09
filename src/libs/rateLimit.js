@@ -1,8 +1,49 @@
-// Simple in-memory rate limiter for API routes.
-// Each key (e.g. IP) is tracked in a Map with a sliding window.
-// For multi-instance deployments, replace with Redis-backed solution.
+import Redis from 'ioredis'
 
-const stores = new Map()
+let redisClient
+const localStores = new Map()
+
+function getRedisClient() {
+  if (redisClient) return redisClient
+  const redisUrl = process.env.REDIS_URL
+
+  if (!redisUrl) {
+    return null
+  }
+
+  redisClient = new Redis(redisUrl, {
+    lazyConnect: true,
+    maxRetriesPerRequest: 1,
+    enableOfflineQueue: false
+  })
+
+  return redisClient
+}
+
+function checkInMemory({ bucket, keyValue, interval, limit }) {
+  if (!localStores.has(bucket)) {
+    localStores.set(bucket, new Map())
+  }
+
+  const tokenStore = localStores.get(bucket)
+  const now = Date.now()
+  const record = tokenStore.get(keyValue)
+
+  if (!record || now - record.start > interval) {
+    tokenStore.set(keyValue, { start: now, count: 1 })
+    return { success: true, remaining: limit - 1, limit, reset: Math.ceil(interval / 1000) }
+  }
+
+  record.count += 1
+  const remaining = Math.max(0, limit - record.count)
+  const reset = Math.max(0, Math.ceil((interval - (now - record.start)) / 1000))
+
+  if (record.count > limit) {
+    return { success: false, remaining: 0, limit, reset }
+  }
+
+  return { success: true, remaining, limit, reset }
+}
 
 /**
  * Creates a rate limiter with the given options.
@@ -11,41 +52,43 @@ const stores = new Map()
  *   limit    – max requests per window
  */
 export function createRateLimit({ interval = 60_000, limit = 10 } = {}) {
-  // Reuse or create store for this config
-  const key = `${interval}:${limit}`
-
-  if (!stores.has(key)) {
-    stores.set(key, new Map())
-  }
-
-  const tokenStore = stores.get(key)
+  const bucket = `${interval}:${limit}`
 
   return {
     /**
      * @param {Request} req
      * @param {string} [customKey]
-     * @returns {{ success: boolean, remaining: number }}
+     * @returns {Promise<{ success: boolean, remaining: number, limit: number, reset: number }>}
      */
-    check(req, customKey) {
+    async check(req, customKey) {
+      const client = getRedisClient()
       const ip = req.headers.get('x-forwarded-for')?.split(',')[0]?.trim() || req.headers.get('x-real-ip') || 'unknown'
       const keyValue = String(customKey || ip)
 
-      const now = Date.now()
-      const record = tokenStore.get(keyValue)
-
-      if (!record || now - record.start > interval) {
-        tokenStore.set(keyValue, { start: now, count: 1 })
-
-        return { success: true, remaining: limit - 1 }
+      if (!client) {
+        return checkInMemory({ bucket, keyValue, interval, limit })
       }
 
-      record.count += 1
-
-      if (record.count > limit) {
-        return { success: false, remaining: 0 }
+      if (client.status !== 'ready') {
+        await client.connect()
       }
 
-      return { success: true, remaining: limit - record.count }
+      const redisKey = `ratelimit:${bucket}:${keyValue}`
+      const count = await client.incr(redisKey)
+
+      if (count === 1) {
+        await client.pexpire(redisKey, interval)
+      }
+
+      const ttl = await client.pttl(redisKey)
+      const reset = Math.max(0, Math.ceil(ttl / 1000))
+      const remaining = Math.max(0, limit - count)
+
+      if (count > limit) {
+        return { success: false, remaining: 0, limit, reset }
+      }
+
+      return { success: true, remaining, limit, reset }
     }
   }
 }

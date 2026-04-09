@@ -32,21 +32,30 @@ function loginRedirectUrl(request) {
   return url
 }
 
+function withRequestId(requestId, res) {
+  res.headers.set('x-request-id', requestId)
+
+  return res
+}
+
 export async function middleware(req) {
   const { pathname } = req.nextUrl
   const normalizedPath = normalizePath(pathname)
+  const requestHeaders = new Headers(req.headers)
+  const requestId = req.headers.get('x-request-id') || crypto.randomUUID()
+  requestHeaders.set('x-request-id', requestId)
 
   if (publicRoutes.some(route => normalizedPath === route || normalizedPath.startsWith(`${route}/`))) {
-    return NextResponse.next()
+    return withRequestId(requestId, NextResponse.next({ request: { headers: requestHeaders } }))
   }
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
   if (!token || !token.id) {
-    return NextResponse.redirect(loginRedirectUrl(req))
+    return withRequestId(requestId, NextResponse.redirect(loginRedirectUrl(req)))
   }
 
   // Status do usuário é validado em AuthGuard (Node) e nas APIs — Prisma não roda no Edge do middleware.
-  return NextResponse.next()
+  return withRequestId(requestId, NextResponse.next({ request: { headers: requestHeaders } }))
 }
 
 // Ignora _next, favicon, pasta images/ e arquivos estáticos comuns em public/ (evita 302 em .svg/.woff etc.).

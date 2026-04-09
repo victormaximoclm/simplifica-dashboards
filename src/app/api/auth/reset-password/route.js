@@ -2,17 +2,23 @@ export const runtime = 'nodejs'
 import { NextResponse } from 'next/server'
 import { prisma } from '@/libs/prisma'
 import bcrypt from 'bcryptjs'
+import { getRequestId, logger } from '@/libs/logger'
 
 export async function POST(req) {
+  const requestId = getRequestId(req)
   const { token, password } = await req.json()
   if (!token || !password) {
-    return NextResponse.json({ message: 'Token e nova senha são obrigatórios.' }, { status: 400 })
+    const response = NextResponse.json({ message: 'Token e nova senha são obrigatórios.' }, { status: 400 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   // Busca token
   const reset = await prisma.passwordResetToken.findUnique({ where: { token } })
   if (!reset || reset.expiresAt < new Date()) {
-    return NextResponse.json({ message: 'Token inválido ou expirado.' }, { status: 400 })
+    const response = NextResponse.json({ message: 'Token inválido ou expirado.' }, { status: 400 })
+    response.headers.set('x-request-id', requestId)
+    return response
   }
 
   // Atualiza senha
@@ -22,5 +28,8 @@ export async function POST(req) {
   // Remove token
   await prisma.passwordResetToken.delete({ where: { token } })
 
-  return NextResponse.json({ message: 'Senha redefinida com sucesso.' })
+  logger.info('reset-password-success', { requestId, userId: reset.userId })
+  const response = NextResponse.json({ message: 'Senha redefinida com sucesso.' })
+  response.headers.set('x-request-id', requestId)
+  return response
 }

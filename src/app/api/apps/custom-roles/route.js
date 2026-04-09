@@ -4,15 +4,17 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { createCustomRoleSchema, parseBody } from '@/libs/validations'
 
 // GET /api/apps/custom-roles - List all custom roles (global)
-export async function GET() {
+export async function GET(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Não autorizado' }, { status: 401, requestId })
   }
 
   const roles = await prisma.customRole.findMany({
@@ -22,25 +24,26 @@ export async function GET() {
     orderBy: { name: 'asc' }
   })
 
-  return NextResponse.json(roles)
+  return jsonWithRequestId(roles, { requestId })
 }
 
 // POST /api/apps/custom-roles - Create custom role (superAdmin only)
 export async function POST(req) {
+  const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
   if (!session) {
-    return NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+    return jsonWithRequestId({ message: 'Não autorizado' }, { status: 401, requestId })
   }
 
   if (session.user.role !== 'superAdmin' && session.user.role !== 'subAdmin') {
-    return NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    return jsonWithRequestId({ message: 'Acesso negado' }, { status: 403, requestId })
   }
 
   const parsed = parseBody(createCustomRoleSchema, await req.json())
 
   if (!parsed.success) {
-    return NextResponse.json({ message: parsed.message }, { status: 400 })
+    return jsonWithRequestId({ message: parsed.message }, { status: 400, requestId })
   }
 
   const { name } = parsed.data
@@ -51,7 +54,7 @@ export async function POST(req) {
   })
 
   if (existing) {
-    return NextResponse.json({ message: 'Já existe um cargo com esse nome' }, { status: 409 })
+    return jsonWithRequestId({ message: 'Já existe um cargo com esse nome' }, { status: 409, requestId })
   }
 
   const role = await prisma.customRole.create({
@@ -61,5 +64,6 @@ export async function POST(req) {
     }
   })
 
-  return NextResponse.json(role, { status: 201 })
+  logger.info('custom-role-create-success', { requestId, userId: session.user.id, customRoleId: role.id })
+  return jsonWithRequestId(role, { status: 201, requestId })
 }
