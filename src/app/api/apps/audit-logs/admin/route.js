@@ -11,6 +11,12 @@ const ADMIN_ACTIONS = [
   'WORKSPACE_CREATE',
   'WORKSPACE_UPDATE',
   'WORKSPACE_DELETE',
+  'DASHBOARD_CREATE',
+  'DASHBOARD_UPDATE',
+  'DASHBOARD_DELETE',
+  'CUSTOM_ROLE_CREATE',
+  'CUSTOM_ROLE_UPDATE',
+  'CUSTOM_ROLE_DELETE',
   'USER_INVITE',
   'USER_INVITE_RESEND',
   'USER_UPDATE',
@@ -71,8 +77,9 @@ export async function GET(req) {
   const dashboardIds = [...new Set(rows.filter(r => r.entityType === 'dashboard' && r.entityId).map(r => r.entityId))]
   const userEntityIds = [...new Set(rows.filter(r => r.entityType === 'user' && r.entityId).map(r => r.entityId))]
   const workspaceEntityIds = [...new Set(rows.filter(r => r.entityType === 'workspace' && r.entityId).map(r => r.entityId))]
+  const customRoleIds = [...new Set(rows.filter(r => r.entityType === 'custom_role' && r.entityId).map(r => r.entityId))]
 
-  const [dashboards, users, workspaces] = await Promise.all([
+  const [dashboards, users, workspaces, customRoles] = await Promise.all([
     dashboardIds.length
       ? prisma.dashboard.findMany({ where: { id: { in: dashboardIds } }, select: { id: true, title: true } })
       : Promise.resolve([]),
@@ -82,17 +89,22 @@ export async function GET(req) {
     workspaceEntityIds.length
       ? prisma.workspace.findMany({ where: { id: { in: workspaceEntityIds } }, select: { id: true, name: true } })
       : Promise.resolve([]),
+    customRoleIds.length
+      ? prisma.customRole.findMany({ where: { id: { in: customRoleIds } }, select: { id: true, name: true } })
+      : Promise.resolve([])
   ])
 
   const dashboardById = new Map(dashboards.map(d => [d.id, d.title]))
   const userById = new Map(users.map(u => [u.id, u.name || u.email || u.id]))
   const workspaceById = new Map(workspaces.map(w => [w.id, w.name]))
+  const customRoleById = new Map(customRoles.map(cr => [cr.id, cr.name]))
 
   const items = rows.map(r => {
     let resourceLabel = null
     if (r.entityType === 'dashboard' && r.entityId) resourceLabel = dashboardById.get(r.entityId) || null
     if (r.entityType === 'user' && r.entityId) resourceLabel = userById.get(r.entityId) || null
     if (r.entityType === 'workspace' && r.entityId) resourceLabel = workspaceById.get(r.entityId) || null
+    if (r.entityType === 'custom_role' && r.entityId) resourceLabel = customRoleById.get(r.entityId) || null
 
     return { ...r, resourceLabel }
   })

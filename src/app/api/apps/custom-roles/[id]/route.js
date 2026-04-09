@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { createAuditLog } from '@/libs/auditService'
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { createCustomRoleSchema, parseBody } from '@/libs/validations'
@@ -55,6 +56,17 @@ export async function PUT(req, { params }) {
   })
 
   logger.info('custom-role-update-success', { requestId, userId: session.user.id, customRoleId: role.id })
+  await createAuditLog({
+    userId: session.user.id,
+    tenantId: null,
+    action: 'CUSTOM_ROLE_UPDATE',
+    resource: 'custom_role',
+    resourceId: role.id,
+    before: { name: existing.name },
+    after: { name: role.name },
+    metadata: { requestId },
+    requestId
+  })
   return jsonWithRequestId(role, { requestId })
 }
 
@@ -92,5 +104,15 @@ export async function DELETE(req, { params }) {
   await prisma.customRole.delete({ where: { id } })
 
   logger.info('custom-role-delete-success', { requestId, userId: session.user.id, customRoleId: id })
+  await createAuditLog({
+    userId: session.user.id,
+    tenantId: null,
+    action: 'CUSTOM_ROLE_DELETE',
+    resource: 'custom_role',
+    resourceId: id,
+    before: { name: existing.name },
+    metadata: { requestId },
+    requestId
+  })
   return jsonWithRequestId({ message: 'Cargo excluído' }, { requestId })
 }

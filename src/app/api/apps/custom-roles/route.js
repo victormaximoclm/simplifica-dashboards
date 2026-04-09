@@ -4,6 +4,7 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
+import { createAuditLog } from '@/libs/auditService'
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { createCustomRoleSchema, parseBody } from '@/libs/validations'
@@ -65,5 +66,15 @@ export async function POST(req) {
   })
 
   logger.info('custom-role-create-success', { requestId, userId: session.user.id, customRoleId: role.id })
+  await createAuditLog({
+    userId: session.user.id,
+    tenantId: null,
+    action: 'CUSTOM_ROLE_CREATE',
+    resource: 'custom_role',
+    resourceId: role.id,
+    after: { name: role.name },
+    metadata: { requestId },
+    requestId
+  })
   return jsonWithRequestId(role, { status: 201, requestId })
 }
