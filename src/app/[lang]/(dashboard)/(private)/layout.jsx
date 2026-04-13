@@ -8,6 +8,7 @@ import VerticalLayout from '@layouts/VerticalLayout'
 // Component Imports
 import Providers from '@components/Providers'
 import SessionValidityMonitor from '@/components/auth/SessionValidityMonitor'
+import ActivityTracker from '@/components/auth/ActivityTracker'
 import Navigation from '@components/layout/vertical/Navigation'
 import Navbar from '@components/layout/vertical/Navbar'
 import VerticalFooter from '@components/layout/vertical/Footer'
@@ -38,6 +39,7 @@ const Layout = async props => {
     <Providers direction={direction}>
       <AuthGuard locale={lang}>
         <SessionValidityMonitor />
+        <ActivityTracker />
         <LayoutWrapper
           systemMode={systemMode}
           verticalLayout={

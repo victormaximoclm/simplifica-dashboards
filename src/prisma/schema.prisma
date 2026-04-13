@@ -92,6 +92,7 @@ model User {
   inviteToken       String?   @unique
   inviteTokenExpiry DateTime?
   lastLoginAt       DateTime?
+  lastActivityAt    DateTime?
   workspaceId       String?
   workspace         Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   customRoleId      String?

@@ -5,6 +5,7 @@ import { PrismaAdapter } from '@auth/prisma-adapter'
 import crypto from 'crypto'
 
 import { createAuditLog } from '@/libs/auditService'
+import { touchUserActivity } from '@/libs/activity'
 import { prisma } from '@/libs/prisma'
 
 const providers = [
@@ -110,17 +111,20 @@ export const authOptions = {
     },
     async session({ session, token }) {
       if (session.user) {
-        session.user.id = token.id || token.sub
+        const userId = token.id || token.sub
+
+        session.user.id = userId
         session.user.name = token.name
         session.user.role = token.role
         session.user.workspaceId = token.workspaceId
 
         const dbUser = await prisma.user.findUnique({
-          where: { id: token.id || token.sub },
+          where: { id: userId },
           select: { image: true }
         })
 
         session.user.image = dbUser?.image ?? null
+        await touchUserActivity(userId, 2)
       }
 
       return session

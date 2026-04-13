@@ -32,6 +32,7 @@ export async function GET(req) {
       role: true,
       status: true,
       lastLoginAt: true,
+      lastActivityAt: true,
       workspace: { select: { id: true, name: true } }
     },
     orderBy: { name: 'asc' }

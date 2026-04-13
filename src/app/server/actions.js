@@ -31,6 +31,7 @@ export const getUserData = async () => {
       role: true,
       status: true,
       lastLoginAt: true,
+      lastActivityAt: true,
       workspace: { select: { id: true, name: true } },
       customRole: { select: { id: true, name: true } }
     },

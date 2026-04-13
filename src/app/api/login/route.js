@@ -77,7 +77,7 @@ export async function POST(req) {
       // Record login timestamp
       await prisma.user.update({
         where: { id: dbUser.id },
-        data: { lastLoginAt: new Date() }
+        data: { lastLoginAt: new Date(), lastActivityAt: new Date() }
       })
 
       const { password: _, status: __, ...filteredUserData } = dbUser

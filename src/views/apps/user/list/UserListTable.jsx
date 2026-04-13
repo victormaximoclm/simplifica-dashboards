@@ -119,6 +119,7 @@ const UserListTable = ({ tableData, workspaces }) => {
   const [data, setData] = useState(...[tableData])
   const [filteredData, setFilteredData] = useState(data)
   const [globalFilter, setGlobalFilter] = useState('')
+  const [activityClock, setActivityClock] = useState(Date.now())
 
   // Hooks
   const { lang: locale } = useParams()
@@ -163,6 +164,14 @@ const UserListTable = ({ tableData, workspaces }) => {
   const [deleteDialogOpen, setDeleteDialogOpen] = useState(false)
   const [userToDelete, setUserToDelete] = useState(null)
   const [resendingInvite, setResendingInvite] = useState(null)
+
+  useEffect(() => {
+    const intervalId = setInterval(() => {
+      setActivityClock(Date.now())
+    }, 60000)
+
+    return () => clearInterval(intervalId)
+  }, [])
 
   const openDeleteDialog = user => {
     setUserToDelete(user)
@@ -332,13 +341,13 @@ const UserListTable = ({ tableData, workspaces }) => {
         header: 'Atividade',
         enableSorting: false,
         cell: ({ row }) => {
-          const lastLogin = row.original.lastLoginAt
+          const lastActivity = row.original.lastActivityAt || row.original.lastLoginAt
 
-          if (!lastLogin) {
+          if (!lastActivity) {
             return <Chip variant='tonal' label='Sem registro' size='small' color='default' />
           }
 
-          const diffHours = (new Date() - new Date(lastLogin)) / (1000 * 60 * 60)
+          const diffHours = (activityClock - new Date(lastActivity).getTime()) / (1000 * 60 * 60)
 
           if (diffHours < 1) return <Chip variant='tonal' label='Online recente' size='small' color='success' />
           if (diffHours < 24) return <Chip variant='tonal' label='Hoje' size='small' color='info' />
@@ -402,7 +411,7 @@ const UserListTable = ({ tableData, workspaces }) => {
       })
     ],
     // eslint-disable-next-line react-hooks/exhaustive-deps
-    [data, filteredData, callerRole, isHighAdmin, session]
+    [data, filteredData, callerRole, isHighAdmin, session, activityClock]
   )
 
   const table = useReactTable({
