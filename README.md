@@ -1,14 +1,6 @@
 # 🚀 SaaS Dashboards
 
 SaaS para gerenciamento seguro de dashboards (ex: Power BI) com controle de acesso por usuário e workspace.
-
-## 💡 Problema
-
-Empresas que utilizam dashboards, ou desenvolvem para clientes enfrentam dificuldades como:
-
-- Falta de controle de acesso por usuário
-- Dificuldade em organizar múltiplos dashboards por equipe e por empresa cliente
-
 ## ✅ Solução
 
 O SaaS Dashboards resolve isso permitindo:
