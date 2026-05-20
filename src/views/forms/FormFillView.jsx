@@ -31,6 +31,8 @@ import {
   formChipRemoveBtnCls
 } from './formStyles'
 
+const FIELDS_PER_PAGE = 10
+
 const WEBHOOK_FIELD_TYPES = new Set(['dynamic-list', 'multi-select-dynamic', 'cpf-lookup'])
 
 const DATASOURCE_METHODS = {
@@ -100,6 +102,7 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
   const [submitted, setSubmitted] = useState(false)
   const [linkClosedMessage, setLinkClosedMessage] = useState(null)
   const [error, setError] = useState(null)
+  const [currentPage, setCurrentPage] = useState(0)
   const router = useRouter()
   const handleGoLinks = () => router.push(`/${lang}/forms/${form.id}/links`)
 
@@ -117,6 +120,18 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     () => fields.filter(f => (f.type === 'cpf-lookup' || !hiddenFieldIds.has(f.id)) && isFieldVisible(f, values)),
     [fields, hiddenFieldIds, values]
   )
+
+  const pages = useMemo(() => {
+    const result = []
+    for (let i = 0; i < visibleFields.length; i += FIELDS_PER_PAGE) {
+      result.push(visibleFields.slice(i, i + FIELDS_PER_PAGE))
+    }
+    return result.length > 0 ? result : [[]]
+  }, [visibleFields])
+
+  const totalPages = pages.length
+  const currentFields = pages[currentPage] ?? []
+  const isLastPage = currentPage === totalPages - 1
 
   const fetchDatasource = useCallback(
     async (field, extra = {}) => {
@@ -298,6 +313,33 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     setCpfErrors({})
     setError(null)
     setSubmitted(false)
+    setCurrentPage(0)
+  }
+
+  const handleNextPage = () => {
+    setError(null)
+
+    for (const field of currentFields) {
+      if (!isFieldVisible(field, values)) continue
+      if (isFieldRequired(field, values) && isFieldEmpty(values[field.id], field, values)) {
+        setError(`O campo "${field.label}" é obrigatório.`)
+        return
+      }
+      const regexError = validateFieldRegex(field, values[field.id])
+      if (regexError) {
+        setError(`"${field.label}": ${regexError}`)
+        return
+      }
+    }
+
+    setCurrentPage(prev => prev + 1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
+  }
+
+  const handlePrevPage = () => {
+    setError(null)
+    setCurrentPage(prev => prev - 1)
+    window.scrollTo({ top: 0, behavior: 'smooth' })
   }
 
   if (linkClosedMessage) {
@@ -356,11 +398,29 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
             </button>
           )}
         </div>
+
+        {/* Barra de progresso — só aparece se tiver mais de 1 página */}
+        {totalPages > 1 && (
+          <div className='flex flex-col gap-2 mt-4'>
+            <div className='flex items-center justify-between'>
+              <span className={formMutedCls}>
+                Etapa {currentPage + 1} de {totalPages}
+              </span>
+              <span className={formMutedCls}>{Math.round(((currentPage + 1) / totalPages) * 100)}%</span>
+            </div>
+            <div className='w-full h-1.5 rounded-full bg-[var(--mui-palette-divider)]'>
+              <div
+                className='h-1.5 rounded-full bg-[var(--mui-palette-primary-main)] transition-all duration-300'
+                style={{ width: `${((currentPage + 1) / totalPages) * 100}%` }}
+              />
+            </div>
+          </div>
+        )}
       </header>
 
       {error && <div className={`${formAlertErrorCls} ${formFieldsWrapCls}`}>{error}</div>}
 
-      {visibleFields.map(field => (
+      {currentFields.map(field => (
         <FieldInput
           key={field.id}
           field={field}
@@ -375,10 +435,29 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
         />
       ))}
 
-      <button type='submit' disabled={submitting} className={`${btnPrimary} ${formFieldsWrapCls}`}>
-        {submitting ? <i className='tabler-loader-2 animate-spin' /> : <i className='tabler-send' />}
-        {submitting ? 'Enviando...' : 'Enviar'}
-      </button>
+      {/* Navegação */}
+      <div
+        className={`flex items-center gap-3 ${formFieldsWrapCls} ${currentPage > 0 ? 'justify-between' : 'justify-end'}`}
+      >
+        {currentPage > 0 && (
+          <button type='button' onClick={handlePrevPage} className={`${btnSecondary} flex-1`}>
+            <i className='tabler-arrow-left text-sm' />
+            Anterior
+          </button>
+        )}
+
+        {isLastPage ? (
+          <button type='submit' disabled={submitting} className={`${btnPrimary} flex-1`}>
+            {submitting ? <i className='tabler-loader-2 animate-spin' /> : <i className='tabler-send' />}
+            {submitting ? 'Enviando...' : 'Enviar'}
+          </button>
+        ) : (
+          <button type='button' onClick={handleNextPage} className={`${btnPrimary} flex-1`}>
+            Próximo
+            <i className='tabler-arrow-right text-sm' />
+          </button>
+        )}
+      </div>
     </form>
   )
 }
