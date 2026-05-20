@@ -2,10 +2,10 @@
 
 import { useEffect, useRef } from 'react'
 import styled from '@emotion/styled'
-import Image from 'next/image'
 import themeConfig from '@configs/themeConfig'
 import useVerticalNav from '@menu/hooks/useVerticalNav'
 import { useSettings } from '@core/hooks/useSettings'
+import SimplificaLogo from '@core/svg/Logo'
 
 const LogoText = styled.span`
   color: ${({ color }) => color ?? 'var(--mui-palette-text-primary)'};
@@ -41,7 +41,7 @@ const Logo = ({ color }) => {
 
   return (
     <div className='flex items-center'>
-      <Image src='/Group 2.svg' alt='Logo' width={32} height={32} />
+      <SimplificaLogo className='text-2xl' />
       <LogoText
         color={color}
         ref={logoTextRef}
