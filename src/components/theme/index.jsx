@@ -37,7 +37,9 @@ const CustomThemeProvider = props => {
   const isServer = typeof window === 'undefined'
   let currentMode
 
-  if (isServer) {
+  if (themeConfig.forceDarkMode) {
+    currentMode = 'dark'
+  } else if (isServer) {
     currentMode = systemMode
   } else {
     if (settings.mode === 'system') {
@@ -95,7 +97,7 @@ const CustomThemeProvider = props => {
     >
       <ThemeProvider
         theme={theme}
-        defaultMode={systemMode}
+        defaultMode={themeConfig.forceDarkMode ? 'dark' : systemMode}
         modeStorageKey={`${themeConfig.templateName.toLowerCase().split(' ').join('-')}-mui-template-mode`}
         forceThemeRerender
       >

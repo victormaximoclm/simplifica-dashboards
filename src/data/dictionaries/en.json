@@ -44,6 +44,8 @@
         "auditAccess": "Access Audit",
         "auditActions": "Admin Audit",
         "manageDashboards": "+ Dashboards",
+        "forms": "Forms",
+        "manageForms": "+ Forms",
         "pages": "Pages",
         "userProfile": "User Profile",
         "accountSettings": "Account Settings",

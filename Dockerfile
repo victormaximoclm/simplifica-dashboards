@@ -9,7 +9,8 @@ WORKDIR /app
 COPY package.json pnpm-lock.yaml ./
 
 # Install deps without running postinstall (needs source files not yet available)
-RUN corepack enable pnpm && pnpm install --frozen-lockfile --ignore-scripts
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ── Builder ──────────────────────────────────
 FROM base AS builder
@@ -20,7 +21,8 @@ COPY --from=deps /app/node_modules ./node_modules
 COPY . .
 
 # Run postinstall scripts now that all source files are available
-RUN corepack enable pnpm && npx prisma generate && pnpm build:icons
+RUN corepack enable && corepack prepare pnpm@9.15.9 --activate
+RUN npx prisma generate && pnpm build:icons
 
 # Build arguments for Next.js public env vars (baked at build time)
 ARG NEXT_PUBLIC_APP_URL=http://localhost:3000

@@ -44,8 +44,11 @@ export const SettingsProvider = props => {
   const updateSettings = (settings, options) => {
     const { updateCookie = true } = options || {}
 
+    const patch =
+      themeConfig.forceDarkMode && settings && 'mode' in settings ? { ...settings, mode: 'dark' } : settings
+
     _updateSettingsState(prev => {
-      const newSettings = { ...prev, ...settings }
+      const newSettings = { ...prev, ...patch }
 
       // Update cookie if needed
       if (updateCookie) updateSettingsCookie(newSettings)
@@ -83,10 +86,12 @@ export const SettingsProvider = props => {
     [_settingsState]
   )
 
+  const settings = themeConfig.forceDarkMode ? { ..._settingsState, mode: 'dark' } : _settingsState
+
   return (
     <SettingsContext.Provider
       value={{
-        settings: _settingsState,
+        settings,
         updateSettings,
         isSettingsChanged,
         resetSettings,

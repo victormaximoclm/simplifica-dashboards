@@ -4,43 +4,59 @@ datasource db {
 }
 
 generator client {
-  provider        = "prisma-client-js"
-  binaryTargets   = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-1.1.x", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
+  provider      = "prisma-client-js"
+  binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-1.1.x", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
 model Workspace {
-  id            String         @id @default(cuid())
+  id            String                 @id @default(cuid())
   name          String
-  slug          String         @unique
-  createdAt     DateTime       @default(now())
-  updatedAt     DateTime       @updatedAt
+  slug          String                 @unique
+  createdAt     DateTime               @default(now())
+  updatedAt     DateTime               @updatedAt
   users         User[]
   dashboards    Dashboard[]
   notifications Notification[]
   auditLogs     AuditLog[]
   errorEvents   ErrorEvent[]
+  integrations  WorkspaceIntegration[]
+  forms         Form[]
+}
+
+model WorkspaceIntegration {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  provider    String
+  enabled     Boolean   @default(false)
+  configJson  Json
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([workspaceId, provider])
 }
 
 model CustomRole {
-  id          String    @id @default(cuid())
-  name        String    @unique
-  users       User[]
+  id                  String                @id @default(cuid())
+  name                String                @unique
+  users               User[]
   dashboardVisibility DashboardVisibility[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt           DateTime              @default(now())
+  updatedAt           DateTime              @updatedAt
 }
 
 model Dashboard {
-  id          String    @id @default(cuid())
-  title       String
-  embedUrl    String
-  iframeCode  String
-  workspaceId String
-  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  allowedRoles DashboardVisibility[]
+  id            String                @id @default(cuid())
+  title         String
+  embedUrl      String
+  iframeCode    String
+  workspaceId   String
+  workspace     Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  allowedRoles  DashboardVisibility[]
   notifications Notification[]
-  createdAt   DateTime  @default(now())
-  updatedAt   DateTime  @updatedAt
+  createdAt     DateTime              @default(now())
+  updatedAt     DateTime              @updatedAt
 }
 
 model DashboardVisibility {
@@ -54,18 +70,18 @@ model DashboardVisibility {
 }
 
 model Account {
-  id                 String  @id @default(cuid())
-  userId             String
-  type               String
-  provider           String
-  providerAccountId  String
-  refresh_token      String?
-  access_token       String?
-  expires_at         Int?
-  token_type         String?
-  scope              String?
-  id_token           String?
-  session_state      String?
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String?
+  access_token      String?
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String?
+  session_state     String?
 
   user User @relation(fields: [userId], references: [id], onDelete: Cascade)
 
@@ -81,36 +97,54 @@ model Session {
 }
 
 model User {
-  id                String    @id @default(cuid())
-  name              String?
-  email             String?   @unique
-  emailVerified     DateTime?
-  image             String?
-  password          String?
-  role              String    @default("user")
-  status            String    @default("pending")
-  inviteToken       String?   @unique
-  inviteTokenExpiry DateTime?
-  lastLoginAt       DateTime?
-  lastActivityAt    DateTime?
-  workspaceId       String?
-  workspace         Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  customRoleId      String?
-  customRole        CustomRole? @relation(fields: [customRoleId], references: [id])
-  accounts              Account[]
-  sessions              Session[]
-  createdNotifications    Notification[]        @relation("NotificationCreator")
-  readNotifications       NotificationRead[]
-  dismissedNotifications  NotificationDismiss[]
-  passwordResetToken PasswordResetToken?
-  auditLogs          AuditLog[]
-  errorEvents        ErrorEvent[]
+  id                     String                @id @default(cuid())
+  name                   String?
+  email                  String?               @unique
+  emailVerified          DateTime?
+  image                  String?
+  password               String?
+  role                   String                @default("user")
+  status                 String                @default("pending")
+  inviteToken            String?               @unique
+  inviteTokenExpiry      DateTime?
+  lastLoginAt            DateTime?
+  lastActivityAt         DateTime?
+  workspaceId            String?
+  workspace              Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  customRoleId           String?
+  customRole             CustomRole?           @relation(fields: [customRoleId], references: [id])
+  accounts               Account[]
+  sessions               Session[]
+  createdNotifications   Notification[]        @relation("NotificationCreator")
+  readNotifications      NotificationRead[]
+  dismissedNotifications NotificationDismiss[]
+  passwordResetToken     PasswordResetToken?
+  auditLogs              AuditLog[]
+  errorEvents            ErrorEvent[]
+  userIntegrations       UserIntegration[]
+}
+
+model UserIntegration {
+  id           String  @id @default(cuid())
+  userId       String
+  user         User    @relation(fields: [userId], references: [id], onDelete: Cascade)
+  provider     String
+  accountEmail String?
+  accountId    String?
+  enabled      Boolean @default(true)
+  token        String?
+  configJson   Json?
+
+  createdAt DateTime @default(now())
+  updatedAt DateTime @default(now()) @updatedAt
+
+  @@unique([userId, provider])
 }
 
 model AuditLog {
-  id         String    @id @default(cuid())
+  id         String     @id @default(cuid())
   userId     String?
-  user       User?     @relation(fields: [userId], references: [id], onDelete: SetNull)
+  user       User?      @relation(fields: [userId], references: [id], onDelete: SetNull)
   tenantId   String?
   tenant     Workspace? @relation(fields: [tenantId], references: [id], onDelete: SetNull)
   action     String
@@ -119,7 +153,7 @@ model AuditLog {
   before     Json?
   after      Json?
   metadata   Json?
-  createdAt  DateTime  @default(now())
+  createdAt  DateTime   @default(now())
 
   @@index([createdAt])
   @@index([action])
@@ -151,19 +185,19 @@ model ErrorEvent {
 }
 
 model Notification {
-  id          String    @id @default(cuid())
-  type        String    // user_invited, user_role_changed, user_status_changed, user_status_pending, user_deleted, dashboard_created, dashboard_deleted, dashboard_updated
+  id          String                @id @default(cuid())
+  type        String // user_invited, user_role_changed, user_status_changed, user_status_pending, user_deleted, dashboard_created, dashboard_deleted, dashboard_updated
   title       String
   message     String
   workspaceId String?
   dashboardId String?
-  workspace   Workspace? @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  dashboard   Dashboard? @relation(fields: [dashboardId], references: [id], onDelete: SetNull)
+  workspace   Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  dashboard   Dashboard?            @relation(fields: [dashboardId], references: [id], onDelete: SetNull)
   createdById String?
-  createdBy   User?     @relation("NotificationCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  createdBy   User?                 @relation("NotificationCreator", fields: [createdById], references: [id], onDelete: SetNull)
   readBy      NotificationRead[]
   dismissedBy NotificationDismiss[]
-  createdAt   DateTime  @default(now())
+  createdAt   DateTime              @default(now())
 
   @@index([dashboardId])
 }
@@ -200,8 +234,34 @@ model VerificationToken {
 
 model PasswordResetToken {
   id        String   @id @default(cuid())
-  userId    String  @unique
-  user      User    @relation(fields: [userId], references: [id], onDelete: Cascade)
-  token     String  @unique
+  userId    String   @unique
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  token     String   @unique
   expiresAt DateTime
+}
+
+model Form {
+  id              String           @id @default(cuid())
+  title           String
+  description     String?
+  workspaceId     String
+  workspace       Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  fields          Json
+  webhookUrl      String
+  allowPublicLink Boolean          @default(false)
+  allowedCargos   String[]         // cargos ClickUp (integração)
+  allowedRoles    String[]         // customRole quando sem integração
+  createdAt       DateTime         @default(now())
+  updatedAt       DateTime         @updatedAt
+  publicLinks     FormPublicLink[]
+}
+
+model FormPublicLink {
+  id        String   @id @default(cuid())
+  formId    String
+  form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
+  token     String   @unique @default(cuid())
+  expiresAt DateTime
+  used      Boolean  @default(false)
+  createdAt DateTime @default(now())
 }

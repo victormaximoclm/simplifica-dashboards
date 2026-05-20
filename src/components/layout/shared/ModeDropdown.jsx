@@ -13,19 +13,21 @@ import ClickAwayListener from '@mui/material/ClickAwayListener'
 import MenuList from '@mui/material/MenuList'
 import MenuItem from '@mui/material/MenuItem'
 
+// Config Imports
+import themeConfig from '@configs/themeConfig'
+
 // Hook Imports
 import { useSettings } from '@core/hooks/useSettings'
 
 const ModeDropdown = () => {
-  // States
   const [open, setOpen] = useState(false)
   const [tooltipOpen, setTooltipOpen] = useState(false)
-
-  // Refs
   const anchorRef = useRef(null)
-
-  // Hooks
   const { settings, updateSettings } = useSettings()
+
+  if (themeConfig.forceDarkMode) {
+    return null
+  }
 
   const handleClose = () => {
     setOpen(false)

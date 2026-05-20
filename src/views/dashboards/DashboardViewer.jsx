@@ -128,7 +128,7 @@ const DashboardViewer = () => {
             <Typography variant='h5' fontWeight={600}>
               {dashboard.title}
             </Typography>
-            <Chip label={dashboard.workspace?.name} size='small' sx={{ mt: 1, bgcolor: '#EB8A5F', color: '#FFF' }} />
+            <Chip label={dashboard.workspace?.name} size='small' color='primary' sx={{ mt: 1 }} />
           </Box>
         </Box>
         <Box

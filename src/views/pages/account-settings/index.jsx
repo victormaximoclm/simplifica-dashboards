@@ -13,9 +13,10 @@ import Grid from '@mui/material/Grid'
 // Component Imports
 import AccountTab from './AccountTab'
 import SecurityTab from './SecurityTab'
+import { SHOW_CLICKUP_IN_USER_PROFILE } from '@/app/constants/integration'
+import ClickUpLinkButton from './ClickupLinkButton'
 
 const AccountSettings = ({ userData }) => {
-  // States
   const [activeTab, setActiveTab] = useState('account')
 
   const handleChange = (event, value) => {
@@ -34,6 +35,7 @@ const AccountSettings = ({ userData }) => {
         <Grid item xs={12}>
           <TabPanel value='account' className='p-0'>
             <AccountTab userData={userData} />
+            {SHOW_CLICKUP_IN_USER_PROFILE && <ClickUpLinkButton />}
           </TabPanel>
           <TabPanel value='security' className='p-0'>
             <SecurityTab />

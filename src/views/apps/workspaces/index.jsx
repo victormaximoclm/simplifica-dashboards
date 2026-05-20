@@ -1,9 +1,7 @@
 'use client'
 
-// React Imports
 import { useState } from 'react'
 
-// MUI Imports
 import Grid from '@mui/material/Grid'
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
@@ -24,12 +22,18 @@ import TableCell from '@mui/material/TableCell'
 import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
+import Divider from '@mui/material/Divider'
+
+import { CLICKUP_WORKSPACE_CONFIG_DEFAULTS } from '@/app/constants/integration'
+
+const CLICKUP_EMPTY = { ...CLICKUP_WORKSPACE_CONFIG_DEFAULTS }
 
 const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
   const [workspaces, setWorkspaces] = useState(initialWorkspaces)
   const [openDialog, setOpenDialog] = useState(false)
   const [editingWorkspace, setEditingWorkspace] = useState(null)
   const [workspaceName, setWorkspaceName] = useState('')
+  const [clickup, setClickup] = useState(CLICKUP_EMPTY)
   const [error, setError] = useState('')
   const [deleteDialog, setDeleteDialog] = useState(false)
   const [workspaceToDelete, setWorkspaceToDelete] = useState(null)
@@ -38,22 +42,51 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
   const handleOpenCreate = () => {
     setEditingWorkspace(null)
     setWorkspaceName('')
+    setClickup(CLICKUP_EMPTY)
     setError('')
     setOpenDialog(true)
   }
 
-  const handleOpenEdit = workspace => {
+  const handleOpenEdit = async workspace => {
     setEditingWorkspace(workspace)
     setWorkspaceName(workspace.name)
+    setClickup(CLICKUP_EMPTY)
     setError('')
     setOpenDialog(true)
+
+    // Busca integração existente
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/workspaces/${workspace.id}/integrations/clickup`)
+
+      if (res.ok) {
+        const data = await res.json()
+
+        if (data?.configJson) {
+          setClickup({
+            workspaceId: data.configJson.workspaceId ?? '',
+            listId: data.configJson.listId ?? '',
+            cargoId: data.configJson.cargoId ?? '',
+            token: data.configJson.token ?? '',
+            clientId: data.configJson.clientId ?? '',
+            clientSecret: data.configJson.clientSecret ?? ''
+          })
+        }
+      }
+    } catch {
+      // sem integração ainda, ok
+    }
   }
 
   const handleClose = () => {
     setOpenDialog(false)
     setEditingWorkspace(null)
     setWorkspaceName('')
+    setClickup(CLICKUP_EMPTY)
     setError('')
+  }
+
+  const handleClickupChange = field => e => {
+    setClickup(prev => ({ ...prev, [field]: e.target.value }))
   }
 
   const handleSubmit = async () => {
@@ -64,6 +97,7 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
     }
 
     try {
+      // 1. Salva/atualiza o workspace
       const url = editingWorkspace
         ? `${process.env.NEXT_PUBLIC_API_URL}/apps/workspaces/${editingWorkspace.id}`
         : `${process.env.NEXT_PUBLIC_API_URL}/apps/workspaces`
@@ -80,6 +114,22 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
         setError(data.message || 'Erro ao salvar')
 
         return
+      }
+
+      const workspaceId = data.id
+
+      // 2. Salva integração ClickUp se ao menos um campo foi preenchido
+      const hasClickup = clickup.workspaceId || clickup.listId || clickup.cargoId || clickup.clientId || clickup.token
+
+      if (hasClickup) {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/workspaces/${workspaceId}/integrations/clickup`, {
+          method: 'PUT',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({
+            enabled: true,
+            configJson: { ...clickup }
+          })
+        })
       }
 
       if (editingWorkspace) {
@@ -214,7 +264,8 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
       {/* Create / Edit Dialog */}
       <Dialog open={openDialog} onClose={handleClose} maxWidth='sm' fullWidth>
         <DialogTitle>{editingWorkspace ? 'Editar Espaço de Trabalho' : 'Novo Espaço de Trabalho'}</DialogTitle>
-        <DialogContent>
+        <DialogContent sx={{ display: 'flex', flexDirection: 'column', gap: 3 }}>
+          {/* Nome */}
           <TextField
             autoFocus
             fullWidth
@@ -225,6 +276,62 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
             error={!!error}
             helperText={error}
             className='mbs-4'
+          />
+
+          {/* Integração ClickUp */}
+          <Divider>
+            <Chip
+              label='Integração ClickUp'
+              size='small'
+              icon={<i className='tabler-brand-clickup' />}
+              variant='tonal'
+              color='primary'
+            />
+          </Divider>
+
+          <TextField
+            fullWidth
+            label='Workspace ID (ClickUp)'
+            placeholder='Ex: 12345678'
+            value={clickup.workspaceId}
+            onChange={handleClickupChange('workspaceId')}
+          />
+          <TextField
+            fullWidth
+            label='List ID (ClickUp)'
+            placeholder='Ex: 901234567'
+            value={clickup.listId}
+            onChange={handleClickupChange('listId')}
+          />
+          <TextField
+            fullWidth
+            label='Cargo ID (ClickUp)'
+            placeholder='Ex: 901234567'
+            value={clickup.cargoId}
+            onChange={handleClickupChange('cargoId')}
+          />
+          <TextField
+            fullWidth
+            label='Token de autenticação (ClickUp)'
+            placeholder='pk_...'
+            value={clickup.token}
+            onChange={handleClickupChange('token')}
+            type='password'
+          />
+          <TextField
+            fullWidth
+            label='Client ID(ClickUp)'
+            placeholder='Ex: ABC123XYZ'
+            value={clickup.clientId}
+            onChange={handleClickupChange('clientId')}
+          />
+          <TextField
+            fullWidth
+            label='Client Secret (ClickUp)'
+            placeholder='Ex: ...'
+            value={clickup.clientSecret}
+            onChange={handleClickupChange('clientSecret')}
+            type='password'
           />
         </DialogContent>
         <DialogActions>

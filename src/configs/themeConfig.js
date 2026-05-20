@@ -19,6 +19,8 @@ const themeConfig = {
   templateName: 'Simpla Insight',
   homePageUrl: '/dashboards',
   settingsCookieName: 'simplifica-dashboards-settings',
+  /** Quando true, o app permanece no tema escuro; claro/sistema ficam desabilitados */
+  forceDarkMode: false,
   mode: 'dark', // 'system', 'light', 'dark'
   skin: 'default', // 'default', 'bordered'
   semiDark: false, // true, false

@@ -41,6 +41,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
   const params = useParams()
   const { data: session } = useSession()
   const [dashboards, setDashboards] = useState([])
+  const [forms, setForms] = useState([])
 
   // Vars
   const { isBreakpointReached, transitionDuration } = verticalNavOptions
@@ -89,22 +90,53 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
       .catch(() => setDashboards([]))
   }, [getActiveWorkspaceId, isHighAdmin, session])
 
+  const fetchForms = useCallback(() => {
+    if (!session) return
+
+    let url = '/api/forms'
+
+    if (isHighAdmin) {
+      const activeWsId = getActiveWorkspaceId()
+
+      if (activeWsId) {
+        url += `?workspaceId=${activeWsId}`
+      } else {
+        setForms([])
+
+        return
+      }
+    }
+
+    fetch(url, { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : []))
+      .then(data => setForms(data))
+      .catch(() => setForms([]))
+  }, [getActiveWorkspaceId, isHighAdmin, session])
+
+  const getFormHref = formId => `/${locale}/forms/${formId}/fill`
+
   useEffect(() => {
     if (!session) {
       setDashboards([])
+      setForms([])
 
       return
     }
 
     fetchDashboards()
+    fetchForms()
     window.addEventListener('workspace-changed', fetchDashboards)
     window.addEventListener('dashboards-changed', fetchDashboards)
+    window.addEventListener('workspace-changed', fetchForms)
+    window.addEventListener('forms-changed', fetchForms)
 
     return () => {
       window.removeEventListener('workspace-changed', fetchDashboards)
       window.removeEventListener('dashboards-changed', fetchDashboards)
+      window.removeEventListener('workspace-changed', fetchForms)
+      window.removeEventListener('forms-changed', fetchForms)
     }
-  }, [fetchDashboards, session])
+  }, [fetchDashboards, fetchForms, session])
 
   return (
     <ScrollWrapper
@@ -144,6 +176,25 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
             </MenuItem>
           )}
         </SubMenu>
+        {session && (
+          <SubMenu
+            label={dictionary['navigation'].forms || 'Formulários'}
+            icon={<i className='tabler-forms' />}
+            suffix={forms.length > 0 ? <CustomChip label={String(forms.length)} size='small' round='true' /> : null}
+          >
+            {forms.map(form => (
+              <MenuItem key={form.id} href={getFormHref(form.id)}>
+                {form.title}
+              </MenuItem>
+            ))}
+            {forms.length === 0 && <MenuItem disabled>Nenhum formulário disponível</MenuItem>}
+            {isHighAdmin && (
+              <MenuItem href={`/${locale}/forms`} icon={<i className='tabler-settings' />}>
+                {dictionary['navigation'].manageForms || '+ Formulários'}
+              </MenuItem>
+            )}
+          </SubMenu>
+        )}
         {(isHighAdmin || isAdmin) && (
           <MenuSection label={dictionary['navigation'].appsPages}>
             <MenuItem href={`/${locale}/apps/user/list`} icon={<i className='tabler-user' />}>

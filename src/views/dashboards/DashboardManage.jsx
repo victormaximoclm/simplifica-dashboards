@@ -197,7 +197,12 @@ const DashboardManage = ({ workspaces }) => {
                       <Typography fontWeight={500}>{db.title}</Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip label={db.workspace?.name} size='small' sx={{ bgcolor: '#EB8A5F', color: '#FFF' }} />
+                      <Chip
+                        label={db.workspace?.name}
+                        size='small'
+                        color='primary'
+                        variant='filled'
+                      />
                     </TableCell>
                     <TableCell>
                       <div className='flex flex-wrap gap-1'>

@@ -1,7 +1,7 @@
 {
   "name": "vuexy-mui-nextjs-admin-template",
   "version": "5.0.1",
-  "license": "Commercial",
+  "license": "UNLICENSED",
   "private": true,
   "scripts": {
     "dev": "next dev --turbopack",

@@ -44,6 +44,8 @@
         "auditAccess": "Audit d'accès",
         "auditActions": "Audit admin",
         "manageDashboards": "+ Tableaux de bord",
+        "forms": "Formulaires",
+        "manageForms": "+ Formulaires",
         "pages": "Pages",
         "userProfile": "Profil de l'utilisateur",
         "accountSettings": "Paramètres du compte",
