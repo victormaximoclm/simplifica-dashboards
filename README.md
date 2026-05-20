@@ -1,6 +1,7 @@
 # 🚀 SaaS Dashboards
 
 SaaS para gerenciamento seguro de dashboards (ex: Power BI) com controle de acesso por usuário e workspace.
+
 ## ✅ Solução
 
 O SaaS Dashboards resolve isso permitindo:
@@ -20,7 +21,6 @@ Em breve.
 ## Stack
 
 - **Frontend/Backend:** Next.js 14+ (App Router)
-- **UI:** Material UI (Vuexy template)
 - **Banco de dados:** PostgreSQL 16
 - **ORM:** Prisma
 - **Autenticação:** NextAuth.js

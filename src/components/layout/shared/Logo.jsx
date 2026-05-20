@@ -1,18 +1,9 @@
 'use client'
 
-// React Imports
 import { useEffect, useRef } from 'react'
-
-// Third-party Imports
 import styled from '@emotion/styled'
-
-// Component Imports
-import VuexyLogo from '@core/svg/Logo'
-
-// Config Imports
+import Image from 'next/image'
 import themeConfig from '@configs/themeConfig'
-
-// Hook Imports
 import useVerticalNav from '@menu/hooks/useVerticalNav'
 import { useSettings } from '@core/hooks/useSettings'
 
@@ -32,34 +23,25 @@ const LogoText = styled.span`
 `
 
 const Logo = ({ color }) => {
-  // Refs
   const logoTextRef = useRef(null)
-
-  // Hooks
   const { isHovered, transitionDuration, isBreakpointReached } = useVerticalNav()
   const { settings } = useSettings()
-
-  // Vars
   const { layout } = settings
 
   useEffect(() => {
-    if (layout !== 'collapsed') {
-      return
-    }
-
-    if (logoTextRef && logoTextRef.current) {
+    if (layout !== 'collapsed') return
+    if (logoTextRef?.current) {
       if (!isBreakpointReached && layout === 'collapsed' && !isHovered) {
-        logoTextRef.current?.classList.add('hidden')
+        logoTextRef.current.classList.add('hidden')
       } else {
         logoTextRef.current.classList.remove('hidden')
       }
     }
-    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isHovered, layout, isBreakpointReached])
 
   return (
     <div className='flex items-center'>
-      <VuexyLogo className='text-2xl text-primary' />
+      <Image src='/Group 2.svg' alt='Logo' width={32} height={32} />
       <LogoText
         color={color}
         ref={logoTextRef}
