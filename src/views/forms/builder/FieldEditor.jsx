@@ -83,7 +83,7 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
         </Field>
       )}
 
-      {field.type === 'number' && (
+      {(field.type === 'number' || field.type === 'text') && (
         <>
           <Field label='Regex de validação'>
             <input

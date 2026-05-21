@@ -15,11 +15,14 @@ import { verticalLayoutClasses } from '@layouts/utils/layoutClasses'
 
 const NavbarContent = () => {
   return (
-    <div className={classnames(verticalLayoutClasses.navbarContent, 'flex items-center justify-between gap-4 is-full')}>
-      <div className='flex items-center gap-4'>
-        <WorkspaceSwitcher />
+    <div className={classnames(verticalLayoutClasses.navbarContent, 'flex items-center justify-between gap-2 is-full')}>
+      <div className='flex items-center gap-2 min-w-0'>
+        <NavToggle />
+        <div className='min-w-0 max-w-[160px] sm:max-w-none'>
+          <WorkspaceSwitcher />
+        </div>
       </div>
-      <div className='flex items-center'>
+      <div className='flex items-center shrink-0'>
         <LanguageDropdown />
         <ModeDropdown />
         <NotificationsDropdown />

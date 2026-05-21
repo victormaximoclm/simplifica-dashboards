@@ -2,6 +2,7 @@
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
 import { useRouter } from 'next/navigation'
+import { toast } from 'react-toastify'
 
 import FormTextField from './FormTextField'
 
@@ -103,6 +104,7 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
   const [linkClosedMessage, setLinkClosedMessage] = useState(null)
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(0)
+  const [fieldErrors, setFieldErrors] = useState({})
   const router = useRouter()
   const handleGoLinks = () => router.push(`/${lang}/forms/${form.id}/links`)
 
@@ -234,6 +236,21 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     setCpfErrors(prev => ({ ...prev, [field.id]: null }))
   }
 
+  const validateField = (field, val) => {
+    // Só valida se o usuário digitou algo
+    if (val === undefined || val === '' || val === null) return
+
+    // Regex — vale para qualquer campo que tenha regex, obrigatório ou não
+    const regexError = validateFieldRegex(field, val)
+    if (regexError) {
+      setFieldErrors(prev => ({ ...prev, [field.id]: regexError }))
+      return
+    }
+
+    // Sem erro — limpa
+    setFieldErrors(prev => ({ ...prev, [field.id]: null }))
+  }
+
   const handleSubmit = async e => {
     e.preventDefault()
     setError(null)
@@ -242,7 +259,9 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       if (!isFieldVisible(field, values)) continue
 
       if (isFieldRequired(field, values) && isFieldEmpty(values[field.id], field, values)) {
-        setError(`O campo "${field.label}" é obrigatório.`)
+        const msg = `O campo "${field.label}" é obrigatório.`
+        setError(msg)
+        toast.error(msg, { position: 'bottom-center' })
         return
       }
     }
@@ -254,6 +273,9 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
           for (const ef of field.extraFields) {
             if (ef.required && (item[ef.key] === '' || item[ef.key] === undefined || item[ef.key] === null)) {
               setError(`Preencha "${ef.label}" para todos os itens em "${field.label}".`)
+              toast.error(`Preencha "${ef.label}" para todos os itens em "${field.label}".`, {
+                position: 'bottom-center'
+              })
               return
             }
           }
@@ -266,6 +288,7 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       const regexError = validateFieldRegex(field, values[field.id])
       if (regexError) {
         setError(`"${field.label}": ${regexError}`)
+        toast.error(`"${field.label}": ${regexError}`, { position: 'bottom-center' })
         return
       }
     }
@@ -298,6 +321,7 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       setSubmitted(true)
     } catch (err) {
       setError(err.message)
+      toast.error(err.message, { position: 'bottom-center' })
     } finally {
       setSubmitting(false)
     }
@@ -314,6 +338,7 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     setError(null)
     setSubmitted(false)
     setCurrentPage(0)
+    setFieldErrors({})
   }
 
   const handleNextPage = () => {
@@ -323,11 +348,13 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       if (!isFieldVisible(field, values)) continue
       if (isFieldRequired(field, values) && isFieldEmpty(values[field.id], field, values)) {
         setError(`O campo "${field.label}" é obrigatório.`)
+        toast.error(`O campo "${field.label}" é obrigatório.`, { position: 'bottom-center' })
         return
       }
       const regexError = validateFieldRegex(field, values[field.id])
       if (regexError) {
         setError(`"${field.label}": ${regexError}`)
+        toast.error(`"${field.label}": ${regexError}`, { position: 'bottom-center' })
         return
       }
     }
@@ -428,8 +455,11 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
           nameValue={field.returnNameFieldId ? values[field.returnNameFieldId] : undefined}
           options={options[field.id]}
           cpfError={cpfErrors[field.id]}
+          fieldError={fieldErrors[field.id]}
           loading={loadingOptions[field.id]}
           onChange={v => setValue(field.id, v)}
+          onBlur={() => validateField(field, values[field.id])}
+          onClearError={() => setFieldErrors(prev => ({ ...prev, [field.id]: null }))}
           onCpfChange={cpf => handleCpfChange(field, cpf)}
           onCpfLookup={() => handleCpfLookup(field)}
         />
@@ -471,7 +501,20 @@ const FormLabel = ({ children, required }) => (
   </label>
 )
 
-const FieldInput = ({ field, value, nameValue, options, cpfError, loading, onChange, onCpfChange, onCpfLookup }) => {
+const FieldInput = ({
+  field,
+  value,
+  nameValue,
+  options,
+  cpfError,
+  fieldError,
+  loading,
+  onChange,
+  onBlur,
+  onCpfChange,
+  onCpfLookup,
+  onClearError
+}) => {
   switch (field.type) {
     case 'textarea':
       return (
@@ -483,36 +526,56 @@ const FieldInput = ({ field, value, nameValue, options, cpfError, loading, onCha
             label={field.label}
             required={field.required}
             value={value ?? ''}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => {
+              onChange(e.target.value)
+              onClearError?.()
+            }}
+            onBlur={onBlur}
             placeholder={field.placeholder}
+            error={!!fieldError}
+            helperText={fieldError ?? ''}
           />
         </FormFieldWrap>
       )
+    case 'text':
     case 'number':
       return (
         <FormFieldWrap>
           <FormTextField
             fullWidth
-            type='number'
+            type={field.type}
             label={field.label}
             required={field.required}
             value={value ?? ''}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => {
+              onChange(e.target.value)
+              onClearError?.()
+            }}
+            onBlur={onBlur}
             placeholder={field.placeholder}
+            error={!!fieldError}
+            helperText={fieldError ?? ''}
           />
         </FormFieldWrap>
       )
     case 'date':
+    case 'time':
       return (
         <FormFieldWrap>
           <FormTextField
             fullWidth
-            type='date'
+            type={field.type}
             label={field.label}
             required={field.required}
             value={value ?? ''}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => {
+              onChange(e.target.value)
+              onClearError?.()
+            }}
+            onBlur={onBlur}
             InputLabelProps={{ shrink: true }}
+            error={!!fieldError}
+            helperText={fieldError ?? ''}
           />
         </FormFieldWrap>
       )
@@ -520,7 +583,7 @@ const FieldInput = ({ field, value, nameValue, options, cpfError, loading, onCha
       return (
         <FormFieldWrap>
           <FormLabel required={field.required}>{field.label}</FormLabel>
-          <select value={value ?? ''} onChange={e => onChange(e.target.value)} className={formInputCls}>
+          <select value={value ?? ''} onChange={e => onChange(e.target.value)} onBlur={onBlur} className={formInputCls}>
             <option value=''>Selecione...</option>
             {(field.options ?? []).map(opt => (
               <option key={opt} value={opt}>
@@ -528,6 +591,7 @@ const FieldInput = ({ field, value, nameValue, options, cpfError, loading, onCha
               </option>
             ))}
           </select>
+          {fieldError && <p className={formErrorCls}>{fieldError}</p>}
         </FormFieldWrap>
       )
     case 'checkbox':
@@ -571,7 +635,11 @@ const FieldInput = ({ field, value, nameValue, options, cpfError, loading, onCha
           <FormLabel required={field.required}>{field.label}</FormLabel>
           <select
             value={value ?? ''}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => {
+              onChange(e.target.value)
+              onClearError?.()
+            }}
+            onBlur={onBlur}
             disabled={loading}
             className={formInputCls}
           >
@@ -582,6 +650,7 @@ const FieldInput = ({ field, value, nameValue, options, cpfError, loading, onCha
               </option>
             ))}
           </select>
+          {fieldError && <p className={formErrorCls}>{fieldError}</p>}
         </FormFieldWrap>
       )
     case 'multi-select-dynamic':
@@ -600,20 +669,7 @@ const FieldInput = ({ field, value, nameValue, options, cpfError, loading, onCha
           onCpfLookup={onCpfLookup}
         />
       )
-    case 'time':
-      return (
-        <FormFieldWrap>
-          <FormTextField
-            fullWidth
-            type='time'
-            label={field.label}
-            required={field.required}
-            value={value ?? ''}
-            onChange={e => onChange(e.target.value)}
-            InputLabelProps={{ shrink: true }}
-          />
-        </FormFieldWrap>
-      )
+
     default:
       return (
         <FormFieldWrap>
@@ -622,7 +678,10 @@ const FieldInput = ({ field, value, nameValue, options, cpfError, loading, onCha
             label={field.label}
             required={field.required}
             value={value ?? ''}
-            onChange={e => onChange(e.target.value)}
+            onChange={e => {
+              onChange(e.target.value)
+              onClearError?.()
+            }}
             placeholder={field.placeholder}
           />
         </FormFieldWrap>

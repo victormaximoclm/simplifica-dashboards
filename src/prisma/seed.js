@@ -17,8 +17,11 @@ async function main() {
 
   const hashedPassword = await bcrypt.hash('Admin@123', 10)
 
+  // ─────────────────────────────────────────────
+  // QA
+  // ─────────────────────────────────────────────
   if (isQa) {
-    console.log('==> Modo QA: criando dados minimos...')
+    console.log('==> Modo QA: criando dados mínimos...')
 
     const wsPotiguar = await prisma.workspace.upsert({
       where: { slug: 'hospital-potiguar' },
@@ -32,7 +35,12 @@ async function main() {
 
     await prisma.user.upsert({
       where: { email: 'admin.hp@simplificagest.com' },
-      update: { role: 'admin', workspaceId: wsPotiguar.id, status: 'active', password: hashedPassword },
+      update: {
+        role: 'admin',
+        workspaceId: wsPotiguar.id,
+        status: 'active',
+        password: hashedPassword
+      },
       create: {
         name: 'Admin Hospital Potiguar',
         email: 'admin.hp@simplificagest.com',
@@ -45,7 +53,12 @@ async function main() {
 
     await prisma.user.upsert({
       where: { email: 'victor@hospital-potiguar.com' },
-      update: { role: 'user', workspaceId: wsPotiguar.id, status: 'active', password: hashedPassword },
+      update: {
+        role: 'user',
+        workspaceId: wsPotiguar.id,
+        status: 'active',
+        password: hashedPassword
+      },
       create: {
         name: 'Victor',
         email: 'victor@hospital-potiguar.com',
@@ -58,16 +71,17 @@ async function main() {
 
     console.log('Seed QA completo!')
     console.log('Workspace:', wsPotiguar.name)
-    console.log('Usuarios: admin.hp@simplificagest.com, victor@hospital-potiguar.com')
-    console.log('Senha de todos os usuarios: Admin@123')
+    console.log('Usuários: admin.hp@simplificagest.com, victor@hospital-potiguar.com')
+    console.log('Senha de todos os usuários: Admin@123')
 
     return
   }
 
-  // ── Modo TESTE ──────────────────────────────────────────────
+  // ─────────────────────────────────────────────
+  // TESTE
+  // ─────────────────────────────────────────────
   console.log('==> Modo TESTE: criando dados de exemplo...')
 
-  // Create workspaces
   const wsPotiguar = await prisma.workspace.upsert({
     where: { slug: 'clinica-demo' },
     update: {},
@@ -88,10 +102,14 @@ async function main() {
     }
   })
 
-  // Create superAdmin
+  // Super Admin
   await prisma.user.upsert({
     where: { email: 'superadmin@demo.com' },
-    update: { role: 'superAdmin', status: 'active', password: hashedPassword },
+    update: {
+      role: 'superAdmin',
+      status: 'active',
+      password: hashedPassword
+    },
     create: {
       name: 'Super Admin',
       email: 'superadmin@demo.com',
@@ -102,10 +120,14 @@ async function main() {
     }
   })
 
-  // Create subAdmin
+  // Sub Admin
   await prisma.user.upsert({
     where: { email: 'subadmin@demo.com' },
-    update: { role: 'subAdmin', status: 'active', password: hashedPassword },
+    update: {
+      role: 'subAdmin',
+      status: 'active',
+      password: hashedPassword
+    },
     create: {
       name: 'Sub Admin',
       email: 'subadmin@demo.com',
@@ -116,10 +138,15 @@ async function main() {
     }
   })
 
-  // Create admin for Hospital Potiguar
+  // Admin da Clínica Demo
   await prisma.user.upsert({
     where: { email: 'admin.hp@clinica-demo.com' },
-    update: { role: 'admin', workspaceId: wsDemo.id, status: 'active', password: hashedPassword },
+    update: {
+      role: 'admin',
+      workspaceId: wsPotiguar.id,
+      status: 'active',
+      password: hashedPassword
+    },
     create: {
       name: 'Admin Clínica Demo',
       email: 'admin.hp@clinica-demo.com',
@@ -130,10 +157,15 @@ async function main() {
     }
   })
 
-  // Create user for Hospital Potiguar
+  // Usuário da Clínica Demo
   await prisma.user.upsert({
     where: { email: 'user@clinica-demo.com' },
-    update: { role: 'user', workspaceId: wsPotiguar.id, status: 'active', password: hashedPassword },
+    update: {
+      role: 'user',
+      workspaceId: wsPotiguar.id,
+      status: 'active',
+      password: hashedPassword
+    },
     create: {
       name: 'Victor',
       email: 'user@clinica-demo.com',
@@ -144,10 +176,15 @@ async function main() {
     }
   })
 
-  // Create user for Hospital Unimed
+  // Usuário da Clínica Beta
   await prisma.user.upsert({
     where: { email: 'user@clinica-beta.com' },
-    update: { role: 'user', workspaceId: wsUnimed.id, status: 'active', password: hashedPassword },
+    update: {
+      role: 'user',
+      workspaceId: wsUnimed.id,
+      status: 'active',
+      password: hashedPassword
+    },
     create: {
       name: 'Gabriel',
       email: 'user@clinica-beta.com',
@@ -158,23 +195,31 @@ async function main() {
     }
   })
 
-  // Create global custom roles
+  // Cargos globais
   const roleRecepcao = await prisma.customRole.upsert({
     where: { name: 'Recepção' },
     update: {},
-    create: { name: 'Recepção' }
+    create: {
+      name: 'Recepção'
+    }
   })
 
   const roleFaturamento = await prisma.customRole.upsert({
     where: { name: 'Faturamento' },
     update: {},
-    create: { name: 'Faturamento' }
+    create: {
+      name: 'Faturamento'
+    }
   })
 
-  // Assign custom role to Victor
+  // Vincular cargo ao usuário da clínica demo
   await prisma.user.update({
-    where: { email: 'victor@hospital-potiguar.com' },
-    data: { customRoleId: roleRecepcao.id }
+    where: {
+      email: 'user@clinica-demo.com'
+    },
+    data: {
+      customRoleId: roleRecepcao.id
+    }
   })
 
   console.log('Seed de teste completo!')
@@ -184,8 +229,8 @@ async function main() {
 }
 
 main()
-  .catch(e => {
-    console.error(e)
+  .catch(error => {
+    console.error(error)
     process.exit(1)
   })
   .finally(async () => {
