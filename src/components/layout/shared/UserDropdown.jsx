@@ -19,6 +19,8 @@ import Typography from '@mui/material/Typography'
 import Divider from '@mui/material/Divider'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
+import LanguageDropdown from './LanguageDropdown'
+import ModeDropdown from './ModeDropdown'
 
 // Third-party Imports
 import { signOut, useSession } from 'next-auth/react'
@@ -124,6 +126,17 @@ const UserDropdown = () => {
                     </div>
                   </div>
                   <Divider className='mlb-1' />
+                  {/* Só aparece em mobile */}
+                  <div className='flex items-center justify-between px-4 py-2 sm:hidden'>
+                    <Typography variant='body2' color='text.secondary'>
+                      Preferências
+                    </Typography>
+                    <div className='flex items-center gap-1'>
+                      <LanguageDropdown />
+                      <ModeDropdown />
+                    </div>
+                  </div>
+                  <Divider className='mlb-1 sm:hidden' />
                   <MenuItem className='mli-2 gap-3' onClick={e => handleDropdownClose(e, '/pages/account-settings')}>
                     <i className='tabler-settings' />
                     <Typography color='text.primary'>Configurações</Typography>
