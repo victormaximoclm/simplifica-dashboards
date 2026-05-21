@@ -37,6 +37,7 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
   const updateDataSource = (key, value) => onChange({ ...field, dataSource: { ...field.dataSource, [key]: value } })
 
   const isWebhookList = field.type === 'dynamic-list' || field.type === 'multi-select-dynamic'
+  const isFreeList = field.type === 'multi-input'
   const isCpfLookup = field.type === 'cpf-lookup'
 
   return (
@@ -69,9 +70,16 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
         <p className={`${formCaptionCls} mt-1`}>Nome da chave enviada ao n8n. Se vazio, usa o ID gerado.</p>
       </Field>
 
-      {!['checkbox', 'date', 'time', 'file', 'dynamic-list', 'multi-select-dynamic', 'cpf-lookup'].includes(
-        field.type
-      ) && (
+      {![
+        'checkbox',
+        'date',
+        'time',
+        'file',
+        'dynamic-list',
+        'multi-select-dynamic',
+        'cpf-lookup',
+        'multi-input'
+      ].includes(field.type) && (
         <Field label='Placeholder'>
           <input
             type='text'
@@ -120,15 +128,108 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
         </label>
       </Field>
 
+      {isFreeList && (
+        <>
+          <Field label='Placeholder do campo de entrada'>
+            <input
+              type='text'
+              value={field.placeholder ?? ''}
+              onChange={e => update('placeholder', e.target.value)}
+              placeholder='Ex: Digite o nome do produto...'
+              className={formInputCls}
+            />
+          </Field>
+          <ExtraFieldsEditor extraFields={field.extraFields ?? []} onChange={list => update('extraFields', list)} />
+        </>
+      )}
+
       {field.type === 'select' && (
-        <Field label='Opções (uma por linha)'>
-          <textarea
-            rows={4}
-            value={(field.options ?? []).join('\n')}
-            onChange={e => update('options', e.target.value.split('\n'))}
-            placeholder={'Opção 1\nOpção 2'}
-            className={`${formInputCls} resize-none`}
-          />
+        <Field label='Opções'>
+          <div className='flex flex-col gap-2'>
+            {(field.options ?? []).map((opt, idx) => {
+              const isObj = typeof opt === 'object'
+              const label = isObj ? opt.label : opt
+              const value = isObj ? opt.value : opt
+              return (
+                <div key={idx} className='flex gap-2 items-center'>
+                  <input
+                    type='text'
+                    value={label}
+                    onChange={e => {
+                      const next = [...(field.options ?? [])]
+                      next[idx] = field.useCustomValues
+                        ? { label: e.target.value, value: isObj ? opt.value : opt }
+                        : e.target.value
+                      update('options', next)
+                    }}
+                    placeholder='Rótulo'
+                    className={formInputCls}
+                  />
+                  {field.useCustomValues && (
+                    <input
+                      type='text'
+                      value={value}
+                      onChange={e => {
+                        const next = [...(field.options ?? [])]
+                        next[idx] = { label, value: e.target.value }
+                        update('options', next)
+                      }}
+                      placeholder='Value'
+                      className={`${formInputCls} w-24`}
+                    />
+                  )}
+                  <button
+                    type='button'
+                    onClick={() =>
+                      update(
+                        'options',
+                        (field.options ?? []).filter((_, i) => i !== idx)
+                      )
+                    }
+                    className={formBuilderIconBtnCls}
+                  >
+                    <i className='tabler-trash text-sm' />
+                  </button>
+                </div>
+              )
+            })}
+
+            <button
+              type='button'
+              onClick={() =>
+                update('options', [...(field.options ?? []), field.useCustomValues ? { label: '', value: '' } : ''])
+              }
+              className={btnDashed}
+            >
+              <i className='tabler-plus' /> Adicionar opção
+            </button>
+          </div>
+
+          <label className='flex items-center gap-2 cursor-pointer mt-2'>
+            <div
+              onClick={() => {
+                const next = !field.useCustomValues
+                // Converte opções ao alternar
+                const converted = (field.options ?? []).map(opt =>
+                  next
+                    ? {
+                        label: typeof opt === 'object' ? opt.label : opt,
+                        value: typeof opt === 'object' ? opt.value : opt
+                      }
+                    : typeof opt === 'object'
+                      ? opt.label
+                      : opt
+                )
+                onChange({ ...field, useCustomValues: next, options: converted })
+              }}
+              className={`w-10 h-5 rounded-full transition-colors cursor-pointer ${field.useCustomValues ? 'bg-[var(--mui-palette-primary-main)]' : formBuilderToggleOffCls} relative`}
+            >
+              <span
+                className={`absolute top-0.5 w-4 h-4 ${formBuilderToggleKnobCls} rounded-full shadow transition-transform ${field.useCustomValues ? 'translate-x-5' : 'translate-x-0.5'}`}
+              />
+            </div>
+            <span className={`text-sm ${formMutedCls}`}>Usar values customizados</span>
+          </label>
         </Field>
       )}
 
@@ -151,7 +252,7 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
             onChange={updateDataSource}
             fields={WEBHOOK_LIST_FIELDS}
           />
-
+          <DependsOnEditor field={field} allFields={allFields} onChange={onChange} />
           <ExtraFieldsEditor extraFields={field.extraFields ?? []} onChange={list => update('extraFields', list)} />
         </>
       )}
@@ -332,7 +433,10 @@ const ConditionalEditor = ({ field, allFields, onChange }) => {
         { label: 'Marcado', value: 'true' },
         { label: 'Desmarcado', value: 'false' }
       ]
-    if (f.type === 'select') return (f.options ?? []).map(o => ({ label: o, value: o }))
+    if (f.type === 'select')
+      return (f.options ?? []).map(o =>
+        typeof o === 'object' ? { label: o.label, value: o.value } : { label: o, value: o }
+      )
     if (f.type === 'dynamic-list') return [] // valor livre, sem opções fixas
     return []
   }
@@ -417,7 +521,10 @@ const RequiredConditionEditor = ({ field, allFields, onChange }) => {
         { label: 'Marcado', value: 'true' },
         { label: 'Desmarcado', value: 'false' }
       ]
-    if (f.type === 'select') return (f.options ?? []).map(o => ({ label: o, value: o }))
+    if (f.type === 'select')
+      return (f.options ?? []).map(o =>
+        typeof o === 'object' ? { label: o.label, value: o.value } : { label: o, value: o }
+      )
     if (f.type === 'dynamic-list') return []
     return []
   }
@@ -460,6 +567,53 @@ const RequiredConditionEditor = ({ field, allFields, onChange }) => {
               className={formInputCls}
             />
           )}
+        </Field>
+      )}
+    </div>
+  )
+}
+
+const DependsOnEditor = ({ field, allFields, onChange }) => {
+  const eligible = (allFields ?? []).filter(
+    f => f.id !== field.id && ['dynamic-list', 'select', 'cpf-lookup'].includes(f.type)
+  )
+  if (eligible.length === 0) return null
+
+  return (
+    <div className='flex flex-col gap-3 pt-3 border-t border-[var(--mui-palette-divider)]'>
+      <p className={formBuilderSectionTitleCls}>Dependência (parâmetro dinâmico)</p>
+      <p className={formCaptionCls}>
+        Ao selecionar um campo pai, este campo só carrega após o pai ter valor, enviando-o como parâmetro{' '}
+        <code>dependsOnValue</code> ao webhook.
+      </p>
+
+      <Field label='Campo pai'>
+        <select
+          value={field.dependsOn ?? ''}
+          onChange={e => onChange({ ...field, dependsOn: e.target.value || null })}
+          className={formInputCls}
+        >
+          <option value=''>Nenhum (carrega sempre)</option>
+          {eligible.map(f => (
+            <option key={f.id} value={f.id}>
+              {f.label}
+            </option>
+          ))}
+        </select>
+      </Field>
+
+      {field.dependsOn && (
+        <Field label='Nome do parâmetro enviado ao webhook'>
+          <input
+            type='text'
+            value={field.dependsOnParam ?? 'dependsOnValue'}
+            onChange={e => onChange({ ...field, dependsOnParam: e.target.value })}
+            placeholder='dependsOnValue'
+            className={formInputCls}
+          />
+          <p className={`${formCaptionCls} mt-1`}>
+            Será enviado como query param: <code>?{field.dependsOnParam || 'dependsOnValue'}=valor_do_pai</code>
+          </p>
         </Field>
       )}
     </div>

@@ -46,7 +46,8 @@ const TYPE_ICONS = {
   'dynamic-list': 'tabler-database',
   'multi-select-dynamic': 'tabler-list-check',
   'cpf-lookup': 'tabler-id',
-  time: 'tabler-clock'
+  time: 'tabler-clock',
+  'multi-input': 'tabler-table-plus'
 }
 
 const TYPE_LABELS = {
@@ -60,7 +61,8 @@ const TYPE_LABELS = {
   'dynamic-list': 'Lista dinâmica',
   'multi-select-dynamic': 'Multi-seleção',
   'cpf-lookup': 'Busca CPF',
-  time: 'Hora'
+  time: 'Hora',
+  'multi-input': 'Lista livre'
 }
 
 const genId = () => `campo_${Date.now()}_${Math.random().toString(36).slice(2, 7)}`

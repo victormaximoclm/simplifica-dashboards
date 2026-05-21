@@ -45,7 +45,7 @@ const DATASOURCE_METHODS = {
 }
 
 function isFieldEmpty(val, field, values = {}) {
-  if (field.type === 'multi-select-dynamic') {
+  if (field.type === 'multi-select-dynamic' || field.type === 'multi-input') {
     return !Array.isArray(val) || val.length === 0
   }
   if (field.type === 'checkbox') return !val
@@ -165,7 +165,9 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
         }
       }
 
-      if (extra.searchValue) params.set('searchValue', extra.searchValue)
+      Object.entries(extra).forEach(([k, v]) => {
+        if (v !== undefined && v !== null && v !== '') params.set(k, String(v))
+      })
 
       const res = await fetch(`/api/forms/datasource?${params}`)
       if (!res.ok) {
@@ -181,6 +183,7 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
   useEffect(() => {
     fields.forEach(async field => {
       if (field.type !== 'dynamic-list' && field.type !== 'multi-select-dynamic') return
+      if (field.dependsOn) return
       const listUrl = field.dataSource?.url || field.dataSource?.webhookUrl
       if (!listUrl) return
 
@@ -195,6 +198,39 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       }
     })
   }, [fields, fetchDatasource])
+
+  useEffect(() => {
+    fields.forEach(async field => {
+      if (!field.dependsOn) return
+      if (field.type !== 'dynamic-list' && field.type !== 'multi-select-dynamic') return
+
+      const parentValue = values[field.dependsOn]
+      if (!parentValue) {
+        // Limpa o filho quando pai esvazia
+        setOptions(prev => ({ ...prev, [field.id]: [] }))
+        setValue(field.id, '')
+        return
+      }
+
+      const listUrl = field.dataSource?.url || field.dataSource?.webhookUrl
+      if (!listUrl) return
+
+      setLoadingOptions(prev => ({ ...prev, [field.id]: true }))
+      try {
+        const paramName = field.dependsOnParam || 'dependsOnValue'
+        const data = await fetchDatasource(field, {
+          dependsOnParam: paramName,
+          dependsOnValue: parentValue
+        })
+        setOptions(prev => ({ ...prev, [field.id]: Array.isArray(data) ? data : [] }))
+        setValue(field.id, '') // reseta seleção anterior
+      } catch {
+        setOptions(prev => ({ ...prev, [field.id]: [] }))
+      } finally {
+        setLoadingOptions(prev => ({ ...prev, [field.id]: false }))
+      }
+    })
+  }, [values, fields, fetchDatasource])
 
   const setValue = (fieldId, value) => setValues(prev => ({ ...prev, [fieldId]: value }))
 
@@ -267,7 +303,7 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     }
 
     for (const field of fields) {
-      if (field.type === 'multi-select-dynamic' && field.extraFields?.length > 0) {
+      if ((field.type === 'multi-select-dynamic' || field.type === 'multi-input') && field.extraFields?.length > 0) {
         const items = values[field.id] ?? []
         for (const item of items) {
           for (const ef of field.extraFields) {
@@ -585,11 +621,15 @@ const FieldInput = ({
           <FormLabel required={field.required}>{field.label}</FormLabel>
           <select value={value ?? ''} onChange={e => onChange(e.target.value)} onBlur={onBlur} className={formInputCls}>
             <option value=''>Selecione...</option>
-            {(field.options ?? []).map(opt => (
-              <option key={opt} value={opt}>
-                {opt}
-              </option>
-            ))}
+            {(field.options ?? []).map((opt, idx) => {
+              const label = typeof opt === 'object' ? opt.label : opt
+              const val = typeof opt === 'object' ? opt.value : opt
+              return (
+                <option key={idx} value={val}>
+                  {label}
+                </option>
+              )
+            })}
           </select>
           {fieldError && <p className={formErrorCls}>{fieldError}</p>}
         </FormFieldWrap>
@@ -631,32 +671,23 @@ const FieldInput = ({
       )
     case 'dynamic-list':
       return (
-        <FormFieldWrap>
-          <FormLabel required={field.required}>{field.label}</FormLabel>
-          <select
-            value={value ?? ''}
-            onChange={e => {
-              onChange(e.target.value)
-              onClearError?.()
-            }}
-            onBlur={onBlur}
-            disabled={loading}
-            className={formInputCls}
-          >
-            <option value=''>{loading ? 'Carregando...' : 'Selecione...'}</option>
-            {(options ?? []).map(opt => (
-              <option key={opt.value} value={opt.value}>
-                {opt.label}
-              </option>
-            ))}
-          </select>
-          {fieldError && <p className={formErrorCls}>{fieldError}</p>}
-        </FormFieldWrap>
+        <DynamicListInput
+          field={field}
+          value={value}
+          options={options}
+          loading={loading}
+          onChange={onChange}
+          onBlur={onBlur}
+        />
       )
     case 'multi-select-dynamic':
       return (
         <MultiSelectDynamicInput field={field} value={value} options={options} loading={loading} onChange={onChange} />
       )
+
+    case 'multi-input':
+      return <MultiInputField field={field} value={value} onChange={onChange} />
+
     case 'cpf-lookup':
       return (
         <CpfLookupInput
@@ -724,6 +755,197 @@ const CpfLookupInput = ({ field, cpfValue, nameValue, cpfError, loading, onCpfCh
     </div>
   </FormFieldWrap>
 )
+
+const DynamicListInput = ({ field, value, options, loading, onChange, onBlur }) => {
+  const [search, setSearch] = useState('')
+  const [open, setOpen] = useState(false)
+  const containerRef = useRef(null)
+  const opts = options ?? []
+
+  useEffect(() => {
+    const handle = e => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  const q = search.trim().toLowerCase()
+  const filtered = q
+    ? opts.filter(
+        o =>
+          String(o.label ?? '')
+            .toLowerCase()
+            .includes(q) ||
+          String(o.value ?? '')
+            .toLowerCase()
+            .includes(q)
+      )
+    : opts
+
+  const selectedLabel = opts.find(o => o.value === value)?.label ?? value ?? ''
+
+  return (
+    <FormFieldWrap>
+      <FormLabel required={field.required}>{field.label}</FormLabel>
+      <div ref={containerRef} className='relative'>
+        <i
+          className={`tabler-search absolute left-3 top-1/2 -translate-y-1/2 text-sm pointer-events-none ${formIconMutedCls}`}
+        />
+        <input
+          type='text'
+          value={open ? search : selectedLabel}
+          onChange={e => {
+            setSearch(e.target.value)
+            setOpen(true)
+          }}
+          onFocus={() => setOpen(true)}
+          onBlur={onBlur}
+          placeholder={loading ? 'Carregando...' : 'Buscar...'}
+          disabled={loading}
+          className={`${formInputCls} pl-9`}
+        />
+        {open && !loading && (
+          <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+            {filtered.length === 0 ? (
+              <li className={`px-3 py-2 text-sm ${formMutedCls}`}>Nenhuma opção encontrada</li>
+            ) : (
+              filtered.map(opt => (
+                <li key={opt.value}>
+                  <button
+                    type='button'
+                    className={formDropdownItemCls}
+                    onClick={() => {
+                      onChange(opt.value)
+                      setSearch('')
+                      setOpen(false)
+                    }}
+                  >
+                    {opt.label}
+                  </button>
+                </li>
+              ))
+            )}
+          </ul>
+        )}
+      </div>
+    </FormFieldWrap>
+  )
+}
+
+const MultiInputField = ({ field, value, onChange }) => {
+  const extraFields = field.extraFields ?? []
+  const selected = Array.isArray(value) ? value : []
+  const [text, setText] = useState('')
+
+  const addItem = () => {
+    const trimmed = text.trim()
+    if (!trimmed) return
+    const initExtras = Object.fromEntries(extraFields.map(ef => [ef.key, ef.type === 'checkbox' ? false : '']))
+    onChange([...selected, { label: trimmed, ...initExtras }])
+    setText('')
+  }
+
+  const removeAt = index => onChange(selected.filter((_, i) => i !== index))
+
+  const updateExtra = (index, key, val) => {
+    onChange(selected.map((item, i) => (i === index ? { ...item, [key]: val } : item)))
+  }
+
+  return (
+    <FormFieldWrap>
+      <FormLabel required={field.required}>{field.label}</FormLabel>
+
+      {/* Input de entrada */}
+      <div className='flex gap-2'>
+        <input
+          type='text'
+          value={text}
+          onChange={e => setText(e.target.value)}
+          onKeyDown={e => e.key === 'Enter' && (e.preventDefault(), addItem())}
+          placeholder={field.placeholder ?? 'Digite e pressione adicionar...'}
+          className={`${formInputCls} flex-1`}
+        />
+        <button type='button' onClick={addItem} className={btnPrimarySm}>
+          Adicionar
+        </button>
+      </div>
+
+      {/* Itens adicionados */}
+      {selected.length > 0 && (
+        <div className='flex flex-col gap-3 mt-3'>
+          {selected.map((item, index) => (
+            <div
+              key={index}
+              className='flex flex-col gap-3 p-3 rounded-lg border border-[var(--mui-palette-divider)] bg-[var(--mui-palette-background-paper)]'
+            >
+              <div className='flex items-center justify-between'>
+                <span className={`text-sm font-medium ${formHeadingCls}`}>{item.label}</span>
+                <button type='button' onClick={() => removeAt(index)} className={formChipRemoveBtnCls}>
+                  <i className='tabler-x text-sm' />
+                </button>
+              </div>
+
+              {extraFields.length > 0 && (
+                <div className='grid grid-cols-1 sm:grid-cols-2 gap-3'>
+                  {extraFields.map(ef => (
+                    <div key={ef.id} className='flex flex-col gap-1'>
+                      <label className={formLabelCls}>
+                        {ef.label}
+                        {ef.required && <span className={formRequiredCls}>*</span>}
+                      </label>
+                      {ef.type === 'text' && (
+                        <input
+                          type='text'
+                          value={item[ef.key] ?? ''}
+                          onChange={e => updateExtra(index, ef.key, e.target.value)}
+                          className={formInputCls}
+                        />
+                      )}
+                      {ef.type === 'number' && (
+                        <input
+                          type='number'
+                          value={item[ef.key] ?? ''}
+                          onChange={e => updateExtra(index, ef.key, e.target.value)}
+                          className={formInputCls}
+                        />
+                      )}
+                      {ef.type === 'select' && (
+                        <select
+                          value={item[ef.key] ?? ''}
+                          onChange={e => updateExtra(index, ef.key, e.target.value)}
+                          className={formInputCls}
+                        >
+                          <option value=''>Selecione...</option>
+                          {(ef.options ?? []).map(o => (
+                            <option key={o} value={o}>
+                              {o}
+                            </option>
+                          ))}
+                        </select>
+                      )}
+                      {ef.type === 'checkbox' && (
+                        <label className='flex items-center gap-2 cursor-pointer mt-1'>
+                          <input
+                            type='checkbox'
+                            checked={!!item[ef.key]}
+                            onChange={e => updateExtra(index, ef.key, e.target.checked)}
+                            className='accent-[var(--mui-palette-primary-main)]'
+                          />
+                          <span className={formMutedCls}>{ef.label}</span>
+                        </label>
+                      )}
+                    </div>
+                  ))}
+                </div>
+              )}
+            </div>
+          ))}
+        </div>
+      )}
+    </FormFieldWrap>
+  )
+}
 
 const MultiSelectDynamicInput = ({ field, value, options, loading, onChange }) => {
   const extraFields = field.extraFields ?? []

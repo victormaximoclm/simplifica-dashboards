@@ -13,17 +13,18 @@ import {
 } from '../formStyles'
 
 const FIELD_TYPES = [
-  { type: 'time', label: 'Hora', icon: 'tabler-clock', group: 'Básico' },
   { type: 'text', label: 'Texto', icon: 'tabler-cursor-text', group: 'Básico' },
   { type: 'textarea', label: 'Área de texto', icon: 'tabler-text-wrap', group: 'Básico' },
   { type: 'number', label: 'Número', icon: 'tabler-number', group: 'Básico' },
   { type: 'date', label: 'Data', icon: 'tabler-calendar', group: 'Básico' },
+  { type: 'time', label: 'Hora', icon: 'tabler-clock', group: 'Básico' },
   { type: 'select', label: 'Seleção', icon: 'tabler-list', group: 'Básico' },
   { type: 'checkbox', label: 'Checkbox', icon: 'tabler-checkbox', group: 'Básico' },
   { type: 'file', label: 'Upload de arquivo', icon: 'tabler-upload', group: 'Básico' },
   { type: 'dynamic-list', label: 'Lista dinâmica', icon: 'tabler-database', group: 'Avançado' },
   { type: 'multi-select-dynamic', label: 'Multi-seleção dinâmica', icon: 'tabler-list-check', group: 'Avançado' },
-  { type: 'cpf-lookup', label: 'Busca por CPF', icon: 'tabler-id', group: 'Avançado' }
+  { type: 'cpf-lookup', label: 'Busca por CPF', icon: 'tabler-id', group: 'Avançado' },
+  { type: 'multi-input', label: 'Lista Livre', icon: 'tabler-table-plus', group: 'Básico' }
 ]
 
 const GROUPS = ['Básico', 'Avançado']

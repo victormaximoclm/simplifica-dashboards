@@ -60,13 +60,17 @@ async function fetchWebhookJson(url, init = {}) {
 
 /** Lista dinâmica — chama webhook e retorna [{ label, value }] */
 export async function getRows(_accessToken, config) {
-  const url = config.url || config.webhookUrl
+  const baseUrl = config.url || config.webhookUrl
+  if (!baseUrl) throw new Error('URL do webhook é obrigatória')
 
-  if (!url) {
-    throw new Error('URL do webhook é obrigatória')
+  const url = new URL(baseUrl)
+
+  // Só repassa o param de dependência, se existir
+  if (config.dependsOnParam && config.dependsOnValue !== undefined) {
+    url.searchParams.set(config.dependsOnParam, String(config.dependsOnValue))
   }
 
-  const data = await fetchWebhookJson(url, { method: 'GET' })
+  const data = await fetchWebhookJson(url.toString(), { method: 'GET' })
   return normalizeOptions(data)
 }
 

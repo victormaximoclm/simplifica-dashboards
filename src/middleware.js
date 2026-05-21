@@ -49,6 +49,18 @@ export async function middleware(req) {
     return withRequestId(requestId, NextResponse.next({ request: { headers: requestHeaders } }))
   }
 
+  if (normalizedPath.startsWith('/api/forms/') && normalizedPath.endsWith('/submit')) {
+    return withRequestId(requestId, NextResponse.next({ request: { headers: requestHeaders } }))
+  }
+
+  if (normalizedPath === '/api/forms/datasource') {
+    return withRequestId(requestId, NextResponse.next({ request: { headers: requestHeaders } }))
+  }
+
+  if (normalizedPath.startsWith('/f/')) {
+    return withRequestId(requestId, NextResponse.next({ request: { headers: requestHeaders } }))
+  }
+
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
   if (!token || !token.id) {
     return withRequestId(requestId, NextResponse.redirect(loginRedirectUrl(req)))
