@@ -248,7 +248,7 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       if (result?.found) {
         setValues(prev => ({
           ...prev,
-          [field.id]: result.cpf ?? cpf,
+          [field.id]: result.value ?? result.cpf ?? cpf,
           ...(field.returnNameFieldId ? { [field.returnNameFieldId]: result.name ?? '' } : {})
         }))
       } else {
