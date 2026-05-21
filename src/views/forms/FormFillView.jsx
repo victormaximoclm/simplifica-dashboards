@@ -248,8 +248,9 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       if (result?.found) {
         setValues(prev => ({
           ...prev,
-          [field.id]: result.value ?? result.cpf ?? cpf,
-          ...(field.returnNameFieldId ? { [field.returnNameFieldId]: result.name ?? '' } : {})
+          [field.id]: cpf,
+          ...(field.returnNameFieldId ? { [field.returnNameFieldId]: result.name ?? '' } : {}),
+          ...(result.value ? { [`${field.id}__value`]: result.value } : {})
         }))
       } else {
         setCpfErrors(prev => ({ ...prev, [field.id]: 'CPF não encontrado' }))
@@ -336,6 +337,16 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       const remappedFields = Object.fromEntries(
         fields.map(f => {
           const key = f.fieldKey?.trim() || f.id
+          if (f.type === 'cpf-lookup') {
+            return [
+              key,
+              {
+                cpf: values[f.id],
+                name: f.returnNameFieldId ? values[f.returnNameFieldId] : undefined,
+                value: values[`${f.id}__value`] ?? undefined
+              }
+            ]
+          }
           return [key, values[f.id]]
         })
       )
