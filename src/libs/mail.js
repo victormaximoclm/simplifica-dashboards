@@ -48,7 +48,7 @@ export async function sendInviteEmail({ to, inviteToken, workspaceName }) {
   const mailOptions = {
     from: process.env.SMTP_FROM || '"Plataforma" <noreply@plataforma.com>',
     to,
-    subject: `Convite para acessar a Simpla Insight - ${safeWorkspaceNameForSubject}`,
+    subject: `Convite para acessar a Simpla Insights - ${safeWorkspaceNameForSubject}`,
     html: `
       <div style="margin:0;padding:24px 12px;background:#f6f7fb;">
         <table role="presentation" width="100%" cellspacing="0" cellpadding="0" style="background:#f6f7fb;">
@@ -57,12 +57,12 @@ export async function sendInviteEmail({ to, inviteToken, workspaceName }) {
               <table role="presentation" width="600" cellspacing="0" cellpadding="0" style="max-width:600px;background:#ffffff;border-radius:14px;overflow:hidden;border:1px solid #eceef3;">
                 <tr>
                   <td style="padding:28px 28px 10px 28px;" align="center">
-                    <img src="${safeLogoUrl}" alt="Simpla Insight" width="180" style="display:block;border:0;outline:none;text-decoration:none;" />
+                    <img src="${safeLogoUrl}" alt="Simpla Insights" width="180" style="display:block;border:0;outline:none;text-decoration:none;" />
                   </td>
                 </tr>
                 <tr>
                   <td style="padding:8px 28px 0 28px;font-family:Arial,Helvetica,sans-serif;color:#1f2937;">
-                    <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;">Você foi convidado(a) para a Simpla Insight</h1>
+                    <h1 style="margin:0 0 10px 0;font-size:22px;line-height:1.3;">Você foi convidado(a) para a Simpla Insights</h1>
                     <p style="margin:0 0 14px 0;font-size:15px;line-height:1.6;color:#4b5563;">Você recebeu um convite para acessar o workspace <strong style="color:#111827;">${safeWorkspaceName}</strong>.</p>
                     <p style="margin:0 0 20px 0;font-size:15px;line-height:1.6;color:#4b5563;">Clique no botão abaixo para aceitar o convite e definir sua senha.</p>
                   </td>

@@ -132,7 +132,9 @@ const UserDropdown = () => {
                       Preferências
                     </Typography>
                     <div className='flex items-center gap-1'>
-                      <LanguageDropdown />
+                      {
+                        //<LanguageDropdown />
+                      }
                       <ModeDropdown />
                     </div>
                   </div>

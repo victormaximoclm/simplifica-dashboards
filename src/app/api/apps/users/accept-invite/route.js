@@ -42,10 +42,13 @@ export async function GET(req) {
     return jsonWithRequestId({ message: 'Convite já aceito' }, { status: 409, requestId })
   }
 
-  return jsonWithRequestId({
-    email: user.email,
-    workspaceName: user.workspace?.name || ''
-  }, { requestId })
+  return jsonWithRequestId(
+    {
+      email: user.email,
+      workspaceName: user.workspace?.name || ''
+    },
+    { requestId }
+  )
 }
 
 // POST /api/apps/users/accept-invite - Accept invite (set name + password)
@@ -55,7 +58,9 @@ export async function POST(req) {
   const withRate = response => applyRateLimitHeaders(response, rate)
 
   if (!rate.success) {
-    return withRate(jsonWithRequestId({ message: 'Muitas tentativas. Aguarde um momento.' }, { status: 429, requestId }))
+    return withRate(
+      jsonWithRequestId({ message: 'Muitas tentativas. Aguarde um momento.' }, { status: 429, requestId })
+    )
   }
 
   const parsed = parseBody(acceptInviteSchema, await req.json())
@@ -64,7 +69,7 @@ export async function POST(req) {
     return withRate(jsonWithRequestId({ message: parsed.message }, { status: 400, requestId }))
   }
 
-  const { token, name, password } = parsed.data
+  const { token, name, password, termsAccepted } = parsed.data
 
   const user = await prisma.user.findUnique({
     where: { inviteToken: token },
@@ -92,7 +97,10 @@ export async function POST(req) {
       password: hashedPassword,
       status: 'active',
       inviteToken: null,
-      inviteTokenExpiry: null
+      inviteTokenExpiry: null,
+      termsAccepted: true,
+      termsAcceptedAt: new Date(),
+      termsVersion: '1.0'
     }
   })
 

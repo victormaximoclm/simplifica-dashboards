@@ -13,12 +13,6 @@ export const setupSchema = v.object({
   password: v.pipe(v.string(), v.minLength(6, 'A senha deve ter pelo menos 6 caracteres'))
 })
 
-export const acceptInviteSchema = v.object({
-  token: v.pipe(v.string(), v.minLength(1, 'Token é obrigatório')),
-  name: v.pipe(v.string(), v.minLength(1, 'Nome é obrigatório')),
-  password: v.pipe(v.string(), v.minLength(6, 'A senha deve ter no mínimo 6 caracteres'))
-})
-
 // ── Password ────────────────────────────────
 export const changePasswordSchema = v.object({
   currentPassword: v.pipe(v.string(), v.minLength(1, 'Senha atual é obrigatória')),
@@ -65,6 +59,13 @@ export const dismissNotificationSchema = v.object({
 export const markReadSchema = v.object({
   notificationIds: v.optional(v.array(v.string())),
   readAll: v.optional(v.boolean())
+})
+
+export const acceptInviteSchema = v.object({
+  token: v.pipe(v.string(), v.minLength(1, 'Token é obrigatório')),
+  name: v.pipe(v.string(), v.minLength(1, 'Nome é obrigatório')),
+  password: v.pipe(v.string(), v.minLength(6, 'A senha deve ter no mínimo 6 caracteres')),
+  termsAccepted: v.literal(true, 'Você precisa aceitar os Termos de Uso')
 })
 
 /**

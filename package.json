@@ -82,6 +82,7 @@
     "react-dropzone": "14.3.8",
     "react-hook-form": "7.69.0",
     "react-map-gl": "8.1.0",
+    "react-pdf": "^9.2.1",
     "react-perfect-scrollbar": "1.5.8",
     "react-player": "3.4.0",
     "react-redux": "9.2.0",

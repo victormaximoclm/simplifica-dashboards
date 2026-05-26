@@ -59,6 +59,7 @@ const MaskImg = styled('img')({
 const Register = ({ mode }) => {
   // States
   const [isPasswordShown, setIsPasswordShown] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Vars
   const darkImg = '/images/pages/auth-mask-dark.png'
@@ -107,8 +108,7 @@ const Register = ({ mode }) => {
         </Link>
         <div className='flex flex-col gap-6 is-full sm:is-auto md:is-full sm:max-is-[400px] md:max-is-[unset] mbs-8 sm:mbs-11 md:mbs-0'>
           <div className='flex flex-col gap-1'>
-            <Typography variant='h4'>Adventure starts here 🚀</Typography>
-            <Typography>Make your app management easy and fun!</Typography>
+            <Typography variant='h4'>A Aventura começa aqui 🚀</Typography>
           </div>
           <form noValidate autoComplete='off' onSubmit={e => e.preventDefault()} className='flex flex-col gap-6'>
             <CustomTextField autoFocus fullWidth label='Nome de usuário' placeholder='Digite seu nome de usuário' />
@@ -131,23 +131,23 @@ const Register = ({ mode }) => {
               }}
             />
             <FormControlLabel
-              control={<Checkbox />}
+              control={<Checkbox checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} />}
               label={
                 <>
-                  <span>I agree to </span>
-                  <Link className='text-primary' href='/' onClick={e => e.preventDefault()}>
-                    política de privacidade e termos
+                  <span>Eu concordo com os </span>
+                  <Link className='text-primary' href={getLocalizedUrl('/pages/termos-de-uso', locale)} target='_blank'>
+                    Termos de Uso e Política de Privacidade
                   </Link>
                 </>
               }
             />
-            <Button fullWidth variant='contained' type='submit'>
-              Sign Up
+            <Button fullWidth variant='contained' type='submit' disabled={!agreedToTerms}>
+              Cadastrar
             </Button>
             <div className='flex justify-center items-center flex-wrap gap-2'>
-              <Typography>Already have an account?</Typography>
+              <Typography>Já tem uma conta?</Typography>
               <Typography component={Link} href={getLocalizedUrl('/login', locale)} color='primary.main'>
-                Sign in instead
+                Entrar na conta
               </Typography>
             </div>
             <Divider className='gap-2'>or</Divider>

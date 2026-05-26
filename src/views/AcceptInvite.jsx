@@ -16,6 +16,8 @@ import InputAdornment from '@mui/material/InputAdornment'
 import Button from '@mui/material/Button'
 import Alert from '@mui/material/Alert'
 import CircularProgress from '@mui/material/CircularProgress'
+import Checkbox from '@mui/material/Checkbox'
+import FormControlLabel from '@mui/material/FormControlLabel'
 
 // Third-party Imports
 import classnames from 'classnames'
@@ -67,6 +69,7 @@ const AcceptInvite = ({ mode }) => {
   const [confirmPassword, setConfirmPassword] = useState('')
   const [isPasswordShown, setIsPasswordShown] = useState(false)
   const [isConfirmPasswordShown, setIsConfirmPasswordShown] = useState(false)
+  const [agreedToTerms, setAgreedToTerms] = useState(false)
 
   // Vars
   const darkImg = '/images/pages/auth-mask-dark.png'
@@ -126,6 +129,11 @@ const AcceptInvite = ({ mode }) => {
     e.preventDefault()
     setError(null)
 
+    if (!agreedToTerms) {
+      setError('Você precisa aceitar os Termos de Uso')
+      return
+    }
+
     if (!name.trim()) {
       setError('Informe seu nome')
 
@@ -150,7 +158,7 @@ const AcceptInvite = ({ mode }) => {
       const res = await fetch('/api/apps/users/accept-invite', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ token, name: name.trim(), password })
+        body: JSON.stringify({ token, name: name.trim(), password, termsAccepted: true })
       })
 
       const data = await res.json()
@@ -268,6 +276,20 @@ const AcceptInvite = ({ mode }) => {
               }
             }}
           />
+          <FormControlLabel
+            control={<Checkbox checked={agreedToTerms} onChange={e => setAgreedToTerms(e.target.checked)} />}
+            label={
+              <>
+                <span>Eu li e concordo com os </span>
+                <Link className='text-primary' href={getLocalizedUrl('/pages/termos-de-uso', locale)} target='_blank'>
+                  Termos de Uso
+                </Link>
+              </>
+            }
+          />
+          <Button fullWidth variant='contained' type='submit' disabled={submitting || !agreedToTerms}>
+            {submitting ? 'Criando conta...' : 'Aceitar Convite e Criar Conta'}
+          </Button>
           <Button fullWidth variant='contained' type='submit' disabled={submitting}>
             {submitting ? 'Criando conta...' : 'Aceitar Convite e Criar Conta'}
           </Button>

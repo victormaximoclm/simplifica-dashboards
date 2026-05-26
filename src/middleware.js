@@ -9,6 +9,7 @@ const publicRoutes = [
   '/reset-password',
   '/setup',
   '/accept-invite',
+  '/pages/termos-de-uso',
   '/api/auth',
   '/api/login',
   '/api/setup',
@@ -73,6 +74,6 @@ export async function middleware(req) {
 // Ignora _next, favicon, pasta images/ e arquivos estáticos comuns em public/ (evita 302 em .svg/.woff etc.).
 export const config = {
   matcher: [
-    '/((?!_next/static|_next/image|favicon.ico|images/|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|woff2?|ttf|eot|txt|xml)$).*)'
+    '/((?!_next/static|_next/image|favicon.ico|images/|docs/|.*\\.(?:ico|png|jpg|jpeg|gif|svg|webp|woff2?|ttf|eot|txt|xml|pdf)$).*)'
   ]
 }

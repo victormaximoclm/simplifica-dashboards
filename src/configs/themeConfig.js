@@ -16,7 +16,7 @@
  * Another way is to clear the cookie from the browser's Application/Storage tab and then reload the page.
  */
 const themeConfig = {
-  templateName: 'Simpla Insight',
+  templateName: 'Simpla Insights',
   homePageUrl: '/dashboards',
   settingsCookieName: 'simplifica-dashboards-settings',
   /** Quando true, o app permanece no tema escuro; claro/sistema ficam desabilitados */

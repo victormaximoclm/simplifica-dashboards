@@ -32,6 +32,10 @@ const FooterContent = () => {
         <Link href='https://simplificagest.com' target='_blank' className='text-primary'>
           Simplifica Soluções em Gestão e Consultoria
         </Link>
+        <span className={textClass}>{` . `}</span>
+        <Link href='/br/pages/termos-de-uso' className='text-primary'>
+          Termos de Uso
+        </Link>
       </p>
       {/* {!isBreakpointReached && (
         <div className='flex items-center gap-4'>

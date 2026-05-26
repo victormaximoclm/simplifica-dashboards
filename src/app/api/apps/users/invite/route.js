@@ -97,7 +97,7 @@ export async function POST(req) {
     })
 
     try {
-      await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simpla Insight' })
+      await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simpla Insights' })
     } catch (err) {
       logger.error('invite-email-send-failed', {
         requestId,
@@ -157,7 +157,7 @@ export async function POST(req) {
   })
 
   try {
-    await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simpla Insight' })
+    await sendInviteEmail({ to: email, inviteToken, workspaceName: workspace?.name || 'Simpla Insights' })
   } catch (err) {
     logger.error('invite-email-send-failed', {
       requestId,

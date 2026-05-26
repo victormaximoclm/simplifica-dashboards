@@ -122,6 +122,9 @@ model User {
   auditLogs              AuditLog[]
   errorEvents            ErrorEvent[]
   userIntegrations       UserIntegration[]
+  termsAccepted     Boolean   @default(false)
+  termsAcceptedAt   DateTime?
+  termsVersion      String?   @default("1.0")
 }
 
 model UserIntegration {
