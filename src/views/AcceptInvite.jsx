@@ -290,9 +290,6 @@ const AcceptInvite = ({ mode }) => {
           <Button fullWidth variant='contained' type='submit' disabled={submitting || !agreedToTerms}>
             {submitting ? 'Criando conta...' : 'Aceitar Convite e Criar Conta'}
           </Button>
-          <Button fullWidth variant='contained' type='submit' disabled={submitting}>
-            {submitting ? 'Criando conta...' : 'Aceitar Convite e Criar Conta'}
-          </Button>
         </form>
       </div>
     )
