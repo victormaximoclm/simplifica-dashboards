@@ -67,12 +67,27 @@ function validateFieldRegex(field, val) {
 }
 
 function isFieldVisible(field, values) {
-  if (!field.condition) return true
-  const { fieldId, value } = field.condition
-  const actual = values[fieldId]
-  // checkbox guarda boolean, compara como string
-  const actualStr = actual === undefined || actual === null ? '' : String(actual)
-  return actualStr === String(value)
+  // Novo: visibility com N regras
+  const v = field.visibility
+  if (v?.rules?.length > 0) {
+    const results = v.rules.map(rule => {
+      const val = String(values[rule.fieldId] ?? '')
+      if (rule.op === 'eq') return val === String(rule.value)
+      if (rule.op === 'neq') return val !== String(rule.value)
+      if (rule.op === 'contains') return val.includes(rule.value)
+      return true
+    })
+    const satisfied = v.operator === 'AND' ? results.every(Boolean) : results.some(Boolean)
+    return v.action === 'show' ? satisfied : !satisfied
+  }
+
+  // Legado: condition simples
+  if (field.condition?.fieldId) {
+    const actual = String(values[field.condition.fieldId] ?? '')
+    return actual === String(field.condition.value ?? '')
+  }
+
+  return true
 }
 
 function isFieldRequired(field, values) {

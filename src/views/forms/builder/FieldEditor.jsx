@@ -407,86 +407,149 @@ const CONDITIONAL_TYPES = new Set(['select', 'dynamic-list', 'checkbox'])
 
 const ConditionalEditor = ({ field, allFields, onChange }) => {
   const eligibleFields = (allFields ?? []).filter(f => f.id !== field.id && CONDITIONAL_TYPES.has(f.type))
-
-  const condition = field.condition ?? null
-  const controllerField = eligibleFields.find(f => f.id === condition?.fieldId)
-
-  const setConditionField = fieldId => {
-    if (!fieldId) {
-      onChange({ ...field, condition: null })
-      return
-    }
-    onChange({ ...field, condition: { fieldId, value: '' } })
-  }
-
-  const setConditionValue = value => {
-    onChange({ ...field, condition: { ...condition, value } })
-  }
-
   if (eligibleFields.length === 0) return null
 
-  // Opções de valor baseadas no tipo do campo controlador
-  const getValueOptions = f => {
+  // Migração: condition legado → visibility novo
+  const visibility =
+    field.visibility ??
+    (field.condition?.fieldId
+      ? {
+          operator: 'AND',
+          action: 'show',
+          rules: [{ fieldId: field.condition.fieldId, op: 'eq', value: field.condition.value ?? '' }]
+        }
+      : { operator: 'AND', action: 'show', rules: [] })
+
+  const update = patch => onChange({ ...field, visibility: { ...visibility, ...patch }, condition: undefined })
+  const updateRule = (i, patch) => {
+    const rules = visibility.rules.map((r, idx) => (idx === i ? { ...r, ...patch } : r))
+    update({ rules })
+  }
+  const addRule = () => update({ rules: [...visibility.rules, { fieldId: '', op: 'eq', value: '' }] })
+  const removeRule = i => update({ rules: visibility.rules.filter((_, idx) => idx !== i) })
+
+  const getValueOptions = fieldId => {
+    const f = eligibleFields.find(x => x.id === fieldId)
     if (!f) return []
     if (f.type === 'checkbox')
       return [
         { label: 'Marcado', value: 'true' },
         { label: 'Desmarcado', value: 'false' }
       ]
-    if (f.type === 'select')
-      return (f.options ?? []).map(o =>
-        typeof o === 'object' ? { label: o.label, value: o.value } : { label: o, value: o }
-      )
-    if (f.type === 'dynamic-list') return [] // valor livre, sem opções fixas
+    if (f.type === 'select') return (f.options ?? []).map(o => (typeof o === 'object' ? o : { label: o, value: o }))
     return []
   }
 
-  const valueOptions = getValueOptions(controllerField)
+  const hasRules = visibility.rules.length > 0
 
   return (
     <div className='flex flex-col gap-3 pt-3 border-t border-[var(--mui-palette-divider)]'>
       <p className={formBuilderSectionTitleCls}>Exibição condicional</p>
 
-      <Field label='Mostrar este campo somente se'>
-        <select
-          value={condition?.fieldId ?? ''}
-          onChange={e => setConditionField(e.target.value)}
-          className={formInputCls}
-        >
-          <option value=''>Sempre visível</option>
-          {eligibleFields.map(f => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
-      </Field>
+      {/* Sem regras: mostrar botão para iniciar */}
+      {!hasRules ? (
+        <button type='button' onClick={addRule} className={btnDashed}>
+          <i className='tabler-plus' /> Adicionar condição
+        </button>
+      ) : (
+        <>
+          {/* Ação + Operador */}
+          <div className='flex gap-2'>
+            <Field label='Ação'>
+              <select
+                value={visibility.action}
+                onChange={e => update({ action: e.target.value })}
+                className={formInputCls}
+              >
+                <option value='show'>Mostrar</option>
+                <option value='hide'>Ocultar</option>
+              </select>
+            </Field>
+            <Field label='Quando'>
+              <select
+                value={visibility.operator}
+                onChange={e => update({ operator: e.target.value })}
+                className={formInputCls}
+              >
+                <option value='AND'>Todas (AND)</option>
+                <option value='OR'>Qualquer (OR)</option>
+              </select>
+            </Field>
+          </div>
 
-      {condition?.fieldId && (
-        <Field label='For igual a'>
-          {valueOptions.length > 0 ? (
-            <select
-              value={condition.value ?? ''}
-              onChange={e => setConditionValue(e.target.value)}
-              className={formInputCls}
-            >
-              <option value=''>Selecione...</option>
-              {valueOptions.map(o => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
-          ) : (
-            <input
-              type='text'
-              value={condition.value ?? ''}
-              onChange={e => setConditionValue(e.target.value)}
-              placeholder='Valor esperado...'
-              className={formInputCls}
-            />
-          )}
-        </Field>
+          {/* Regras */}
+          {visibility.rules.map((rule, i) => {
+            const valueOptions = getValueOptions(rule.fieldId)
+            return (
+              <div key={i} className='flex flex-col gap-2 p-3 rounded-lg border border-[var(--mui-palette-divider)]'>
+                <div className='flex items-center justify-between'>
+                  <span className={formCaptionCls}>Condição {i + 1}</span>
+                  <button type='button' onClick={() => removeRule(i)} className={formBuilderIconBtnCls}>
+                    <i className='tabler-trash text-sm' />
+                  </button>
+                </div>
+
+                <Field label='Campo'>
+                  <select
+                    value={rule.fieldId}
+                    onChange={e => updateRule(i, { fieldId: e.target.value, value: '' })}
+                    className={formInputCls}
+                  >
+                    <option value=''>Selecione...</option>
+                    {eligibleFields.map(f => (
+                      <option key={f.id} value={f.id}>
+                        {f.label}
+                      </option>
+                    ))}
+                  </select>
+                </Field>
+
+                <Field label='Operador'>
+                  <select
+                    value={rule.op}
+                    onChange={e => updateRule(i, { op: e.target.value })}
+                    className={formInputCls}
+                  >
+                    <option value='eq'>Igual a</option>
+                    <option value='neq'>Diferente de</option>
+                    <option value='contains'>Contém</option>
+                  </select>
+                </Field>
+
+                {rule.fieldId && (
+                  <Field label='Valor'>
+                    {valueOptions.length > 0 ? (
+                      <select
+                        value={rule.value}
+                        onChange={e => updateRule(i, { value: e.target.value })}
+                        className={formInputCls}
+                      >
+                        <option value=''>Selecione...</option>
+                        {valueOptions.map(o => (
+                          <option key={o.value} value={o.value}>
+                            {o.label}
+                          </option>
+                        ))}
+                      </select>
+                    ) : (
+                      <input
+                        type='text'
+                        value={rule.value}
+                        onChange={e => updateRule(i, { value: e.target.value })}
+                        placeholder='Valor...'
+                        className={formInputCls}
+                      />
+                    )}
+                  </Field>
+                )}
+              </div>
+            )
+          })}
+
+          <button type='button' onClick={addRule} className={btnDashed}>
+            <i className='tabler-plus' /> Adicionar condição
+          </button>
+        </>
       )}
     </div>
   )
