@@ -190,7 +190,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
             {forms.length === 0 && <MenuItem disabled>Nenhum formulário disponível</MenuItem>}
             {isHighAdmin && (
               <MenuItem href={`/${locale}/forms`} icon={<i className='tabler-settings' />}>
-                {dictionary['navigation'].manageForms || '+ Formulários'}
+                {dictionary['navigation'].manageForms || 'Gerenciar Formulários'}
               </MenuItem>
             )}
           </SubMenu>
