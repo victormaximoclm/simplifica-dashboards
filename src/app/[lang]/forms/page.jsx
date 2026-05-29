@@ -9,9 +9,8 @@ import { prisma } from '@/libs/prisma'
 import FormsListView from '@/views/forms/FormsListView'
 import {
   buildFormListWhereForRole,
-  filterFormsForContext,
+  filterFormsForRole,
   getUserFormContext,
-  shouldFilterFormsByContext,
   userHasFormViewerAccess
 } from '@/libs/formAccess'
 import { resolveFormWorkspaceId } from '@/libs/formWorkspace'
@@ -67,9 +66,7 @@ const FormsPage = async ({ params }) => {
     }
   })
 
-  if (shouldFilterFormsByContext(userRole)) {
-    forms = filterFormsForContext(forms, ctx)
-  }
+  forms = filterFormsForRole(forms, userRole, ctx)
 
   return <FormsListView forms={forms} canManage={canManageForms(userRole)} lang={lang} />
 }

@@ -1,5 +1,5 @@
 import { isHighAdmin } from '@/utils/roleHelpers'
-import { canAccessForm } from '@/libs/formAccess'
+import { canAccessForm, isFormHighAdminOnly } from '@/libs/formAccess'
 
 /** Apenas SuperAdmin e SubAdmin criam/editam formulários */
 export function canManageForms(role) {
@@ -7,11 +7,13 @@ export function canManageForms(role) {
 }
 
 /**
- * Admin e HighAdmin preenchem qualquer form do workspace (sem filtro CustomRole/cargo).
- * Usuários comuns dependem de customRoleId + allowedRoles no formulário.
+ * HighAdmin: qualquer form. Admin: forms com cargo ou função definidos.
+ * Usuários comuns: customRoleId + match em allowedRoles/cargos.
  */
-export function canFillAllFormsInWorkspace(role) {
-  return isHighAdmin(role) || role === 'admin'
+export function canFillAllFormsInWorkspace(role, form) {
+  if (isHighAdmin(role)) return true
+  if (role === 'admin') return form ? !isFormHighAdminOnly(form) : true
+  return false
 }
 
 /** Apenas admin do workspace e highAdmin podem gerar novos links públicos */
@@ -20,8 +22,10 @@ export function canGeneratePublicLinks(role) {
 }
 
 export function canGeneratePublicLinksInFill(role, form, ctx = {}) {
-  if (isHighAdmin(role) || role === 'admin') return true
+  if (isHighAdmin(role)) return true
   if (!form) return false
+  if (isFormHighAdminOnly(form)) return false
+  if (role === 'admin') return true
   return canAccessForm(form, ctx)
 }
 
@@ -33,11 +37,11 @@ export function canSubmitForm(session, form, ctx = {}) {
 
   if (isHighAdmin(role)) return true
 
-  if (role === 'admin') {
-    return form.workspaceId === session.user.workspaceId
-  }
-
   if (form.workspaceId !== session.user.workspaceId) return false
+
+  if (isFormHighAdminOnly(form)) return false
+
+  if (role === 'admin') return true
 
   return canAccessForm(form, ctx)
 }

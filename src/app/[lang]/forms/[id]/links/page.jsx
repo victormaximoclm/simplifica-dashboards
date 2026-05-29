@@ -6,7 +6,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/libs/auth'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
-import { canAccessForm, getUserFormContext } from '@/libs/formAccess'
+import { canNonHighAdminAccessForm, getUserFormContext } from '@/libs/formAccess'
 import { canGeneratePublicLinks } from '@/libs/formPermissions'
 import FormLinksView from '@/views/forms/FormLinksView'
 
@@ -30,10 +30,8 @@ const FormLinksPage = async ({ params }) => {
   if (!isHighAdmin(role)) {
     if (form.workspaceId !== session.user.workspaceId) redirect(`/${lang}/forms`)
 
-    if (role !== 'admin') {
-      const ctx = await getUserFormContext(session.user.id)
-      if (!canAccessForm(form, ctx)) redirect(`/${lang}/forms`)
-    }
+    const ctx = role !== 'admin' ? await getUserFormContext(session.user.id) : {}
+    if (!canNonHighAdminAccessForm(role, form, ctx)) redirect(`/${lang}/forms`)
   }
 
   return (

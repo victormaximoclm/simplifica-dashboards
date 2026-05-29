@@ -362,7 +362,9 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
-        throw new Error(err.message || 'Erro ao enviar')
+        // err.source pode vir da API: 'webhook' | 'server'
+        const msg = err.source === 'webhook' ? `Erro no webhook: ${err.message}` : err.message || 'Erro ao enviar'
+        throw new Error(msg)
       }
 
       setSubmitted(true)

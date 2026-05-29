@@ -8,7 +8,7 @@ import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { createAuditLog } from '@/libs/auditService'
 import { createNotification } from '@/libs/notifications'
-import { canAccessForm, getUserFormContext } from '@/libs/formAccess'
+import { canNonHighAdminAccessForm, getUserFormContext } from '@/libs/formAccess'
 import { canManageFormInWorkspace } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
 
@@ -46,13 +46,11 @@ export async function GET(req, { params }) {
         return response
       }
 
-      if (role !== 'admin') {
-        const ctx = await getUserFormContext(session.user.id)
-        if (!canAccessForm(form, ctx)) {
-          const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-          response.headers.set('x-request-id', requestId)
-          return response
-        }
+      const ctx = role !== 'admin' ? await getUserFormContext(session.user.id) : {}
+      if (!canNonHighAdminAccessForm(role, form, ctx)) {
+        const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+        response.headers.set('x-request-id', requestId)
+        return response
       }
     }
 

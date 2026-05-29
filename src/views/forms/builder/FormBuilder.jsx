@@ -274,7 +274,9 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
           </Section>
 
           <Section title='Cargos ClickUp (integração)'>
-            <p className={`${formCaptionCls} mb-1`}>Um cargo por linha. Vazio = todos.</p>
+            <p className={`${formCaptionCls} mb-1`}>
+              Um cargo por linha. Sem cargo nem função = somente Super Admin e Sub Admin.
+            </p>
             <textarea
               rows={4}
               value={allowedCargos.join('\n')}

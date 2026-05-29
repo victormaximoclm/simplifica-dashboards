@@ -4,7 +4,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/libs/auth'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
-import { canAccessForm, getUserFormContext } from '@/libs/formAccess'
+import { canNonHighAdminAccessForm, getUserFormContext } from '@/libs/formAccess'
 import FormFillView from '@/views/forms/FormFillView'
 import { canGeneratePublicLinksInFill } from '@/libs/formPermissions'
 
@@ -37,9 +37,9 @@ const FormFillPage = async ({ params }) => {
   }
 
   let ctx = {}
-  if (role !== 'admin' && !isHighAdmin(role)) {
-    ctx = await getUserFormContext(session.user.id)
-    if (!canAccessForm(form, ctx)) redirect(`/${lang}/forms`)
+  if (!isHighAdmin(role)) {
+    if (role !== 'admin') ctx = await getUserFormContext(session.user.id)
+    if (!canNonHighAdminAccessForm(role, form, ctx)) redirect(`/${lang}/forms`)
   }
 
   const canManage = canGeneratePublicLinksInFill(role, form, ctx)

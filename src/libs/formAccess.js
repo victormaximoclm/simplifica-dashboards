@@ -40,6 +40,20 @@ export function cargoMatches(allowedCargos, cargo) {
   return allowedCargos.some(c => String(c).trim().toLowerCase() === normalized)
 }
 
+/** Sem cargo nem função no formulário — visível apenas para Super/Sub Admin */
+export function isFormHighAdminOnly(form) {
+  const hasCargos = Array.isArray(form?.allowedCargos) && form.allowedCargos.length > 0
+  const hasRoles = Array.isArray(form?.allowedRoles) && form.allowedRoles.length > 0
+  return !hasCargos && !hasRoles
+}
+
+/** Acesso autenticado (admin/user); highAdmin valida fora */
+export function canNonHighAdminAccessForm(role, form, ctx = {}) {
+  if (isFormHighAdminOnly(form)) return false
+  if (role === 'admin') return true
+  return canAccessForm(form, ctx)
+}
+
 /** Compara customRoleId (ou nome legado) com allowedRoles do formulário */
 export function roleMatches(allowedRoles, customRoleId, customRoleName) {
   if (!Array.isArray(allowedRoles) || allowedRoles.length === 0) return false
@@ -58,7 +72,7 @@ export function canAccessForm(form, ctx) {
   const restrictsCargos = Array.isArray(form.allowedCargos) && form.allowedCargos.length > 0
   const restrictsRoles = Array.isArray(form.allowedRoles) && form.allowedRoles.length > 0
 
-  if (!restrictsCargos && !restrictsRoles) return true
+  if (!restrictsCargos && !restrictsRoles) return false
   if (restrictsRoles && roleMatches(form.allowedRoles, ctx.customRoleId, ctx.customRoleName)) return true
   if (restrictsCargos && cargoMatches(form.allowedCargos, ctx.cargo)) return true
 
@@ -71,6 +85,14 @@ export function filterFormsForContext(forms, ctx) {
   return forms.filter(form => canAccessForm(form, ctx))
 }
 
+/** Pós-query: highAdmin vê tudo; admin/user conforme restrições do form */
+export function filterFormsForRole(forms, role, ctx = {}) {
+  if (isHighAdmin(role)) return forms
+  if (role === 'admin') return forms.filter(form => !isFormHighAdminOnly(form))
+  if (shouldFilterFormsByContext(role)) return filterFormsForContext(forms, ctx)
+  return forms
+}
+
 /** Usuários comuns: filtro pós-query por cargo (case-insensitive) */
 export function shouldFilterFormsByContext(role) {
   return !isHighAdmin(role) && role !== 'admin'
@@ -78,16 +100,16 @@ export function shouldFilterFormsByContext(role) {
 
 /**
  * Filtro Prisma para usuários com CustomRole no workspace.
- * - Formulários abertos (sem restrição de cargo/função)
  * - Formulários com allowedRoles contendo o customRoleId
  * - Formulários com allowedCargos contendo o cargo ClickUp (se houver)
+ * Formulários sem cargo nem função: apenas Super/Sub Admin (fora deste where).
  */
 export function buildFormListWhere(workspaceId, ctx = {}) {
   if (!workspaceId || !userHasFormViewerAccess(ctx)) {
     return { id: 'none' }
   }
 
-  const orConditions = [{ AND: [{ allowedCargos: { isEmpty: true } }, { allowedRoles: { isEmpty: true } }] }]
+  const orConditions = []
 
   orConditions.push({ allowedRoles: { has: ctx.customRoleId } })
   if (ctx.customRoleName) {

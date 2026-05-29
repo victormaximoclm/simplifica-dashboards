@@ -10,9 +10,8 @@ import { createAuditLog } from '@/libs/auditService'
 import { createNotification } from '@/libs/notifications'
 import {
   buildFormListWhereForRole,
-  filterFormsForContext,
-  getUserFormContext,
-  shouldFilterFormsByContext
+  filterFormsForRole,
+  getUserFormContext
 } from '@/libs/formAccess'
 import { canManageFormInWorkspace, resolveFormWorkspaceId } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
@@ -66,9 +65,7 @@ export async function GET(req) {
       }
     })
 
-    if (shouldFilterFormsByContext(role)) {
-      forms = filterFormsForContext(forms, ctx)
-    }
+    forms = filterFormsForRole(forms, role, ctx)
 
     const response = NextResponse.json(forms)
     response.headers.set('x-request-id', requestId)

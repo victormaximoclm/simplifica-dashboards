@@ -7,7 +7,7 @@ import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { createAuditLog } from '@/libs/auditService'
-import { canAccessForm, getUserFormContext } from '@/libs/formAccess'
+import { canNonHighAdminAccessForm, getUserFormContext, isFormHighAdminOnly } from '@/libs/formAccess'
 import { canGeneratePublicLinks } from '@/libs/formPermissions'
 
 // GET /api/forms/[id]/links - lista links gerados
@@ -40,13 +40,11 @@ export async function GET(req, { params }) {
         return response
       }
 
-      if (role !== 'admin') {
-        const ctx = await getUserFormContext(session.user.id)
-        if (!canAccessForm(form, ctx)) {
-          const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-          response.headers.set('x-request-id', requestId)
-          return response
-        }
+      const ctx = role !== 'admin' ? await getUserFormContext(session.user.id) : {}
+      if (!canNonHighAdminAccessForm(role, form, ctx)) {
+        const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+        response.headers.set('x-request-id', requestId)
+        return response
       }
     }
 
@@ -113,6 +111,11 @@ export async function POST(req, { params }) {
 
     if (!isHighAdmin(role)) {
       if (form.workspaceId !== session.user.workspaceId) {
+        const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+        response.headers.set('x-request-id', requestId)
+        return response
+      }
+      if (isFormHighAdminOnly(form)) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
         response.headers.set('x-request-id', requestId)
         return response
