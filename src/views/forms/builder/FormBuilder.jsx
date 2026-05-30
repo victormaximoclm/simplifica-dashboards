@@ -36,6 +36,7 @@ import {
 } from '../formStyles'
 
 const TYPE_ICONS = {
+  'address-lookup': 'tabler-map-pin',
   text: 'tabler-cursor-text',
   textarea: 'tabler-text-wrap',
   number: 'tabler-number',
@@ -51,6 +52,7 @@ const TYPE_ICONS = {
 }
 
 const TYPE_LABELS = {
+  'address-lookup': 'Endereço',
   text: 'Texto',
   textarea: 'Área de texto',
   number: 'Número',
@@ -95,7 +97,8 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
       ...(type === 'dynamic-list' || type === 'multi-select-dynamic'
         ? { dataSource: { provider: 'webhook', url: '' } }
         : {}),
-      ...(type === 'cpf-lookup' ? { dataSource: { provider: 'webhook', url: '' }, returnNameFieldId: '' } : {})
+      ...(type === 'cpf-lookup' ? { dataSource: { provider: 'webhook', url: '' }, returnNameFieldId: '' } : {}),
+      ...(type === 'address-lookup' ? {} : {})
     }
     setFields(prev => [...prev, newField])
     setSelectedFieldId(newField.id)

@@ -78,7 +78,8 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
         'dynamic-list',
         'multi-select-dynamic',
         'cpf-lookup',
-        'multi-input'
+        'multi-input',
+        'address-lookup'
       ].includes(field.type) && (
         <Field label='Placeholder'>
           <input

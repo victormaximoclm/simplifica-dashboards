@@ -729,6 +729,9 @@ const FieldInput = ({
         />
       )
 
+    case 'address-lookup':
+      return <AddressLookupInput field={field} value={value} onChange={onChange} />
+
     default:
       return (
         <FormFieldWrap>
@@ -783,6 +786,73 @@ const CpfLookupInput = ({ field, cpfValue, nameValue, cpfError, loading, onCpfCh
     </div>
   </FormFieldWrap>
 )
+
+const AddressLookupInput = ({ field, value, onChange }) => {
+  const [query, setQuery] = useState('')
+  const [suggestions, setSuggestions] = useState([])
+  const [open, setOpen] = useState(false)
+  const debounceRef = useRef(null)
+
+  const search = q => {
+    clearTimeout(debounceRef.current)
+    debounceRef.current = setTimeout(async () => {
+      if (!q || q.length < 4) return setSuggestions([])
+      const res = await fetch(
+        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=br`,
+        { headers: { 'Accept-Language': 'pt-BR' } }
+      )
+      const data = await res.json()
+      setSuggestions(data)
+      setOpen(true)
+    }, 600)
+  }
+
+  const select = item => {
+    const { road, suburb, city, town, village, state, postcode } = item.address
+    onChange({
+      display: item.display_name,
+      street: road ?? '',
+      neighborhood: suburb ?? '',
+      city: city ?? town ?? village ?? '',
+      state: state ?? '',
+      postcode: postcode ?? '',
+      lat: item.lat,
+      lon: item.lon
+    })
+    setQuery(item.display_name)
+    setSuggestions([])
+    setOpen(false)
+  }
+
+  return (
+    <FormFieldWrap>
+      <FormLabel required={field.required}>{field.label}</FormLabel>
+      <div className='relative'>
+        <input
+          type='text'
+          value={query}
+          onChange={e => {
+            setQuery(e.target.value)
+            search(e.target.value)
+          }}
+          placeholder={field.placeholder ?? 'Digite o endereço...'}
+          className={formInputCls}
+        />
+        {open && suggestions.length > 0 && (
+          <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+            {suggestions.map(s => (
+              <li key={s.place_id}>
+                <button type='button' className={formDropdownItemCls} onClick={() => select(s)}>
+                  {s.display_name}
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+      </div>
+    </FormFieldWrap>
+  )
+}
 
 const DynamicListInput = ({ field, value, options, loading, onChange, onBlur }) => {
   const [search, setSearch] = useState('')

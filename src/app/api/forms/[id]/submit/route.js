@@ -52,6 +52,16 @@ export async function POST(req, { params }) {
         })
 
         if (!existing || existing.formId !== id) {
+          await createAuditLog({
+            userId: `public:${publicToken}`,
+            tenantId: form.workspaceId,
+            action: 'FORM_SUBMIT_REJECTED',
+            entityType: 'form',
+            entityId: id,
+            after: { reason: 'invalid_token' },
+            metadata: { requestId }
+          })
+
           const response = NextResponse.json({ message: 'Token inválido' }, { status: 403 })
           response.headers.set('x-request-id', requestId)
           return response
@@ -60,6 +70,16 @@ export async function POST(req, { params }) {
         const message = existing.used
           ? 'Link já utilizado. Não é possível enviar outra resposta.'
           : 'Link expirado. Não é possível enviar respostas.'
+
+        await createAuditLog({
+          userId: `public:${publicToken}`,
+          tenantId: form.workspaceId,
+          action: 'FORM_SUBMIT_REJECTED',
+          entityType: 'form',
+          entityId: id,
+          after: { reason: existing.used ? 'link_already_used' : 'link_expired' },
+          metadata: { requestId }
+        })
 
         const response = NextResponse.json({ message }, { status: 403 })
         response.headers.set('x-request-id', requestId)
@@ -113,22 +133,35 @@ export async function POST(req, { params }) {
 
     if (!webhookResponse.ok) {
       logger.error('webhook-error', { requestId, formId: id, status: webhookResponse.status })
+
+      // ✅ Audit log de falha — cobre sessão autenticada e link público
+      const auditUserId = session?.user?.id ?? `public:${publicLinkId ?? publicToken}`
+      await createAuditLog({
+        userId: auditUserId,
+        tenantId: form.workspaceId,
+        action: 'FORM_SUBMIT_FAILED',
+        entityType: 'form',
+        entityId: id,
+        after: { isPublicSubmission, publicLinkId, webhookStatus: webhookResponse.status },
+        metadata: { requestId }
+      })
+
       const response = NextResponse.json({ message: 'Erro ao enviar dados' }, { status: 500 })
       response.headers.set('x-request-id', requestId)
       return response
     }
 
-    if (session) {
-      await createAuditLog({
-        userId: session.user.id,
-        tenantId: form.workspaceId,
-        action: 'FORM_SUBMIT',
-        entityType: 'form',
-        entityId: id,
-        after: { isPublicSubmission, publicLinkId },
-        metadata: { requestId }
-      })
-    }
+    // ✅ Audit log de sucesso — removida a guarda `if (session)`, cobre os dois fluxos
+    const auditUserId = session?.user?.id ?? `public:${publicLinkId ?? publicToken}`
+    await createAuditLog({
+      userId: auditUserId,
+      tenantId: form.workspaceId,
+      action: 'FORM_SUBMIT',
+      entityType: 'form',
+      entityId: id,
+      after: { isPublicSubmission, publicLinkId },
+      metadata: { requestId }
+    })
 
     logger.info('form-submit-success', { requestId, formId: id, isPublicSubmission })
 
