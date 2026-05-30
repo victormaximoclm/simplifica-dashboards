@@ -24,7 +24,8 @@ const FIELD_TYPES = [
   { type: 'dynamic-list', label: 'Lista dinâmica', icon: 'tabler-database', group: 'Avançado' },
   { type: 'multi-select-dynamic', label: 'Multi-seleção dinâmica', icon: 'tabler-list-check', group: 'Avançado' },
   { type: 'cpf-lookup', label: 'Busca por CPF', icon: 'tabler-id', group: 'Avançado' },
-  { type: 'multi-input', label: 'Lista Livre', icon: 'tabler-table-plus', group: 'Básico' }
+  { type: 'multi-input', label: 'Lista Livre', icon: 'tabler-table-plus', group: 'Básico' },
+  { type: 'address-lookup', label: 'Endereço', icon: 'tabler-map-pin', group: 'Básico' }
 ]
 
 const GROUPS = ['Básico', 'Avançado']
