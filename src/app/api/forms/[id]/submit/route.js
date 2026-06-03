@@ -132,6 +132,7 @@ export async function POST(req, { params }) {
     })
 
     if (!webhookResponse.ok) {
+      const webhookError = await webhookResponse.text().catch(() => '')
       logger.error('webhook-error', { requestId, formId: id, status: webhookResponse.status })
 
       // ✅ Audit log de falha — cobre sessão autenticada e link público
@@ -146,7 +147,10 @@ export async function POST(req, { params }) {
         metadata: { requestId }
       })
 
-      const response = NextResponse.json({ message: 'Erro ao enviar dados' }, { status: 500 })
+      const response = NextResponse.json(
+        { message: 'Erro ao enviar dados', webhookMessage: webhookError },
+        { status: 500 }
+      )
       response.headers.set('x-request-id', requestId)
       return response
     }
