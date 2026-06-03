@@ -137,6 +137,26 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     [fields, hiddenFieldIds, values]
   )
 
+  useEffect(() => {
+    const hiddenFields = fields.filter(f => !isFieldVisible(f, values))
+    if (hiddenFields.length === 0) return
+
+    const toClean = hiddenFields.filter(f => {
+      const val = values[f.id]
+      return val !== undefined && val !== null && val !== '' && val !== false
+    })
+
+    if (toClean.length === 0) return
+
+    setValues(prev => {
+      const next = { ...prev }
+      toClean.forEach(f => {
+        next[f.id] = f.type === 'checkbox' ? false : undefined
+      })
+      return next
+    })
+  }, [values, fields])
+
   const pages = useMemo(() => {
     const perPage = form.pagination?.enabled ? (form.pagination?.perPage ?? 10) : Infinity
     const result = []
