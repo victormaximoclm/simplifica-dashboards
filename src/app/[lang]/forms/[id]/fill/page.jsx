@@ -26,7 +26,8 @@ const FormFillPage = async ({ params }) => {
       workspaceId: true,
       allowedCargos: true,
       allowedRoles: true,
-      allowPublicLink: true
+      allowPublicLink: true,
+      pagination: true
     }
   })
 

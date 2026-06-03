@@ -79,7 +79,7 @@ export async function PUT(req, { params }) {
   try {
     const { id } = await params
     const body = await req.json()
-    const { title, description, fields, webhookUrl, allowPublicLink, allowedCargos, allowedRoles } = body
+    const { title, description, fields, webhookUrl, allowPublicLink, allowedCargos, allowedRoles, pagination } = body
 
     const form = await prisma.form.findUnique({ where: { id } })
 
@@ -104,7 +104,8 @@ export async function PUT(req, { params }) {
         webhookUrl,
         allowPublicLink,
         allowedCargos: allowedCargos ?? [],
-        allowedRoles: allowedRoles ?? []
+        allowedRoles: allowedRoles ?? [],
+        pagination: pagination ?? { enabled: false, perPage: 10 }
       }
     })
 

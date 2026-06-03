@@ -84,6 +84,7 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
   const [showTypeSelector, setShowTypeSelector] = useState(false)
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
+  const [pagination, setPagination] = useState(form?.pagination ?? { enabled: false, perPage: 10 })
 
   const selectedField = fields.find(f => f.id === selectedFieldId) ?? null
 
@@ -176,7 +177,8 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
         allowedCargos,
         allowedRoles,
         fields,
-        workspaceId
+        workspaceId,
+        pagination
       }
       const url = isNew ? '/api/forms' : `/api/forms/${form.id}`
       const method = isNew ? 'POST' : 'PUT'
@@ -276,7 +278,7 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
             </label>
           </Section>
 
-          <Section title='Cargos ClickUp (integração)'>
+          {/* <Section title='Cargos ClickUp (integração)'>
             <p className={`${formCaptionCls} mb-1`}>
               Um cargo por linha. Sem cargo nem função = somente Super Admin e Sub Admin.
             </p>
@@ -287,6 +289,24 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
               placeholder={'Gerente\nAnalista'}
               className={`${inputCls} resize-none`}
             />
+          </Section> */}
+
+          <Section title='Paginação'>
+            <label className='flex items-center gap-2 cursor-pointer'>
+              <Toggle value={pagination.enabled} onChange={v => setPagination(p => ({ ...p, enabled: v }))} />
+              <span className={formMutedCls}>Paginar formulário</span>
+            </label>
+            {pagination.enabled && (
+              <Field label='Perguntas por página'>
+                <input
+                  type='number'
+                  min={1}
+                  value={pagination.perPage}
+                  onChange={e => setPagination(p => ({ ...p, perPage: Math.max(1, Number(e.target.value)) }))}
+                  className={inputCls}
+                />
+              </Field>
+            )}
           </Section>
 
           <Section title='Funções (sem ClickUp)'>

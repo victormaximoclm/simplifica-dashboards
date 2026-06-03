@@ -257,6 +257,7 @@ model Form {
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   publicLinks     FormPublicLink[]
+  pagination Json @default("{\"enabled\": false, \"perPage\": 10}")
 }
 
 model FormPublicLink {

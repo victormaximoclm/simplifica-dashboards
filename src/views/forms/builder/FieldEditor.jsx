@@ -231,6 +231,18 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
             </div>
             <span className={`text-sm ${formMutedCls}`}>Usar values customizados</span>
           </label>
+
+          <label className='flex items-center gap-2 cursor-pointer mt-2'>
+            <div
+              onClick={() => onChange({ ...field, multiSelect: !field.multiSelect })}
+              className={`w-10 h-5 rounded-full transition-colors cursor-pointer ${field.multiSelect ? 'bg-[var(--mui-palette-primary-main)]' : formBuilderToggleOffCls} relative`}
+            >
+              <span
+                className={`absolute top-0.5 w-4 h-4 ${formBuilderToggleKnobCls} rounded-full shadow transition-transform ${field.multiSelect ? 'translate-x-5' : 'translate-x-0.5'}`}
+              />
+            </div>
+            <span className={`text-sm ${formMutedCls}`}>Permitir múltipla seleção</span>
+          </label>
         </Field>
       )}
 

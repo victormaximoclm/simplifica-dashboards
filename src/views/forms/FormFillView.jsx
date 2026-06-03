@@ -32,8 +32,6 @@ import {
   formChipRemoveBtnCls
 } from './formStyles'
 
-const FIELDS_PER_PAGE = 10
-
 const WEBHOOK_FIELD_TYPES = new Set(['dynamic-list', 'multi-select-dynamic', 'cpf-lookup'])
 
 const DATASOURCE_METHODS = {
@@ -71,7 +69,8 @@ function isFieldVisible(field, values) {
   const v = field.visibility
   if (v?.rules?.length > 0) {
     const results = v.rules.map(rule => {
-      const val = String(values[rule.fieldId] ?? '')
+      const raw = values[rule.fieldId]
+      const val = Array.isArray(raw) ? raw.join(',') : String(raw ?? '')
       if (rule.op === 'eq') return val === String(rule.value)
       if (rule.op === 'neq') return val !== String(rule.value)
       if (rule.op === 'contains') return val.includes(rule.value)
@@ -139,12 +138,13 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
   )
 
   const pages = useMemo(() => {
+    const perPage = form.pagination?.enabled ? (form.pagination?.perPage ?? 10) : Infinity
     const result = []
-    for (let i = 0; i < visibleFields.length; i += FIELDS_PER_PAGE) {
-      result.push(visibleFields.slice(i, i + FIELDS_PER_PAGE))
+    for (let i = 0; i < visibleFields.length; i += perPage) {
+      result.push(visibleFields.slice(i, i + perPage))
     }
     return result.length > 0 ? result : [[]]
-  }, [visibleFields])
+  }, [visibleFields, form.pagination])
 
   const totalPages = pages.length
   const currentFields = pages[currentPage] ?? []
@@ -644,21 +644,26 @@ const FieldInput = ({
         </FormFieldWrap>
       )
     case 'select':
+      if (field.multiSelect) {
+        const selected = Array.isArray(value) ? value : []
+        const opts = (field.options ?? []).map(opt => (typeof opt === 'object' ? opt : { label: opt, value: opt }))
+        return (
+          <FormFieldWrap>
+            <FormLabel required={field.required}>{field.label}</FormLabel>
+            <StaticMultiSelect opts={opts} selected={selected} onChange={onChange} fieldError={fieldError} />
+            {fieldError && <p className={formErrorCls}>{fieldError}</p>}
+          </FormFieldWrap>
+        )
+      }
       return (
         <FormFieldWrap>
           <FormLabel required={field.required}>{field.label}</FormLabel>
-          <select value={value ?? ''} onChange={e => onChange(e.target.value)} onBlur={onBlur} className={formInputCls}>
-            <option value=''>Selecione...</option>
-            {(field.options ?? []).map((opt, idx) => {
-              const label = typeof opt === 'object' ? opt.label : opt
-              const val = typeof opt === 'object' ? opt.value : opt
-              return (
-                <option key={idx} value={val}>
-                  {label}
-                </option>
-              )
-            })}
-          </select>
+          <StaticSingleSelect
+            opts={(field.options ?? []).map(opt => (typeof opt === 'object' ? opt : { label: opt, value: opt }))}
+            value={value}
+            onChange={onChange}
+            onBlur={onBlur}
+          />
           {fieldError && <p className={formErrorCls}>{fieldError}</p>}
         </FormFieldWrap>
       )
@@ -749,6 +754,117 @@ const FieldInput = ({
         </FormFieldWrap>
       )
   }
+}
+
+const StaticSingleSelect = ({ opts, value, onChange, onBlur }) => {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+  const selected = opts.find(o => o.value === value)
+
+  useEffect(() => {
+    const handle = e => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  return (
+    <div ref={ref} className='relative'>
+      <button
+        type='button'
+        onClick={() => setOpen(v => !v)}
+        onBlur={onBlur}
+        className={`${formInputCls} flex items-center justify-between w-full text-left`}
+      >
+        <span className={selected ? '' : formMutedCls}>{selected?.label ?? 'Selecione...'}</span>
+        <i className='tabler-chevron-down text-sm' />
+      </button>
+      {open && (
+        <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+          <li>
+            <button
+              type='button'
+              className={formDropdownItemCls}
+              onClick={() => {
+                onChange('')
+                setOpen(false)
+              }}
+            >
+              <span className={formMutedCls}>Selecione...</span>
+            </button>
+          </li>
+          {opts.map(opt => (
+            <li key={opt.value}>
+              <button
+                type='button'
+                className={formDropdownItemCls}
+                onClick={() => {
+                  onChange(opt.value)
+                  setOpen(false)
+                }}
+              >
+                {opt.label}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
+}
+
+const StaticMultiSelect = ({ opts, selected, onChange, fieldError }) => {
+  const [open, setOpen] = useState(false)
+  const ref = useRef(null)
+
+  useEffect(() => {
+    const handle = e => {
+      if (ref.current && !ref.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => document.removeEventListener('mousedown', handle)
+  }, [])
+
+  const toggle = val => {
+    onChange(selected.includes(val) ? selected.filter(v => v !== val) : [...selected, val])
+  }
+
+  return (
+    <div ref={ref} className='relative'>
+      <button
+        type='button'
+        onClick={() => setOpen(v => !v)}
+        className={`${formInputCls} flex items-center justify-between w-full text-left`}
+      >
+        <span className={selected.length === 0 ? formMutedCls : ''}>
+          {selected.length === 0
+            ? 'Selecione...'
+            : selected.map(v => opts.find(o => o.value === v)?.label ?? v).join(', ')}
+        </span>
+        <i className='tabler-chevron-down text-sm' />
+      </button>
+      {open && (
+        <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+          {opts.map(opt => (
+            <li key={opt.value}>
+              <button type='button' className={formDropdownItemCls} onClick={() => toggle(opt.value)}>
+                <div className='flex items-center gap-2'>
+                  <input
+                    type='checkbox'
+                    readOnly
+                    checked={selected.includes(opt.value)}
+                    className='accent-[var(--mui-palette-primary-main)] pointer-events-none'
+                  />
+                  {opt.label}
+                </div>
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </div>
+  )
 }
 
 const CpfLookupInput = ({ field, cpfValue, nameValue, cpfError, loading, onCpfChange, onCpfLookup }) => (

@@ -8,11 +8,7 @@ import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { createAuditLog } from '@/libs/auditService'
 import { createNotification } from '@/libs/notifications'
-import {
-  buildFormListWhereForRole,
-  filterFormsForRole,
-  getUserFormContext
-} from '@/libs/formAccess'
+import { buildFormListWhereForRole, filterFormsForRole, getUserFormContext } from '@/libs/formAccess'
 import { canManageFormInWorkspace, resolveFormWorkspaceId } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
 
@@ -61,6 +57,7 @@ export async function GET(req) {
         allowedRoles: true,
         createdAt: true,
         updatedAt: true,
+        pagination: true,
         _count: { select: { publicLinks: true } }
       }
     })
@@ -97,7 +94,17 @@ export async function POST(req) {
 
   try {
     const body = await req.json()
-    const { title, description, workspaceId, fields, webhookUrl, allowPublicLink, allowedCargos, allowedRoles } = body
+    const {
+      title,
+      description,
+      workspaceId,
+      fields,
+      webhookUrl,
+      allowPublicLink,
+      allowedCargos,
+      allowedRoles,
+      pagination
+    } = body
 
     if (!title || !workspaceId || !fields || !webhookUrl) {
       const response = NextResponse.json({ message: 'Campos obrigatórios ausentes' }, { status: 400 })
@@ -128,7 +135,8 @@ export async function POST(req) {
         webhookUrl,
         allowPublicLink: allowPublicLink ?? false,
         allowedCargos: allowedCargos ?? [],
-        allowedRoles: allowedRoles ?? []
+        allowedRoles: allowedRoles ?? [],
+        pagination: pagination ?? { enabled: false, perPage: 10 }
       }
     })
 
