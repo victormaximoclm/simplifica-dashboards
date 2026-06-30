@@ -70,7 +70,19 @@ function isFieldVisible(field, values) {
   if (v?.rules?.length > 0) {
     const results = v.rules.map(rule => {
       const raw = values[rule.fieldId]
-      const val = Array.isArray(raw) ? raw.join(',') : String(raw ?? '')
+
+      if (Array.isArray(raw)) {
+        // multi-select: compara item a item (string ou { value, label, ... }), nunca concatena em string
+        const items = raw.map(item => String(item?.value ?? item ?? ''))
+        const target = String(rule.value)
+
+        if (rule.op === 'eq') return items.some(item => item === target)
+        if (rule.op === 'neq') return !items.some(item => item === target)
+        if (rule.op === 'contains') return items.some(item => item.includes(target))
+        return true
+      }
+
+      const val = String(raw ?? '')
       if (rule.op === 'eq') return val === String(rule.value)
       if (rule.op === 'neq') return val !== String(rule.value)
       if (rule.op === 'contains') return val.includes(rule.value)
