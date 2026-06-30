@@ -258,6 +258,7 @@ model Form {
   updatedAt       DateTime         @updatedAt
   publicLinks     FormPublicLink[]
   pagination Json @default("{\"enabled\": false, \"perPage\": 10}")
+  refreshOnSubmit Boolean @default(false)
 }
 
 model FormPublicLink {

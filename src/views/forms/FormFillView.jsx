@@ -406,6 +406,9 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       }
 
       setSubmitted(true)
+      if (form.refreshOnSubmit) {
+        window.location.reload()
+      }
     } catch (err) {
       setError(err.message)
       toast.error(err.message, { position: 'bottom-center' })

@@ -103,7 +103,8 @@ export async function POST(req) {
       allowPublicLink,
       allowedCargos,
       allowedRoles,
-      pagination
+      pagination,
+      refreshOnSubmit
     } = body
 
     if (!title || !workspaceId || !fields || !webhookUrl) {
@@ -136,7 +137,8 @@ export async function POST(req) {
         allowPublicLink: allowPublicLink ?? false,
         allowedCargos: allowedCargos ?? [],
         allowedRoles: allowedRoles ?? [],
-        pagination: pagination ?? { enabled: false, perPage: 10 }
+        pagination: pagination ?? { enabled: false, perPage: 10 },
+        refreshOnSubmit: refreshOnSubmit
       }
     })
 

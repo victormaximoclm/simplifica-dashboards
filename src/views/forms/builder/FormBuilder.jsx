@@ -85,6 +85,7 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
   const [saving, setSaving] = useState(false)
   const [error, setError] = useState(null)
   const [pagination, setPagination] = useState(form?.pagination ?? { enabled: false, perPage: 10 })
+  const [refreshOnSubmit, setRefreshOnSubmit] = useState(form?.refreshOnSubmit ?? false)
 
   const selectedField = fields.find(f => f.id === selectedFieldId) ?? null
 
@@ -178,7 +179,8 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
         allowedRoles,
         fields,
         workspaceId,
-        pagination
+        pagination,
+        refreshOnSubmit
       }
       const url = isNew ? '/api/forms' : `/api/forms/${form.id}`
       const method = isNew ? 'POST' : 'PUT'
@@ -278,18 +280,12 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
             </label>
           </Section>
 
-          {/* <Section title='Cargos ClickUp (integração)'>
-            <p className={`${formCaptionCls} mb-1`}>
-              Um cargo por linha. Sem cargo nem função = somente Super Admin e Sub Admin.
-            </p>
-            <textarea
-              rows={4}
-              value={allowedCargos.join('\n')}
-              onChange={e => setCargosFromText(e.target.value)}
-              placeholder={'Gerente\nAnalista'}
-              className={`${inputCls} resize-none`}
-            />
-          </Section> */}
+          <Section title='Comportamento'>
+            <label className='flex items-center gap-2 cursor-pointer'>
+              <Toggle value={refreshOnSubmit} onChange={setRefreshOnSubmit} />
+              <span className={formMutedCls}>Atualizar página após envio</span>
+            </label>
+          </Section>
 
           <Section title='Paginação'>
             <label className='flex items-center gap-2 cursor-pointer'>
@@ -309,7 +305,7 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
             )}
           </Section>
 
-          <Section title='Funções (sem ClickUp)'>
+          <Section title='Funções'>
             {customRoles.length === 0 ? (
               <p className={formCaptionCls}>Nenhuma função cadastrada.</p>
             ) : (
