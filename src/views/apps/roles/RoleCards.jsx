@@ -23,7 +23,7 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 
-const RoleCards = () => {
+const RoleCards = ({ workspaceId }) => {
   const [customRoles, setCustomRoles] = useState([])
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingRole, setEditingRole] = useState(null)
@@ -35,12 +35,14 @@ const RoleCards = () => {
   const [formData, setFormData] = useState({ name: '' })
 
   const fetchRoles = useCallback(async () => {
-    const res = await fetch('/api/apps/custom-roles')
+    if (!workspaceId) return
+
+    const res = await fetch(`/api/apps/custom-roles?workspaceId=${workspaceId}`)
 
     if (res.ok) {
       setCustomRoles(await res.json())
     }
-  }, [])
+  }, [workspaceId])
 
   useEffect(() => {
     fetchRoles()
@@ -75,7 +77,10 @@ const RoleCards = () => {
     const res = await fetch(url, {
       method,
       headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify(formData)
+      body: JSON.stringify({
+        ...formData,
+        workspaceId
+      })
     })
 
     if (res.ok) {
@@ -191,8 +196,7 @@ const RoleCards = () => {
             </Button>
           </div>
           <Typography variant='body2' color='text.secondary' sx={{ mb: 3 }}>
-            Funções globais que podem ser atribuídas a usuários de qualquer espaço de trabalho para controlar a
-            visibilidade dos dashboards.
+            Funções disponíveis que podem ser atribuídas a usuários para controlar a visibilidade dos módulos.
           </Typography>
           <TableContainer>
             <Table>

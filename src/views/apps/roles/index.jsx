@@ -1,13 +1,10 @@
 'use client'
 
-// MUI Imports
 import Grid from '@mui/material/Grid'
 import Typography from '@mui/material/Typography'
-
-// Component Imports
 import RoleCards from './RoleCards'
 
-const Roles = () => {
+const Roles = ({ workspaceId }) => {
   return (
     <Grid container spacing={6}>
       <Grid size={{ xs: 12 }}>
@@ -24,7 +21,7 @@ const Roles = () => {
         </Typography>
       </Grid>
       <Grid size={{ xs: 12 }}>
-        <RoleCards />
+        <RoleCards workspaceId={workspaceId} />
       </Grid>
     </Grid>
   )

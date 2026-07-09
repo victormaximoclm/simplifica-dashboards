@@ -41,6 +41,14 @@ export async function POST(req) {
 
   const { email, workspaceId, role, customRoleId } = parsed.data
 
+  if (customRoleId) {
+    const targetWorkspaceId = workspaceId || updateData.workspaceId || targetUser?.workspaceId
+    const roleCheck = await prisma.customRole.findUnique({ where: { id: customRoleId } })
+    if (!roleCheck || roleCheck.workspaceId !== targetWorkspaceId) {
+      return jsonWithRequestId({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400, requestId })
+    }
+  }
+
   // Validate role assignment permissions
   const assignedRole = role || 'user'
   const assignable = getAssignableRoles(session.user.role)

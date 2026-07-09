@@ -32,6 +32,14 @@ export async function PUT(req, { params }) {
   const body = await req.json()
   const { role, workspaceId, status, customRoleId } = body
 
+  if (customRoleId) {
+    const targetWorkspaceId = workspaceId || updateData.workspaceId || targetUser?.workspaceId
+    const roleCheck = await prisma.customRole.findUnique({ where: { id: customRoleId } })
+    if (!roleCheck || roleCheck.workspaceId !== targetWorkspaceId) {
+      return jsonWithRequestId({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400, requestId })
+    }
+  }
+
   const targetUser = await prisma.user.findUnique({
     where: { id },
     select: { role: true, status: true, name: true, email: true, workspaceId: true }
@@ -44,7 +52,10 @@ export async function PUT(req, { params }) {
   }
 
   if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
-    const response = NextResponse.json({ message: 'SubAdmin não pode modificar SuperAdmin ou SubAdmin' }, { status: 403 })
+    const response = NextResponse.json(
+      { message: 'SubAdmin não pode modificar SuperAdmin ou SubAdmin' },
+      { status: 403 }
+    )
     response.headers.set('x-request-id', requestId)
     return response
   }
@@ -65,7 +76,10 @@ export async function PUT(req, { params }) {
     const assignable = getAssignableRoles(session.user.role)
 
     if (!assignable.includes(role)) {
-      const response = NextResponse.json({ message: 'Você não tem permissão para atribuir este cargo' }, { status: 403 })
+      const response = NextResponse.json(
+        { message: 'Você não tem permissão para atribuir este cargo' },
+        { status: 403 }
+      )
       response.headers.set('x-request-id', requestId)
       return response
     }
@@ -242,7 +256,12 @@ export async function DELETE(req, { params }) {
     action: 'USER_DELETE',
     resource: 'user',
     resourceId: id,
-    before: { role: targetUser?.role, name: targetUser?.name, email: targetUser?.email, workspaceId: targetUser?.workspaceId },
+    before: {
+      role: targetUser?.role,
+      name: targetUser?.name,
+      email: targetUser?.email,
+      workspaceId: targetUser?.workspaceId
+    },
     metadata: { requestId },
     requestId
   })

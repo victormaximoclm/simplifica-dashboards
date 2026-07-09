@@ -21,6 +21,7 @@ model Workspace {
   errorEvents   ErrorEvent[]
   integrations  WorkspaceIntegration[]
   forms         Form[]
+  customRoles   CustomRole[]
 }
 
 model WorkspaceIntegration {
@@ -44,6 +45,10 @@ model CustomRole {
   dashboardVisibility DashboardVisibility[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
+  workspace           Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId         String
+
+  @@unique([workspaceId, name])
 }
 
 model Dashboard {

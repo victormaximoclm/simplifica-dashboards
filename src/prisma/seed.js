@@ -199,17 +199,13 @@ async function main() {
   const roleRecepcao = await prisma.customRole.upsert({
     where: { name: 'Recepção' },
     update: {},
-    create: {
-      name: 'Recepção'
-    }
+    create: { name: 'Recepção', workspaceId: wsPotiguar.id }
   })
 
   const roleFaturamento = await prisma.customRole.upsert({
     where: { name: 'Faturamento' },
     update: {},
-    create: {
-      name: 'Faturamento'
-    }
+    create: { name: 'Faturamento', workspaceId: wsUnimed.id }
   })
 
   // Vincular cargo ao usuário da clínica demo

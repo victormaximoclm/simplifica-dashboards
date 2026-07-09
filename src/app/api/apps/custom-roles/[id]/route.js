@@ -39,8 +39,8 @@ export async function PUT(req, { params }) {
   }
 
   // Check for duplicate name
-  const duplicate = await prisma.customRole.findUnique({
-    where: { name: name.trim() }
+  const duplicate = await prisma.customRole.findFirst({
+    where: { workspaceId: existing.workspaceId, name: name.trim() }
   })
 
   if (duplicate && duplicate.id !== id) {
@@ -58,7 +58,7 @@ export async function PUT(req, { params }) {
   logger.info('custom-role-update-success', { requestId, userId: session.user.id, customRoleId: role.id })
   await createAuditLog({
     userId: session.user.id,
-    tenantId: null,
+    tenantId: existing.workspaceId,
     action: 'CUSTOM_ROLE_UPDATE',
     resource: 'custom_role',
     resourceId: role.id,
@@ -106,7 +106,7 @@ export async function DELETE(req, { params }) {
   logger.info('custom-role-delete-success', { requestId, userId: session.user.id, customRoleId: id })
   await createAuditLog({
     userId: session.user.id,
-    tenantId: null,
+    tenantId: existing.workspaceId,
     action: 'CUSTOM_ROLE_DELETE',
     resource: 'custom_role',
     resourceId: id,

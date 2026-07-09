@@ -48,7 +48,8 @@ export const createDashboardSchema = v.object({
 
 // ── Custom Roles ────────────────────────────
 export const createCustomRoleSchema = v.object({
-  name: v.pipe(v.string(), v.minLength(1, 'Nome do cargo é obrigatório'))
+  name: v.pipe(v.string(), v.minLength(1, 'Nome do cargo é obrigatório')),
+  workspaceId: v.pipe(v.string(), v.minLength(1, 'Workspace é obrigatório'))
 })
 
 // ── Notifications ───────────────────────────
