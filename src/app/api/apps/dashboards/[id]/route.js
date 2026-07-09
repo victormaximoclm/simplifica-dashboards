@@ -124,10 +124,29 @@ export async function PUT(req, { params }) {
 
   // Update allowed roles if provided
   if (Array.isArray(allowedRoleIds)) {
-    updateData.allowedRoles = {
-      deleteMany: {},
-      create: allowedRoleIds.map(customRoleId => ({ customRoleId }))
+    const dashboardModule = await prisma.module.findUnique({ where: { key: 'dashboards' } })
+
+    // Remove permissões antigas deste dashboard
+    await prisma.rolePermission.deleteMany({
+      where: { moduleId: dashboardModule.id, resourceId: id, action: 'view' }
+    })
+
+    // Cria novas
+    if (allowedRoleIds.length > 0) {
+      await prisma.rolePermission.createMany({
+        data: allowedRoleIds.map(roleId => ({
+          id: 'rp_' + Math.random().toString(36).slice(2, 10),
+          customRoleId: roleId,
+          moduleId: dashboardModule.id,
+          action: 'view',
+          resourceId: id
+        })),
+        skipDuplicates: true
+      })
     }
+
+    // Remove allowedRoles do updateData (não usa mais DashboardVisibility)
+    delete updateData.allowedRoles
   }
 
   const dashboard = await prisma.dashboard.update({

@@ -62,20 +62,14 @@ const DashboardManage = ({ workspaces }) => {
   }
 
   const fetchCustomRoles = useCallback(async () => {
-    const res = await fetch('/api/apps/custom-roles')
-
-    if (res.ok) {
-      setCustomRoles(await res.json())
-    }
-  }, [])
+    if (!formData.workspaceId) return
+    const res = await fetch(`/api/apps/custom-roles?workspaceId=${formData.workspaceId}`)
+    if (res.ok) setCustomRoles(await res.json())
+  }, [formData.workspaceId])
 
   useEffect(() => {
-    fetchDashboards()
     fetchCustomRoles()
-  }, [fetchDashboards, fetchCustomRoles])
-
-  // Custom roles are global (not workspace-scoped)
-  const filteredRoles = customRoles
+  }, [fetchCustomRoles])
 
   const resetForm = () => {
     setFormData({ iframeCode: '', title: '', workspaceId: '', allowedRoleIds: [] })
@@ -90,14 +84,12 @@ const DashboardManage = ({ workspaces }) => {
 
   const handleOpenEdit = dashboard => {
     setEditingDashboard(dashboard)
-
     setFormData({
       iframeCode: '',
       title: dashboard.title,
       workspaceId: dashboard.workspaceId,
-      allowedRoleIds: (dashboard.allowedRoles || []).map(ar => ar.customRoleId)
+      allowedRoleIds: (dashboard.permissions || []).map(p => p.customRoleId) // ← mudou
     })
-
     setDialogOpen(true)
   }
 
@@ -197,19 +189,14 @@ const DashboardManage = ({ workspaces }) => {
                       <Typography fontWeight={500}>{db.title}</Typography>
                     </TableCell>
                     <TableCell>
-                      <Chip
-                        label={db.workspace?.name}
-                        size='small'
-                        color='primary'
-                        variant='filled'
-                      />
+                      <Chip label={db.workspace?.name} size='small' color='primary' variant='filled' />
                     </TableCell>
                     <TableCell>
                       <div className='flex flex-wrap gap-1'>
-                        {(db.allowedRoles || []).length === 0 ? (
+                        {(db.permissions || []).length === 0 ? (
                           <Chip label='Somente Admin' size='small' variant='tonal' color='warning' />
                         ) : (
-                          (db.allowedRoles || []).map(ar => (
+                          (db.permissions || []).map(ar => (
                             <Chip
                               key={ar.customRoleId}
                               label={ar.customRole?.name || ar.customRoleId}
@@ -318,7 +305,7 @@ const DashboardManage = ({ workspaces }) => {
                       : 'Selecione um workspace primeiro'}
                   </MenuItem>
                 ) : (
-                  filteredRoles.map(role => (
+                  customRoles.map(role => (
                     <MenuItem key={role.id} value={role.id}>
                       <Checkbox checked={formData.allowedRoleIds.includes(role.id)} />
                       <ListItemText primary={role.name} />

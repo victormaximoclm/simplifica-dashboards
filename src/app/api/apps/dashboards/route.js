@@ -71,26 +71,35 @@ export async function GET(req) {
     // Admin sees all dashboards in their workspace
     where.workspaceId = session.user.workspaceId
   } else {
-    // Regular user: sees dashboards in their workspace that have their customRoleId in allowedRoles
     where.workspaceId = session.user.workspaceId
 
-    // Get user's customRoleId
     const user = await prisma.user.findUnique({
       where: { id: session.user.id },
       select: { customRoleId: true }
     })
 
-    if (user?.customRoleId) {
-      where.allowedRoles = {
-        some: { customRoleId: user.customRoleId }
-      }
-    } else {
-      // User without custom role sees nothing
-      logger.debug('dashboards-list-empty-custom-role', { requestId, userId: session.user.id })
+    if (!user?.customRoleId) {
       const response = NextResponse.json([])
       response.headers.set('x-request-id', requestId)
       return response
     }
+
+    const dashboardModule = await prisma.module.findUnique({ where: { key: 'dashboards' } })
+
+    const permissions = await prisma.rolePermission.findMany({
+      where: { customRoleId: user.customRoleId, moduleId: dashboardModule.id, action: 'view' },
+      select: { resourceId: true }
+    })
+
+    const allowedDashboardIds = permissions.map(p => p.resourceId).filter(Boolean)
+
+    if (allowedDashboardIds.length === 0) {
+      const response = NextResponse.json([])
+      response.headers.set('x-request-id', requestId)
+      return response
+    }
+
+    where.id = { in: allowedDashboardIds }
   }
 
   const dashboards = await prisma.dashboard.findMany({
@@ -159,13 +168,24 @@ export async function POST(req) {
       title: sanitizeDashboardTitle(customTitle || iframeParsed.title),
       embedUrl: iframeParsed.embedUrl,
       iframeCode,
-      workspaceId,
-      allowedRoles: {
-        create: (allowedRoleIds || []).map(customRoleId => ({ customRoleId }))
-      }
+      workspaceId
     },
     include: dashboardIncludes
   })
+
+  if (allowedRoleIds?.length) {
+    const dashboardModule = await prisma.module.findUnique({ where: { key: 'dashboards' } })
+    await prisma.rolePermission.createMany({
+      data: allowedRoleIds.map(roleId => ({
+        id: 'rp_' + Math.random().toString(36).slice(2, 10),
+        customRoleId: roleId,
+        moduleId: dashboardModule.id,
+        action: 'view',
+        resourceId: dashboard.id
+      })),
+      skipDuplicates: true
+    })
+  }
 
   // Emit notification
   const creator = await prisma.user.findUnique({ where: { email: session.user.email }, select: { id: true } })
@@ -190,7 +210,11 @@ export async function POST(req) {
     action: 'DASHBOARD_CREATE',
     resource: 'dashboard',
     resourceId: dashboard.id,
-    after: { title: dashboard.title, workspaceId: dashboard.workspaceId, allowedRoleCount: dashboard.allowedRoles.length },
+    after: {
+      title: dashboard.title,
+      workspaceId: dashboard.workspaceId,
+      allowedRoleCount: dashboard.allowedRoles.length
+    },
     metadata: { requestId },
     requestId
   })

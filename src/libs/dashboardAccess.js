@@ -5,6 +5,10 @@ export const dashboardIncludes = {
   workspace: { select: { id: true, name: true } },
   allowedRoles: {
     include: { customRole: { select: { id: true, name: true } } }
+  },
+  permissions: {
+    where: { action: 'view' },
+    include: { customRole: { select: { id: true, name: true } } }
   }
 }
 
@@ -47,7 +51,20 @@ export async function getAuthorizedDashboard({ dashboardId, session }) {
     select: { customRoleId: true }
   })
 
-  const hasAccess = user?.customRoleId && dashboard.allowedRoles.some(ar => ar.customRoleId === user.customRoleId)
+  if (!user?.customRoleId) {
+    return { ok: false, status: 403, message: 'Acesso negado' }
+  }
+
+  const dashboardModule = await prisma.module.findUnique({ where: { key: 'dashboards' } })
+
+  const hasAccess = await prisma.rolePermission.findFirst({
+    where: {
+      customRoleId: user.customRoleId,
+      moduleId: dashboardModule.id,
+      action: 'view',
+      resourceId: dashboardId
+    }
+  })
 
   if (!hasAccess) {
     return { ok: false, status: 403, message: 'Acesso negado' }
