@@ -4,16 +4,11 @@ set -e
 PRISMA_CLI="node /app/prisma-cli/node_modules/prisma/build/index.js"
 
 echo "==> Running Prisma migrations..."
-$PRISMA_CLI db push --schema src/prisma/schema.prisma 2>&1 || {
-  echo "==> WARNING: prisma db push failed, retrying in 5s..."
-  sleep 5
-  $PRISMA_CLI db push --schema src/prisma/schema.prisma 2>&1
-}
+$PRISMA_CLI migrate deploy --schema src/prisma/schema.prisma
 
-# Run production seed (creates super admin if not exists)
 if [ "${SEED_ON_START:-false}" = "true" ]; then
-  echo "==> Running seed (production mode)..."
-  node src/prisma/seed.js --production 2>&1 || echo "==> Seed skipped or already applied"
+  echo "==> Running seed..."
+  node src/prisma/seed.js --production || echo "==> Seed skipped"
 fi
 
 echo "==> Starting application..."

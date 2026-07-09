@@ -1,9 +1,9 @@
 # Multi-stage: deps → build (standalone) → runner com Prisma CLI para db push no entrypoint.
-FROM node:20-alpine AS base
+FROM node:20-alpine3.21 AS base
 
 # ── Dependencies ─────────────────────────────
 FROM base AS deps
-RUN apk add --no-cache libc6-compat openssl
+RUN apk update && apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY package.json pnpm-lock.yaml ./
@@ -14,7 +14,7 @@ RUN pnpm install --frozen-lockfile --ignore-scripts
 
 # ── Builder ──────────────────────────────────
 FROM base AS builder
-RUN apk add --no-cache libc6-compat openssl
+RUN apk update && apk add --no-cache libc6-compat openssl
 WORKDIR /app
 
 COPY --from=deps /app/node_modules ./node_modules
@@ -43,7 +43,7 @@ RUN npm init -y && npm install prisma@6.19.0 && rm -f package.json package-lock.
 FROM base AS runner
 WORKDIR /app
 
-RUN apk add --no-cache openssl dos2unix
+RUN apk update && apk add --no-cache libc6-compat openssl dos2unix
 
 ENV NODE_ENV=production
 ENV NEXT_TELEMETRY_DISABLED=1
