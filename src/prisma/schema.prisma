@@ -45,8 +45,9 @@ model CustomRole {
   dashboardVisibility DashboardVisibility[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
-  workspace           Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
-  workspaceId         String
+  workspace           Workspace?             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspaceId         String?
+  permissions RolePermission[]
 
   @@unique([workspaceId, name])
 }
@@ -274,4 +275,26 @@ model FormPublicLink {
   expiresAt DateTime
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
+}
+
+model Module {
+  id          String           @id @default(cuid())
+  key         String           @unique  // ex: "dashboards", "forms"
+  name        String           // ex: "Dashboards", "Formulários"
+  createdAt   DateTime         @default(now())
+  permissions RolePermission[]
+}
+
+model RolePermission {
+  id           String     @id @default(cuid())
+  customRoleId String
+  customRole   CustomRole @relation(fields: [customRoleId], references: [id], onDelete: Cascade)
+  moduleId     String
+  module       Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
+  action       String     // "view" | "create" | "edit" | "delete"
+  resourceId   String?    // null = permissão no módulo inteiro; preenchido = recurso específico (dashboardId, formId)
+
+  createdAt DateTime @default(now())
+
+  @@unique([customRoleId, moduleId, action, resourceId])
 }
