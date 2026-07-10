@@ -102,7 +102,9 @@ export async function POST(req, { params }) {
 
       submitCtx = await getUserFormContext(session.user.id)
 
-      if (!canSubmitForm(session, form, submitCtx)) {
+      const canSubmit = await canSubmitForm(session, form, submitCtx)
+
+      if (!canSubmit) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
         response.headers.set('x-request-id', requestId)
         return response

@@ -43,7 +43,7 @@ const FormFillPage = async ({ params }) => {
     if (!canNonHighAdminAccessForm(role, form, ctx)) redirect(`/${lang}/forms`)
   }
 
-  const canManage = canGeneratePublicLinksInFill(role, form, ctx)
+  const canManage = await canGeneratePublicLinksInFill(role, form, ctx)
 
   return <FormFillView form={form} canManage={canManage} lang={lang} />
 }

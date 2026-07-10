@@ -23,8 +23,9 @@ export async function resolveFormWorkspaceId(session, formWorkspaceId = null) {
 }
 
 /** CustomRole é global no schema — lista todas as funções disponíveis */
-export async function listCustomRolesForForms() {
+export async function listCustomRolesForForms(workspaceId) {
   return prisma.customRole.findMany({
+    where: workspaceId ? { workspaceId } : undefined,
     select: { id: true, name: true },
     orderBy: { name: 'asc' }
   })

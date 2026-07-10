@@ -47,10 +47,22 @@ export async function GET(req, { params }) {
       }
 
       const ctx = role !== 'admin' ? await getUserFormContext(session.user.id) : {}
-      if (!canNonHighAdminAccessForm(role, form, ctx)) {
-        const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-        response.headers.set('x-request-id', requestId)
-        return response
+
+      if (role !== 'admin') {
+        const formsModule = await prisma.module.findUnique({ where: { key: 'forms' } })
+        if (!formsModule || !ctx.customRoleId) {
+          const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+          response.headers.set('x-request-id', requestId)
+          return response
+        }
+        const perm = await prisma.rolePermission.findFirst({
+          where: { customRoleId: ctx.customRoleId, moduleId: formsModule.id, action: 'view', resourceId: id }
+        })
+        if (!perm) {
+          const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+          response.headers.set('x-request-id', requestId)
+          return response
+        }
       }
     }
 
@@ -120,6 +132,28 @@ export async function PUT(req, { params }) {
       }
     })
 
+    // Sincroniza RolePermission
+    if (Array.isArray(allowedRoles)) {
+      const formsModule = await prisma.module.findUnique({ where: { key: 'forms' } })
+      if (formsModule) {
+        await prisma.rolePermission.deleteMany({
+          where: { moduleId: formsModule.id, resourceId: id, action: 'view' }
+        })
+        if (allowedRoles.length > 0) {
+          await prisma.rolePermission.createMany({
+            data: allowedRoles.map(roleId => ({
+              id: 'rp_' + Math.random().toString(36).slice(2, 10),
+              customRoleId: roleId,
+              moduleId: formsModule.id,
+              action: 'view',
+              resourceId: id
+            })),
+            skipDuplicates: true
+          })
+        }
+      }
+    }
+
     await createAuditLog({
       userId: session.user.id,
       tenantId: form.workspaceId,
@@ -169,6 +203,10 @@ export async function DELETE(req, { params }) {
       response.headers.set('x-request-id', requestId)
       return response
     }
+
+    await prisma.rolePermission.deleteMany({
+      where: { resourceId: id }
+    })
 
     await prisma.form.delete({ where: { id } })
 

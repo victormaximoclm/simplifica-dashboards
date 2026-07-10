@@ -38,11 +38,9 @@ const FormEditPage = async ({ params }) => {
     redirect(`/${lang}/forms`)
   }
 
-  const customRoles = await listCustomRolesForForms()
+  const customRoles = await listCustomRolesForForms(workspaceId)
 
-  return (
-    <FormBuilder form={form} workspaceId={workspaceId} customRoles={customRoles} lang={lang} />
-  )
+  return <FormBuilder form={form} workspaceId={workspaceId} customRoles={customRoles} lang={lang} />
 }
 
 export default FormEditPage

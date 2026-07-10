@@ -86,7 +86,7 @@ const RoleCards = ({ workspaceId }) => {
     if (res.ok) {
       setDialogOpen(false)
       setSuccess(editingRole ? 'Cargo atualizado!' : 'Cargo criado!')
-      fetchRoles()
+      await fetchRoles()
       setTimeout(() => setSuccess(''), 3000)
     } else {
       const data = await res.json()

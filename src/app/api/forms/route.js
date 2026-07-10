@@ -41,7 +41,7 @@ export async function GET(req) {
       workspaceId = ctx.workspaceId
     }
 
-    where = buildFormListWhereForRole(role, workspaceId, ctx)
+    where = await buildFormListWhereForRole(role, workspaceId, ctx)
 
     let forms = await prisma.form.findMany({
       where,
@@ -62,7 +62,7 @@ export async function GET(req) {
       }
     })
 
-    forms = filterFormsForRole(forms, role, ctx)
+    forms = await filterFormsForRole(forms, role, ctx)
 
     const response = NextResponse.json(forms)
     response.headers.set('x-request-id', requestId)
@@ -141,6 +141,22 @@ export async function POST(req) {
         refreshOnSubmit: refreshOnSubmit
       }
     })
+
+    if (allowedRoles?.length) {
+      const formsModule = await prisma.module.findUnique({ where: { key: 'forms' } })
+      if (formsModule) {
+        await prisma.rolePermission.createMany({
+          data: allowedRoles.map(roleId => ({
+            id: 'rp_' + Math.random().toString(36).slice(2, 10),
+            customRoleId: roleId,
+            moduleId: formsModule.id,
+            action: 'view',
+            resourceId: form.id
+          })),
+          skipDuplicates: true
+        })
+      }
+    }
 
     await createNotification({
       type: 'form_created',

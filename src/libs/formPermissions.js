@@ -17,11 +17,11 @@ export function canFillAllFormsInWorkspace(role, form) {
 }
 
 /** Apenas admin do workspace e highAdmin podem gerar novos links públicos */
-export function canGeneratePublicLinks(role) {
+export async function canGeneratePublicLinks(role) {
   return isHighAdmin(role) || role === 'admin'
 }
 
-export function canGeneratePublicLinksInFill(role, form, ctx = {}) {
+export async function canGeneratePublicLinksInFill(role, form, ctx = {}) {
   if (isHighAdmin(role)) return true
   if (!form) return false
   if (isFormHighAdminOnly(form)) return false
