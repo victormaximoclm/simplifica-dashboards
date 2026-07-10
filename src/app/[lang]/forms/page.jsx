@@ -7,12 +7,7 @@ import { authOptions } from '@/libs/auth'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import FormsListView from '@/views/forms/FormsListView'
-import {
-  buildFormListWhereForRole,
-  filterFormsForRole,
-  getUserFormContext,
-  userHasFormViewerAccess
-} from '@/libs/formAccess'
+import { buildFormListWhereForRole, getUserFormContext, userHasFormViewerAccess } from '@/libs/formAccess'
 import { resolveFormWorkspaceId } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
 import { formIconMutedCls, formMutedCls, formTitleCls } from '@/views/forms/formStyles'
@@ -66,8 +61,6 @@ const FormsPage = async ({ params }) => {
     }
   })
 
-  forms = filterFormsForRole(forms, userRole, ctx)
-
   return <FormsListView forms={forms} canManage={canManageForms(userRole)} lang={lang} />
 }
 
@@ -83,9 +76,7 @@ const EmptyState = ({ canManage, reason = 'default' }) => (
     <i className={`tabler-forms text-6xl ${formIconMutedCls}`} />
     <h4 className={`text-xl font-medium ${formTitleCls}`}>Nenhum formulário disponível</h4>
     <p className={`${formMutedCls} text-center max-w-md`}>
-      {canManage
-        ? 'Nenhum formulário criado neste workspace.'
-        : EMPTY_MESSAGES[reason] ?? EMPTY_MESSAGES.default}
+      {canManage ? 'Nenhum formulário criado neste workspace.' : (EMPTY_MESSAGES[reason] ?? EMPTY_MESSAGES.default)}
     </p>
   </main>
 )

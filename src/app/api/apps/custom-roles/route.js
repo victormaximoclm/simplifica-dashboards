@@ -39,8 +39,7 @@ export async function GET(req) {
     })
     return { ...role, moduleCounts }
   })
-  console.log(JSON.stringify(rolesWithCounts[0]))
-  return jsonWithRequestId(roles, { requestId })
+  return jsonWithRequestId(rolesWithCounts, { requestId })
 }
 
 // POST /api/apps/custom-roles - Create custom role (superAdmin only)

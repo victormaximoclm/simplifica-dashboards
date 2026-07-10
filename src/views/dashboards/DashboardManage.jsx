@@ -68,6 +68,10 @@ const DashboardManage = ({ workspaces }) => {
   }, [formData.workspaceId])
 
   useEffect(() => {
+    fetchDashboards()
+  }, [fetchDashboards])
+
+  useEffect(() => {
     fetchCustomRoles()
   }, [fetchCustomRoles])
 

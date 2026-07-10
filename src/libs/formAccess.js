@@ -51,9 +51,9 @@ export async function canAccessForm(form, ctx) {
   return !!perm
 }
 
-export async function filterFormsForRole(forms, role, ctx = {}) {
+/*export async function filterFormsForRole(forms, role, ctx = {}) {
   if (isHighAdmin(role)) return forms
-  if (role === 'admin') return forms.filter(form => !isFormHighAdminOnly(form))
+  if (role === 'admin') return forms
   if (!ctx?.customRoleId) return []
 
   const { prisma } = await import('@/libs/prisma')
@@ -67,7 +67,7 @@ export async function filterFormsForRole(forms, role, ctx = {}) {
 
   const allowed = new Set(perms.map(p => p.resourceId))
   return forms.filter(f => allowed.has(f.id))
-}
+}*/
 
 export async function buildFormListWhereForRole(role, workspaceId, ctx = {}) {
   if (isHighAdmin(role)) {
