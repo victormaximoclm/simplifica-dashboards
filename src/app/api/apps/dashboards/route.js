@@ -108,8 +108,34 @@ export async function GET(req) {
     orderBy: { createdAt: 'desc' }
   })
 
+  const dashboardModule = await prisma.module.findUnique({ where: { key: 'dashboards' } })
+  const dashboardIds = dashboards.map(d => d.id)
+
+  const permissions = dashboardModule
+    ? await prisma.rolePermission.findMany({
+        where: {
+          moduleId: dashboardModule.id,
+          action: 'view',
+          resourceId: { in: dashboardIds }
+        },
+        include: { customRole: { select: { id: true, name: true } } }
+      })
+    : []
+
+  // Agrupa por dashboardId
+  const permsByDashboard = {}
+  permissions.forEach(p => {
+    if (!permsByDashboard[p.resourceId]) permsByDashboard[p.resourceId] = []
+    permsByDashboard[p.resourceId].push(p)
+  })
+
+  const result = dashboards.map(d => ({
+    ...d,
+    permissions: permsByDashboard[d.id] ?? []
+  }))
+
   logger.debug('dashboards-list-success', { requestId, userId: session.user.id, count: dashboards.length })
-  const response = NextResponse.json(dashboards.map(stripDashboardSensitiveFields))
+  const response = NextResponse.json(result.map(stripDashboardSensitiveFields))
   response.headers.set('x-request-id', requestId)
   return response
 }

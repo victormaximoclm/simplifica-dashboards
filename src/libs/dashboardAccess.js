@@ -5,10 +5,6 @@ export const dashboardIncludes = {
   workspace: { select: { id: true, name: true } },
   allowedRoles: {
     include: { customRole: { select: { id: true, name: true } } }
-  },
-  permissions: {
-    where: { action: 'view' },
-    include: { customRole: { select: { id: true, name: true } } }
   }
 }
 
