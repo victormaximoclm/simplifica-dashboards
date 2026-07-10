@@ -71,7 +71,7 @@ export async function canAccessForm(form, ctx) {
 
 export async function buildFormListWhereForRole(role, workspaceId, ctx = {}) {
   if (isHighAdmin(role)) {
-    return workspaceId ? { workspaceId } : {}
+    return workspaceId ? { workspaceId } : { id: 'none' }
   }
 
   if (role === 'admin') {

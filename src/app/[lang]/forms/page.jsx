@@ -44,7 +44,7 @@ const FormsPage = async ({ params }) => {
     }
   }
 
-  const where = buildFormListWhereForRole(userRole, workspaceId, ctx)
+  const where = await buildFormListWhereForRole(userRole, workspaceId, ctx)
 
   let forms = await prisma.form.findMany({
     where,
