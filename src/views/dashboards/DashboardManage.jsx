@@ -298,7 +298,7 @@ const DashboardManage = ({ workspaces }) => {
                   </div>
                 )}
               >
-                {filteredRoles.length === 0 ? (
+                {customRoles.length === 0 ? (
                   <MenuItem disabled>
                     {formData.workspaceId
                       ? 'Nenhum cargo neste workspace. Crie cargos primeiro.'
