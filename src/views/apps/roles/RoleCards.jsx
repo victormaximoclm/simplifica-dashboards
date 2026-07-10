@@ -205,6 +205,7 @@ const RoleCards = ({ workspaceId }) => {
                   <TableCell>Nome</TableCell>
                   <TableCell align='center'>Usuários</TableCell>
                   <TableCell align='center'>Dashboards</TableCell>
+                  <TableCell align='center'>Formulários</TableCell>
                   <TableCell align='right'>Ações</TableCell>
                 </TableRow>
               </TableHead>
@@ -227,7 +228,10 @@ const RoleCards = ({ workspaceId }) => {
                         <Chip label={role._count?.users || 0} size='small' variant='tonal' color='primary' />
                       </TableCell>
                       <TableCell align='center'>
-                        <Chip label={role._count?.dashboardVisibility || 0} size='small' variant='tonal' color='info' />
+                        <Chip label={role.moduleCounts?.dashboards || 0} size='small' variant='tonal' color='info' />
+                      </TableCell>
+                      <TableCell align='center'>
+                        <Chip label={role.moduleCounts?.forms || 0} size='small' variant='tonal' color='secondary' />
                       </TableCell>
                       <TableCell align='right'>
                         <IconButton size='small' onClick={() => handleOpenEdit(role)}>

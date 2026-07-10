@@ -22,8 +22,22 @@ export async function GET(req) {
 
   const roles = await prisma.customRole.findMany({
     where: { workspaceId },
-    include: { _count: { select: { users: true, dashboardVisibility: true } } },
-    orderBy: { name: 'asc' }
+    orderBy: { name: 'asc' },
+    include: {
+      _count: { select: { users: true } },
+      permissions: {
+        include: { module: { select: { key: true } } }
+      }
+    }
+  })
+
+  const rolesWithCounts = roles.map(role => {
+    const moduleCounts = {}
+    role.permissions.forEach(p => {
+      const key = p.module.key
+      moduleCounts[key] = (moduleCounts[key] || 0) + 1
+    })
+    return { ...role, moduleCounts }
   })
 
   return jsonWithRequestId(roles, { requestId })
