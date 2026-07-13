@@ -45,9 +45,9 @@ model CustomRole {
   dashboardVisibility DashboardVisibility[]
   createdAt           DateTime              @default(now())
   updatedAt           DateTime              @updatedAt
-  workspace           Workspace?             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  workspace           Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workspaceId         String?
-  permissions RolePermission[]
+  permissions         RolePermission[]
 
   @@unique([workspaceId, name])
 }
@@ -128,9 +128,10 @@ model User {
   auditLogs              AuditLog[]
   errorEvents            ErrorEvent[]
   userIntegrations       UserIntegration[]
-  termsAccepted     Boolean   @default(false)
-  termsAcceptedAt   DateTime?
-  termsVersion      String?   @default("1.0")
+  termsAccepted          Boolean               @default(false)
+  termsAcceptedAt        DateTime?
+  termsVersion           String?               @default("1.0")
+  adminPermissions       AdminPermission[]
 }
 
 model UserIntegration {
@@ -258,13 +259,13 @@ model Form {
   fields          Json
   webhookUrl      String
   allowPublicLink Boolean          @default(false)
-  allowedCargos   String[]         // cargos ClickUp (integração)
-  allowedRoles    String[]         // customRole quando sem integração
+  allowedCargos   String[] // cargos ClickUp (integração)
+  allowedRoles    String[] // customRole quando sem integração
   createdAt       DateTime         @default(now())
   updatedAt       DateTime         @updatedAt
   publicLinks     FormPublicLink[]
-  pagination Json @default("{\"enabled\": false, \"perPage\": 10}")
-  refreshOnSubmit Boolean @default(false)
+  pagination      Json             @default("{\"enabled\": false, \"perPage\": 10}")
+  refreshOnSubmit Boolean          @default(false)
 }
 
 model FormPublicLink {
@@ -279,8 +280,8 @@ model FormPublicLink {
 
 model Module {
   id          String           @id @default(cuid())
-  key         String           @unique  // ex: "dashboards", "forms"
-  name        String           // ex: "Dashboards", "Formulários"
+  key         String           @unique // ex: "dashboards", "forms"
+  name        String // ex: "Dashboards", "Formulários"
   createdAt   DateTime         @default(now())
   permissions RolePermission[]
 }
@@ -291,10 +292,25 @@ model RolePermission {
   customRole   CustomRole @relation(fields: [customRoleId], references: [id], onDelete: Cascade)
   moduleId     String
   module       Module     @relation(fields: [moduleId], references: [id], onDelete: Cascade)
-  action       String     // "view" | "create" | "edit" | "delete"
-  resourceId   String?    // null = permissão no módulo inteiro; preenchido = recurso específico (dashboardId, formId)
+  action       String // "view" | "create" | "edit" | "delete"
+  resourceId   String? // null = permissão no módulo inteiro; preenchido = recurso específico (dashboardId, formId)
 
   createdAt DateTime @default(now())
 
   @@unique([customRoleId, moduleId, action, resourceId])
+}
+
+model AdminPermission {
+  id String @id @default(cuid())
+
+  userId String
+  user   User   @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  moduleKey String // "users", "dashboards", "forms", "files"
+  action    String // "share", "edit", "delete", "invite", "create"
+
+  createdAt DateTime @default(now())
+
+  @@unique([userId, moduleKey, action])
+  @@index([userId])
 }

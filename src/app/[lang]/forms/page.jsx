@@ -56,6 +56,7 @@ const FormsPage = async ({ params }) => {
       allowPublicLink: true,
       allowedCargos: true,
       allowedRoles: true,
+      workspaceId: true,
       createdAt: true,
       _count: { select: { publicLinks: true } }
     }

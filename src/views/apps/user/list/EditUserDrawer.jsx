@@ -4,6 +4,7 @@
 import { useEffect, useState } from 'react'
 
 // MUI Imports
+import Snackbar from '@mui/material/Snackbar'
 import Button from '@mui/material/Button'
 import Drawer from '@mui/material/Drawer'
 import IconButton from '@mui/material/IconButton'
@@ -15,6 +16,7 @@ import InputAdornment from '@mui/material/InputAdornment'
 
 // Component Imports
 import CustomTextField from '@core/components/mui/TextField'
+import AdminPermissionDrawer from './AdminPermissionDrawer'
 
 const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, callerEmail, onSave }) => {
   const [role, setRole] = useState('')
@@ -28,6 +30,12 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, calle
   const [passwordMsg, setPasswordMsg] = useState(null)
   const [passwordErr, setPasswordErr] = useState(null)
   const [passwordLoading, setPasswordLoading] = useState(false)
+  const [permissionDrawerOpen, setPermissionDrawerOpen] = useState(false)
+  const [snackbar, setSnackbar] = useState({
+    open: false,
+    severity: 'success',
+    message: ''
+  })
 
   useEffect(() => {
     if (user) {
@@ -129,123 +137,185 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, calle
   }
 
   return (
-    <Drawer
-      open={open}
-      anchor='right'
-      variant='temporary'
-      onClose={handleClose}
-      ModalProps={{ keepMounted: true }}
-      sx={{ '& .MuiDrawer-paper': { width: { xs: 300, sm: 400 } } }}
-    >
-      <div className='flex items-center justify-between plb-5 pli-6'>
-        <Typography variant='h5'>Editar Usuário</Typography>
-        <IconButton size='small' onClick={handleClose}>
-          <i className='tabler-x text-2xl text-textPrimary' />
-        </IconButton>
-      </div>
-      <Divider />
-      <form onSubmit={handleSubmit} className='flex flex-col gap-6 p-6'>
-        <CustomTextField fullWidth label='Nome' value={user.name || ''} disabled />
-        <CustomTextField fullWidth label='Email' value={user.email || ''} disabled />
-        <CustomTextField
-          select
-          fullWidth
-          label='Cargo do Sistema'
-          value={role}
-          onChange={e => setRole(e.target.value)}
-          disabled={!canChangeRole}
-        >
-          {callerRole === 'superAdmin' && <MenuItem value='subAdmin'>Sub Admin</MenuItem>}
-          <MenuItem value='admin'>Admin</MenuItem>
-          <MenuItem value='user'>Usuário</MenuItem>
-        </CustomTextField>
-        {role === 'user' && (
+    <>
+      <Drawer
+        open={open}
+        anchor='right'
+        variant='temporary'
+        onClose={handleClose}
+        ModalProps={{ keepMounted: true }}
+        sx={{ '& .MuiDrawer-paper': { width: { xs: 300, sm: 400 } } }}
+      >
+        <div className='flex items-center justify-between plb-5 pli-6'>
+          <Typography variant='h5'>Editar Usuário</Typography>
+          <IconButton size='small' onClick={handleClose}>
+            <i className='tabler-x text-2xl text-textPrimary' />
+          </IconButton>
+        </div>
+        <Divider />
+        <form onSubmit={handleSubmit} className='flex flex-col gap-6 p-6'>
+          <CustomTextField fullWidth label='Nome' value={user.name || ''} disabled />
+          <CustomTextField fullWidth label='Email' value={user.email || ''} disabled />
           <CustomTextField
             select
             fullWidth
-            label='Cargo Personalizado'
-            value={customRoleId}
-            onChange={e => setCustomRoleId(e.target.value)}
-            helperText='Define quais dashboards o usuário poderá ver'
+            label='Cargo do Sistema'
+            value={role}
+            onChange={e => setRole(e.target.value)}
+            disabled={!canChangeRole}
           >
-            <MenuItem value=''>Nenhum</MenuItem>
-            {customRoles.map(cr => (
-              <MenuItem key={cr.id} value={cr.id}>
-                {cr.name}
+            {callerRole === 'superAdmin' && <MenuItem value='subAdmin'>Sub Admin</MenuItem>}
+            <MenuItem value='admin'>Admin</MenuItem>
+            <MenuItem value='user'>Usuário</MenuItem>
+          </CustomTextField>
+          {role === 'admin' && (
+            <>
+              <Divider />
+              <Typography variant='subtitle2'>Permissões de Compartilhamento</Typography>
+
+              <Button variant='tonal' onClick={() => setPermissionDrawerOpen(true)}>
+                Gerenciar Permissões
+              </Button>
+            </>
+          )}
+
+          {role === 'user' && (
+            <CustomTextField
+              select
+              fullWidth
+              label='Cargo Personalizado'
+              value={customRoleId}
+              onChange={e => setCustomRoleId(e.target.value)}
+              helperText='Define quais dashboards o usuário poderá ver'
+            >
+              <MenuItem value=''>Nenhum</MenuItem>
+              {customRoles.map(cr => (
+                <MenuItem key={cr.id} value={cr.id}>
+                  {cr.name}
+                </MenuItem>
+              ))}
+            </CustomTextField>
+          )}
+          <CustomTextField
+            select
+            fullWidth
+            label='Empresa'
+            value={workspaceId}
+            onChange={e => setWorkspaceId(e.target.value)}
+          >
+            <MenuItem value=''>Sem empresa</MenuItem>
+            {workspaces.map(ws => (
+              <MenuItem key={ws.id} value={ws.id}>
+                {ws.name}
               </MenuItem>
             ))}
           </CustomTextField>
-        )}
-        <CustomTextField
-          select
-          fullWidth
-          label='Empresa'
-          value={workspaceId}
-          onChange={e => setWorkspaceId(e.target.value)}
-        >
-          <MenuItem value=''>Sem empresa</MenuItem>
-          {workspaces.map(ws => (
-            <MenuItem key={ws.id} value={ws.id}>
-              {ws.name}
-            </MenuItem>
-          ))}
-        </CustomTextField>
-        <CustomTextField
-          select
-          fullWidth
-          label='Status'
-          value={status}
-          onChange={e => setStatus(e.target.value)}
-          disabled={user.status === 'pending'}
-          helperText={user.status === 'pending' ? 'Usuários pendentes não podem ter o status alterado' : ''}
-        >
-          <MenuItem value='active'>Ativo</MenuItem>
-          <MenuItem value='inactive'>Inativo</MenuItem>
-          {user.status === 'pending' && <MenuItem value='pending'>Pendente</MenuItem>}
-        </CustomTextField>
-        {canResetPassword && (
-          <>
-            <Divider />
-            <Typography variant='subtitle2'>Redefinir Senha</Typography>
-            {passwordErr && <Alert severity='error'>{passwordErr}</Alert>}
-            {passwordMsg && <Alert severity='success'>{passwordMsg}</Alert>}
-            <CustomTextField
-              fullWidth
-              type={showPassword ? 'text' : 'password'}
-              label='Nova Senha'
-              placeholder='Mínimo 6 caracteres'
-              value={newPassword}
-              onChange={e => setNewPassword(e.target.value)}
-              InputProps={{
-                endAdornment: (
-                  <InputAdornment position='end'>
-                    <IconButton onClick={() => setShowPassword(!showPassword)} edge='end'>
-                      <i className={showPassword ? 'tabler-eye-off' : 'tabler-eye'} />
-                    </IconButton>
-                  </InputAdornment>
-                )
-              }}
-            />
-            <Button
-              variant='tonal'
-              color='warning'
-              onClick={handleResetPassword}
-              disabled={passwordLoading || !newPassword}
-            >
-              {passwordLoading ? 'Alterando...' : 'Alterar Senha'}
+          <CustomTextField
+            select
+            fullWidth
+            label='Status'
+            value={status}
+            onChange={e => setStatus(e.target.value)}
+            disabled={user.status === 'pending'}
+            helperText={user.status === 'pending' ? 'Usuários pendentes não podem ter o status alterado' : ''}
+          >
+            <MenuItem value='active'>Ativo</MenuItem>
+            <MenuItem value='inactive'>Inativo</MenuItem>
+            {user.status === 'pending' && <MenuItem value='pending'>Pendente</MenuItem>}
+          </CustomTextField>
+          {canResetPassword && (
+            <>
+              <Divider />
+              <Typography variant='subtitle2'>Redefinir Senha</Typography>
+              {passwordErr && <Alert severity='error'>{passwordErr}</Alert>}
+              {passwordMsg && <Alert severity='success'>{passwordMsg}</Alert>}
+              <CustomTextField
+                fullWidth
+                type={showPassword ? 'text' : 'password'}
+                label='Nova Senha'
+                placeholder='Mínimo 6 caracteres'
+                value={newPassword}
+                onChange={e => setNewPassword(e.target.value)}
+                InputProps={{
+                  endAdornment: (
+                    <InputAdornment position='end'>
+                      <IconButton onClick={() => setShowPassword(!showPassword)} edge='end'>
+                        <i className={showPassword ? 'tabler-eye-off' : 'tabler-eye'} />
+                      </IconButton>
+                    </InputAdornment>
+                  )
+                }}
+              />
+              <Button
+                variant='tonal'
+                color='warning'
+                onClick={handleResetPassword}
+                disabled={passwordLoading || !newPassword}
+              >
+                {passwordLoading ? 'Alterando...' : 'Alterar Senha'}
+              </Button>
+            </>
+          )}
+          <div className='flex items-center gap-4'>
+            <Button variant='contained' type='submit' disabled={loading}>
+              {loading ? 'Salvando...' : 'Salvar'}
             </Button>
-          </>
-        )}
-        <div className='flex items-center gap-4'>
-          <Button variant='contained' type='submit' disabled={loading}>
-            {loading ? 'Salvando...' : 'Salvar'}
-          </Button>
-          <Button variant='tonal' color='error' type='reset' onClick={handleClose}>
-            Cancelar
-          </Button>
-        </div>
-      </form>
-    </Drawer>
+            <Button variant='tonal' color='error' type='reset' onClick={handleClose}>
+              Cancelar
+            </Button>
+          </div>
+        </form>
+      </Drawer>
+      <AdminPermissionDrawer
+        open={permissionDrawerOpen}
+        handleClose={() => setPermissionDrawerOpen(false)}
+        user={user}
+        onSave={result => {
+          if (result.error) {
+            setSnackbar({
+              open: true,
+              severity: 'error',
+              message: result.message
+            })
+
+            return
+          }
+
+          setSnackbar({
+            open: true,
+            severity: 'success',
+            message: 'Permissões atualizadas com sucesso!'
+          })
+        }}
+      />
+      <Snackbar
+        open={snackbar.open}
+        autoHideDuration={4000}
+        onClose={() =>
+          setSnackbar(prev => ({
+            ...prev,
+            open: false
+          }))
+        }
+        anchorOrigin={{
+          vertical: 'bottom',
+          horizontal: 'right'
+        }}
+      >
+        <Alert
+          severity={snackbar.severity}
+          variant='filled'
+          onClose={() =>
+            setSnackbar(prev => ({
+              ...prev,
+              open: false
+            }))
+          }
+        >
+          {snackbar.message}
+        </Alert>
+      </Snackbar>
+    </>
   )
 }
 

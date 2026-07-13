@@ -9,6 +9,7 @@ import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
+import ShareFormDialog from './builder/ShareFormDialog'
 
 import {
   btnPrimary,
@@ -27,13 +28,15 @@ import {
   formTitleCls
 } from './formStyles'
 
-const FormsListView = ({ forms: initialForms, canManage, lang }) => {
+const FormsListView = ({ forms: initialForms, canManage, canShare, lang }) => {
   const router = useRouter()
   const [forms, setForms] = useState(initialForms ?? [])
   const [deleteDialog, setDeleteDialog] = useState(false)
   const [formToDelete, setFormToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
   const [deleteError, setDeleteError] = useState(null)
+  const [shareDialog, setShareDialog] = useState(false)
+  const [formToShare, setFormToShare] = useState(null)
 
   useEffect(() => {
     setForms(initialForms ?? [])
@@ -126,9 +129,14 @@ const FormsListView = ({ forms: initialForms, canManage, lang }) => {
               key={form.id}
               form={form}
               canManage={canManage}
+              canShare={canShare}
               onFill={() => goFill(form.id)}
               onEdit={() => goEdit(form.id)}
               onLinks={() => goLinks(form.id)}
+              onShare={() => {
+                setFormToShare(form)
+                setShareDialog(true)
+              }}
               onDelete={e => handleOpenDelete(e, form)}
             />
           ))}
@@ -156,11 +164,20 @@ const FormsListView = ({ forms: initialForms, canManage, lang }) => {
           </Button>
         </DialogActions>
       </Dialog>
+
+      <ShareFormDialog
+        open={shareDialog}
+        form={formToShare}
+        onClose={() => {
+          setShareDialog(false)
+          setFormToShare(null)
+        }}
+      />
     </>
   )
 }
 
-const FormCard = ({ form, canManage, onFill, onEdit, onLinks, onDelete }) => {
+const FormCard = ({ form, canManage, onFill, onEdit, onLinks, onDelete, onShare, canShare }) => {
   const createdAt = new Date(form.createdAt).toLocaleDateString('pt-BR', {
     day: '2-digit',
     month: 'short',
@@ -221,6 +238,11 @@ const FormCard = ({ form, canManage, onFill, onEdit, onLinks, onDelete }) => {
         {form.allowPublicLink && (
           <button type='button' onClick={onLinks} className={btnSecondary}>
             Link
+          </button>
+        )}
+        {(canShare || canManage) && (
+          <button type='button' onClick={onShare} className={btnSecondary}>
+            Compartilhar
           </button>
         )}
       </div>
