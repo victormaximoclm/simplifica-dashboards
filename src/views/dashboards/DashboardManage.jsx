@@ -29,6 +29,7 @@ import Select from '@mui/material/Select'
 import OutlinedInput from '@mui/material/OutlinedInput'
 import Checkbox from '@mui/material/Checkbox'
 import ListItemText from '@mui/material/ListItemText'
+import { useSession } from 'next-auth/react'
 
 const DashboardManage = ({ workspaces }) => {
   const [dashboards, setDashboards] = useState([])
@@ -39,6 +40,11 @@ const DashboardManage = ({ workspaces }) => {
   const [deletingId, setDeletingId] = useState(null)
   const [error, setError] = useState('')
   const [success, setSuccess] = useState('')
+  const { data: session } = useSession()
+  const isSuperAdmin = session?.user?.role === 'superAdmin'
+  const isSubAdmin = session?.user?.role === 'subAdmin'
+  const isHighAdmin = isSuperAdmin || isSubAdmin
+  const isAdmin = session?.user?.role === 'admin'
 
   const [formData, setFormData] = useState({
     iframeCode: '',
@@ -250,6 +256,7 @@ const DashboardManage = ({ workspaces }) => {
               value={formData.title}
               onChange={e => setFormData(prev => ({ ...prev, title: e.target.value }))}
               fullWidth
+              disabled={!isHighAdmin}
             />
             <TextField
               label='Código iframe do Power BI'
@@ -260,6 +267,7 @@ const DashboardManage = ({ workspaces }) => {
               rows={4}
               fullWidth
               helperText='Cole o código iframe gerado pelo Power BI'
+              disabled={!isHighAdmin}
             />
             {editingDashboard && (
               <Alert severity='info' variant='outlined'>
@@ -278,6 +286,7 @@ const DashboardManage = ({ workspaces }) => {
                 }))
               }
               fullWidth
+              disabled={!isHighAdmin}
             >
               {workspaces.map(ws => (
                 <MenuItem key={ws.id} value={ws.id}>
@@ -347,7 +356,7 @@ const DashboardManage = ({ workspaces }) => {
         </DialogContent>
         <DialogActions>
           <Button onClick={() => setDeleteDialogOpen(false)}>Cancelar</Button>
-          <Button variant='contained' color='error' onClick={handleDelete}>
+          <Button variant='contained' color='error' onClick={handleDelete} disabled={!isHighAdmin}>
             Excluir
           </Button>
         </DialogActions>

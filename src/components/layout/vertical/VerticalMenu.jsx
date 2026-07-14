@@ -27,6 +27,8 @@ import StyledVerticalNavExpandIcon from '@menu/styles/vertical/StyledVerticalNav
 // Style Imports
 import menuItemStyles from '@core/styles/vertical/menuItemStyles'
 import menuSectionStyles from '@core/styles/vertical/menuSectionStyles'
+import { canShareForms } from '@/libs/formPermissions'
+import { canShareDash } from '@/libs/dashboardAccess'
 
 const RenderExpandIcon = ({ open, transitionDuration }) => (
   <StyledVerticalNavExpandIcon open={open} transitionDuration={transitionDuration}>
@@ -170,7 +172,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
             </MenuItem>
           ))}
           {dashboards.length === 0 && <MenuItem disabled>Nenhum dashboard disponível</MenuItem>}
-          {isHighAdmin && (
+          {(isHighAdmin || canShareDash(session.user.adminPermissions)) && (
             <MenuItem href={`/${locale}/dashboards/manage`} icon={<i className='tabler-settings' />}>
               {dictionary['navigation'].manageDashboards}
             </MenuItem>
@@ -188,7 +190,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
               </MenuItem>
             ))}
             {forms.length === 0 && <MenuItem disabled>Nenhum formulário disponível</MenuItem>}
-            {(isHighAdmin || isAdmin) && (
+            {(isHighAdmin || canShareForms(session.user.adminPermissions)) && (
               <MenuItem href={`/${locale}/forms`} icon={<i className='tabler-settings' />}>
                 {dictionary['navigation'].manageForms || 'Gerenciar Formulários'}
               </MenuItem>

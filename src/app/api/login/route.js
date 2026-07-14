@@ -45,7 +45,8 @@ export async function POST(req) {
       role: true,
       password: true,
       status: true,
-      workspaceId: true
+      workspaceId: true,
+      adminPermissions: true
     }
   })
 

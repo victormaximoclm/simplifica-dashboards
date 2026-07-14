@@ -44,7 +44,8 @@ const providers = [
             name: safeUser?.name ?? null,
             email: safeUser?.email ?? null,
             role: safeUser?.role ?? null,
-            workspaceId: safeUser?.workspaceId ?? null
+            workspaceId: safeUser?.workspaceId ?? null,
+            adminPermissions: safeUser.adminPermissions ?? []
           }
         }
 
@@ -90,7 +91,8 @@ export const authOptions = {
           name: user.name ?? null,
           email: user.email ?? null,
           role: user.role ?? null,
-          workspaceId: user.workspaceId ?? null
+          workspaceId: user.workspaceId ?? null,
+          adminPermissions: user.adminPermissions ?? []
         }
       }
 
@@ -116,7 +118,8 @@ export const authOptions = {
         session.user.id = userId
         session.user.name = token.name
         session.user.role = token.role
-        session.user.workspaceId = token.workspaceId
+        ;((session.user.workspaceId = token.workspaceId),
+          (session.user.adminPermissions = token.adminPermissions ?? []))
 
         const dbUser = await prisma.user.findUnique({
           where: { id: userId },
