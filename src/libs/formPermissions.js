@@ -6,6 +6,10 @@ export function canManageForms(role) {
   return isHighAdmin(role)
 }
 
+export function canShareForms(adminPermissions = []) {
+  return adminPermissions.some(permission => permission.moduleKey === 'forms' && permission.action === 'share')
+}
+
 /**
  * HighAdmin: qualquer form. Admin: forms com cargo ou função definidos.
  * Usuários comuns: customRoleId + match em allowedRoles/cargos.

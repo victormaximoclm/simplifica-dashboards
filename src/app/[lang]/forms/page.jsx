@@ -9,7 +9,7 @@ import { prisma } from '@/libs/prisma'
 import FormsListView from '@/views/forms/FormsListView'
 import { buildFormListWhereForRole, getUserFormContext, userHasFormViewerAccess } from '@/libs/formAccess'
 import { resolveFormWorkspaceId } from '@/libs/formWorkspace'
-import { canManageForms } from '@/libs/formPermissions'
+import { canManageForms, canShareForms } from '@/libs/formPermissions'
 import { formIconMutedCls, formMutedCls, formTitleCls } from '@/views/forms/formStyles'
 
 const FormsPage = async ({ params }) => {
@@ -62,7 +62,23 @@ const FormsPage = async ({ params }) => {
     }
   })
 
-  return <FormsListView forms={forms} canManage={canManageForms(userRole)} lang={lang} />
+  const user = await prisma.user.findUnique({
+    where: {
+      id: session.user.id
+    },
+    include: {
+      adminPermissions: true
+    }
+  })
+
+  return (
+    <FormsListView
+      forms={forms}
+      canManage={canManageForms(userRole)}
+      canShare={canShareForms(user.adminPermissions)}
+      lang={lang}
+    />
+  )
 }
 
 const EMPTY_MESSAGES = {

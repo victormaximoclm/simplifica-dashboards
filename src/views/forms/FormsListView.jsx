@@ -178,11 +178,16 @@ const FormsListView = ({ forms: initialForms, canManage, canShare, lang }) => {
 }
 
 const FormCard = ({ form, canManage, onFill, onEdit, onLinks, onDelete, onShare, canShare }) => {
-  const createdAt = new Date(form.createdAt).toLocaleDateString('pt-BR', {
-    day: '2-digit',
-    month: 'short',
-    year: 'numeric'
-  })
+  const [createdAt, setCreatedAt] = useState('')
+  useEffect(() => {
+    setCreatedAt(
+      new Date(form.createdAt).toLocaleDateString('pt-BR', {
+        day: '2-digit',
+        month: 'short',
+        year: 'numeric'
+      })
+    )
+  }, [form.createdAt])
 
   return (
     <div
@@ -201,7 +206,7 @@ const FormCard = ({ form, canManage, onFill, onEdit, onLinks, onDelete, onShare,
       <div className={`flex items-center gap-3 text-xs ${formMutedCls}`} onClick={onFill}>
         <span className='flex items-center gap-1'>
           <i className='tabler-calendar text-sm' />
-          {createdAt}
+          {createdAt || 'Carregando...'}
         </span>
         {form.allowPublicLink && (
           <span className={`flex items-center gap-1 ${formSuccessTextCls}`}>
