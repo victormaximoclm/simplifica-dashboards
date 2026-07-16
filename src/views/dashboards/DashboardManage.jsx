@@ -162,7 +162,12 @@ const DashboardManage = ({ workspaces }) => {
       <CardHeader
         title='Gerenciar Dashboards'
         action={
-          <Button variant='contained' startIcon={<i className='tabler-plus' />} onClick={handleOpenCreate}>
+          <Button
+            variant='contained'
+            startIcon={<i className='tabler-plus' />}
+            onClick={handleOpenCreate}
+            disabled={!isHighAdmin}
+          >
             Novo Dashboard
           </Button>
         }

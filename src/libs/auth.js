@@ -108,7 +108,8 @@ export const authOptions = {
         name: token.name ?? null,
         email: token.email ?? null,
         role: token.role ?? null,
-        workspaceId: token.workspaceId ?? null
+        workspaceId: token.workspaceId ?? null,
+        adminPermissions: token.adminPermissions ?? []
       }
     },
     async session({ session, token }) {

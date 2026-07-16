@@ -7,7 +7,7 @@ import { authOptions } from '@/libs/auth'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { canNonHighAdminAccessForm, getUserFormContext } from '@/libs/formAccess'
-import { canGeneratePublicLinks } from '@/libs/formPermissions'
+import { canGeneratePublicLinksInFill, canGeneratePublicLinks } from '@/libs/formPermissions'
 import FormLinksView from '@/views/forms/FormLinksView'
 
 const FormLinksPage = async ({ params }) => {
@@ -27,21 +27,23 @@ const FormLinksPage = async ({ params }) => {
 
   const role = session.user.role
 
-  if (!isHighAdmin(role)) {
-    if (form.workspaceId !== session.user.workspaceId) redirect(`/${lang}/forms`)
+  const ctx = role !== 'admin' && !isHighAdmin(role) ? await getUserFormContext(session.user.id) : {}
 
-    const ctx = role !== 'admin' ? await getUserFormContext(session.user.id) : {}
-    if (!canNonHighAdminAccessForm(role, form, ctx)) redirect(`/${lang}/forms`)
+  if (!isHighAdmin(role)) {
+    if (form.workspaceId !== session.user.workspaceId) {
+      redirect(`/${lang}/forms`)
+    }
+
+    if (!canNonHighAdminAccessForm(role, form, ctx)) {
+      redirect(`/${lang}/forms`)
+    }
   }
 
-  return (
-    <FormLinksView
-      formId={form.id}
-      formTitle={form.title}
-      lang={lang}
-      canGenerateLink={canGeneratePublicLinks(role)}
-    />
-  )
+  const canGenerateLink = isHighAdmin(role)
+    ? await canGeneratePublicLinks(role)
+    : await canGeneratePublicLinksInFill(role, form, ctx)
+
+  return <FormLinksView formId={form.id} formTitle={form.title} lang={lang} canGenerateLink={canGenerateLink} />
 }
 
 export default FormLinksPage

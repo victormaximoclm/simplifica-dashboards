@@ -27,8 +27,7 @@ import StyledVerticalNavExpandIcon from '@menu/styles/vertical/StyledVerticalNav
 // Style Imports
 import menuItemStyles from '@core/styles/vertical/menuItemStyles'
 import menuSectionStyles from '@core/styles/vertical/menuSectionStyles'
-import { canShareForms } from '@/libs/formPermissions'
-import { canShareDash } from '@/libs/dashboardAccess'
+import { canShareDash, canShareForms } from '@/libs/adminPermissions'
 
 const RenderExpandIcon = ({ open, transitionDuration }) => (
   <StyledVerticalNavExpandIcon open={open} transitionDuration={transitionDuration}>
@@ -53,6 +52,10 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
   const isSubAdmin = session?.user?.role === 'subAdmin'
   const isHighAdmin = isSuperAdmin || isSubAdmin
   const isAdmin = session?.user?.role === 'admin'
+
+  const canManageDashboards = isHighAdmin || canShareDash(session?.user?.adminPermissions ?? [])
+
+  const canManageForms = isHighAdmin || canShareForms(session?.user?.adminPermissions ?? [])
 
   // Helper to read activeWorkspaceId from cookie (fallback when localStorage is empty)
   const getActiveWorkspaceId = useCallback(() => {
@@ -172,7 +175,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
             </MenuItem>
           ))}
           {dashboards.length === 0 && <MenuItem disabled>Nenhum dashboard disponível</MenuItem>}
-          {(isHighAdmin || canShareDash(session.user.adminPermissions)) && (
+          {canManageDashboards && (
             <MenuItem href={`/${locale}/dashboards/manage`} icon={<i className='tabler-settings' />}>
               {dictionary['navigation'].manageDashboards}
             </MenuItem>
@@ -190,7 +193,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
               </MenuItem>
             ))}
             {forms.length === 0 && <MenuItem disabled>Nenhum formulário disponível</MenuItem>}
-            {(isHighAdmin || canShareForms(session.user.adminPermissions)) && (
+            {canManageForms && (
               <MenuItem href={`/${locale}/forms`} icon={<i className='tabler-settings' />}>
                 {dictionary['navigation'].manageForms || 'Gerenciar Formulários'}
               </MenuItem>
