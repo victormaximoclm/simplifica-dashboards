@@ -31,14 +31,14 @@ export async function createAuditLog({
   metadata = null,
   requestId = null
 }) {
-  try {
-    const normalizedAction = String(action || '')
-      .trim()
-      .replace(/-/g, '_')
-      .toUpperCase()
-    const normalizedResource = resource || entityType
-    const normalizedResourceId = resourceId || entityId
+  const normalizedAction = String(action || '')
+    .trim()
+    .replace(/-/g, '_')
+    .toUpperCase()
 
+  const normalizedResource = resource || entityType
+  const normalizedResourceId = resourceId || entityId
+  try {
     await prisma.auditLog.create({
       data: {
         userId,
@@ -62,10 +62,7 @@ export async function createAuditLog({
   }
 }
 
-export async function createDedupedAuditLog({
-  dedupeWindowMinutes = 15,
-  ...input
-}) {
+export async function createDedupedAuditLog({ dedupeWindowMinutes = 15, ...input }) {
   const now = new Date()
   const from = new Date(now.getTime() - dedupeWindowMinutes * 60 * 1000)
   const action = String(input.action || '')
