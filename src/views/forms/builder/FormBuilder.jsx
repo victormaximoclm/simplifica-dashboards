@@ -96,6 +96,11 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
       type,
       label: TYPE_LABELS[type] ?? type,
       required: false,
+      ...(type === 'date'
+        ? {
+            defaultCurrentDate: false
+          }
+        : {}),
       ...(type === 'dynamic-list' || type === 'multi-select-dynamic'
         ? { dataSource: { provider: 'webhook', url: '' } }
         : {}),

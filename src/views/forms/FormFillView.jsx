@@ -118,8 +118,15 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     const initial = {}
     const fs = Array.isArray(form.fields) ? form.fields : []
     fs.forEach(f => {
-      if (f.type === 'checkbox') initial[f.id] = false
+      if (f.type === 'checkbox') {
+        initial[f.id] = false
+      }
+
+      if (f.type === 'date' && f.defaultCurrentDate) {
+        initial[f.id] = new Date().toISOString().split('T')[0]
+      }
     })
+
     return initial
   })
   const [options, setOptions] = useState({})
@@ -433,7 +440,12 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     if (publicToken) return
     const initial = {}
     fields.forEach(f => {
-      if (f.type === 'checkbox') initial[f.id] = false
+      if (f.type === 'checkbox') {
+        initial[f.id] = false
+      }
+      if (f.type === 'date' && f.defaultCurrentDate) {
+        initial[f.id] = new Date().toISOString().split('T')[0]
+      }
     })
     setValues(initial)
     setCpfErrors({})

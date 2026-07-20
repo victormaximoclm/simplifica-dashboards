@@ -129,6 +129,27 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
         </label>
       </Field>
 
+      {field.type === 'date' && (
+        <Field label='Valor padrão'>
+          <label className='flex items-center gap-2 cursor-pointer'>
+            <div
+              onClick={() => update('defaultCurrentDate', !field.defaultCurrentDate)}
+              className={`w-10 h-5 rounded-full transition-colors cursor-pointer ${
+                field.defaultCurrentDate ? 'bg-[var(--mui-palette-primary-main)]' : formBuilderToggleOffCls
+              } relative`}
+            >
+              <span
+                className={`absolute top-0.5 w-4 h-4 ${formBuilderToggleKnobCls} rounded-full shadow transition-transform ${
+                  field.defaultCurrentDate ? 'translate-x-5' : 'translate-x-0.5'
+                }`}
+              />
+            </div>
+
+            <span className={`text-sm ${formMutedCls}`}>Usar data atual</span>
+          </label>
+        </Field>
+      )}
+
       {isFreeList && (
         <>
           <Field label='Placeholder do campo de entrada'>
