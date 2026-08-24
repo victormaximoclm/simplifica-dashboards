@@ -80,7 +80,7 @@ export const getWorkspaces = async () => {
 
     const workspace = await prisma.workspace.findUnique({
       where: { id: session.user.workspaceId },
-      include: { _count: { select: { users: true } } }
+      include: { _count: { select: { users: true } }, plan: true }
     })
 
     return workspace ? [workspace] : []
@@ -88,7 +88,7 @@ export const getWorkspaces = async () => {
 
   // High admin (superAdmin/subAdmin): return all workspaces
   return prisma.workspace.findMany({
-    include: { _count: { select: { users: true } } },
+    include: { _count: { select: { users: true } }, plan: true },
     orderBy: { createdAt: 'desc' }
   })
 }

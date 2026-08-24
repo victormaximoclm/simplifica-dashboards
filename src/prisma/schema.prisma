@@ -8,10 +8,23 @@ generator client {
   binaryTargets = ["native", "debian-openssl-3.0.x", "linux-arm64-openssl-1.1.x", "rhel-openssl-3.0.x", "linux-musl-openssl-3.0.x"]
 }
 
+model Plan {
+  id         String      @id @default(cuid())
+  key        String      @unique // "simple", "pro", "enterprise"
+  name       String
+  maxUsers   Int         // -1 = ilimitado, se quiser um plano enterprise sem teto
+  createdAt  DateTime    @default(now())
+  updatedAt  DateTime    @updatedAt
+  workspaces Workspace[]
+}
+
 model Workspace {
   id            String                 @id @default(cuid())
   name          String
   slug          String                 @unique
+  planId         String?
+  plan           Plan?       @relation(fields: [planId], references: [id])
+  extraUserSlots Int         @default(0) // ajuste manual (compra de espaço extra)
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   users         User[]
@@ -22,6 +35,8 @@ model Workspace {
   integrations  WorkspaceIntegration[]
   forms         Form[]
   customRoles   CustomRole[]
+  folders Folder[]
+  documents Document[]
 }
 
 model WorkspaceIntegration {
@@ -48,6 +63,7 @@ model CustomRole {
   workspace           Workspace?            @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   workspaceId         String?
   permissions         RolePermission[]
+  folderVisibility FolderVisibility[]
 
   @@unique([workspaceId, name])
 }
@@ -132,6 +148,8 @@ model User {
   termsAcceptedAt        DateTime?
   termsVersion           String?               @default("1.0")
   adminPermissions       AdminPermission[]
+  createdFolders    Folder[]
+  uploadedDocuments Document[]
 }
 
 model UserIntegration {
@@ -313,4 +331,52 @@ model AdminPermission {
 
   @@unique([userId, moduleKey, action])
   @@index([userId])
+}
+
+model Folder {
+  id          String    @id @default(cuid())
+  name        String
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  parentId    String?
+  parent      Folder?   @relation("FolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    Folder[]  @relation("FolderTree")
+  createdById String?
+  createdBy   User?     @relation(fields: [createdById], references: [id], onDelete: SetNull)
+  documents   Document[]
+  allowedRoles FolderVisibility[]
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@index([workspaceId])
+  @@index([parentId])
+}
+
+model FolderVisibility {
+  id           String     @id @default(cuid())
+  folderId     String
+  customRoleId String
+  folder       Folder     @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  customRole   CustomRole @relation(fields: [customRoleId], references: [id], onDelete: Cascade)
+
+  @@unique([folderId, customRoleId])
+}
+
+model Document {
+  id           String    @id @default(cuid())
+  name         String
+  fileUrl      String
+  mimeType     String?
+  size         Int?
+  folderId     String
+  folder       Folder    @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  workspaceId  String
+  workspace    Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  uploadedById String?
+  uploadedBy   User?     @relation(fields: [uploadedById], references: [id], onDelete: SetNull)
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  @@index([folderId])
+  @@index([workspaceId])
 }

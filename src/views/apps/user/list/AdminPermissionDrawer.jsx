@@ -18,22 +18,10 @@ const AdminPermissionDrawer = ({ open, handleClose, user, onSave }) => {
   const [permissions, setPermissions] = useState([])
   const [loading, setLoading] = useState(false)
 
-  const actions = [
-    {
-      key: 'share',
-      label: 'Compartilhar'
-    }
-  ]
-
   const modules = [
-    {
-      key: 'dashboards',
-      name: 'Dashboards'
-    },
-    {
-      key: 'forms',
-      name: 'Formulários'
-    }
+    { key: 'dashboards', name: 'Dashboards', action: { key: 'share', label: 'Compartilhar' } },
+    { key: 'forms', name: 'Formulários', action: { key: 'share', label: 'Compartilhar' } },
+    { key: 'users', name: 'Usuários', action: { key: 'manage', label: 'Gerenciar' } }
   ]
 
   useEffect(() => {
@@ -169,7 +157,7 @@ const AdminPermissionDrawer = ({ open, handleClose, user, onSave }) => {
                   {module.name}
                 </Typography>
 
-                {actions.map(action => (
+                {[module.action].map(action => (
                   <FormControlLabel
                     key={action.key}
                     control={

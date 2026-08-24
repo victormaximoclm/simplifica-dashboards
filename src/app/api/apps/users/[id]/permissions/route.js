@@ -164,14 +164,20 @@ export async function PUT(req, { params }) {
       )
     }
 
-    const allowedActions = ['share']
-
+    const allowedModuleActions = {
+      dashboards: ['share'],
+      forms: ['share'],
+      users: ['manage']
+    }
     const invalidPermission = permissions.some(permission => {
+      const validActions = allowedModuleActions[permission.moduleKey]
+
       return (
         !permission.moduleKey ||
         typeof permission.moduleKey !== 'string' ||
+        !validActions ||
         !permission.action ||
-        !allowedActions.includes(permission.action)
+        !validActions.includes(permission.action)
       )
     })
 

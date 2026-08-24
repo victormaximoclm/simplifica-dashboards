@@ -168,7 +168,7 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, calle
             <MenuItem value='admin'>Admin</MenuItem>
             <MenuItem value='user'>Usuário</MenuItem>
           </CustomTextField>
-          {role === 'admin' && (
+          {isHighAdminCaller && role === 'admin' && (
             <>
               <Divider />
               <Typography variant='subtitle2'>Permissões de Compartilhamento</Typography>

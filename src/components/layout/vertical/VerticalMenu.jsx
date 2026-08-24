@@ -27,7 +27,7 @@ import StyledVerticalNavExpandIcon from '@menu/styles/vertical/StyledVerticalNav
 // Style Imports
 import menuItemStyles from '@core/styles/vertical/menuItemStyles'
 import menuSectionStyles from '@core/styles/vertical/menuSectionStyles'
-import { canShareDash, canShareForms } from '@/libs/adminPermissions'
+import { canShareDash, canShareForms, canUploadDocuments } from '@/libs/adminPermissions'
 
 const RenderExpandIcon = ({ open, transitionDuration }) => (
   <StyledVerticalNavExpandIcon open={open} transitionDuration={transitionDuration}>
@@ -43,6 +43,7 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
   const { data: session } = useSession()
   const [dashboards, setDashboards] = useState([])
   const [forms, setForms] = useState([])
+  const [folders, setFolders] = useState([])
 
   // Vars
   const { isBreakpointReached, transitionDuration } = verticalNavOptions
@@ -56,6 +57,9 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
   const canManageDashboards = isHighAdmin || canShareDash(session?.user?.adminPermissions ?? [])
 
   const canManageForms = isHighAdmin || canShareForms(session?.user?.adminPermissions ?? [])
+
+  const canManageFolders = isHighAdmin
+  const canUploadDocs = isHighAdmin || canUploadDocuments(session?.user?.adminPermissions ?? [])
 
   // Helper to read activeWorkspaceId from cookie (fallback when localStorage is empty)
   const getActiveWorkspaceId = useCallback(() => {
@@ -120,6 +124,27 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
 
   const getFormHref = formId => `/${locale}/forms/${formId}/fill`
 
+  const fetchFolders = useCallback(() => {
+    if (!session) return
+
+    let url = '/api/folders'
+
+    if (isHighAdmin) {
+      const activeWsId = getActiveWorkspaceId()
+      if (activeWsId) {
+        url += `?workspaceId=${activeWsId}`
+      } else {
+        setFolders([])
+        return
+      }
+    }
+
+    fetch(url, { cache: 'no-store' })
+      .then(res => (res.ok ? res.json() : []))
+      .then(data => setFolders(data))
+      .catch(() => setFolders([]))
+  }, [getActiveWorkspaceId, isHighAdmin, session])
+
   useEffect(() => {
     if (!session) {
       setDashboards([])
@@ -130,18 +155,23 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
 
     fetchDashboards()
     fetchForms()
+    fetchFolders()
     window.addEventListener('workspace-changed', fetchDashboards)
     window.addEventListener('dashboards-changed', fetchDashboards)
     window.addEventListener('workspace-changed', fetchForms)
     window.addEventListener('forms-changed', fetchForms)
+    window.addEventListener('workspace-changed', fetchFolders)
+    window.addEventListener('folders-changed', fetchFolders)
 
     return () => {
       window.removeEventListener('workspace-changed', fetchDashboards)
       window.removeEventListener('dashboards-changed', fetchDashboards)
       window.removeEventListener('workspace-changed', fetchForms)
       window.removeEventListener('forms-changed', fetchForms)
+      window.removeEventListener('workspace-changed', fetchFolders)
+      window.removeEventListener('folders-changed', fetchFolders)
     }
-  }, [fetchDashboards, fetchForms, session])
+  }, [fetchDashboards, fetchForms, fetchFolders, session])
 
   return (
     <ScrollWrapper
@@ -196,6 +226,25 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
             {canManageForms && (
               <MenuItem href={`/${locale}/forms`} icon={<i className='tabler-settings' />}>
                 {dictionary['navigation'].manageForms || 'Gerenciar Formulários'}
+              </MenuItem>
+            )}
+          </SubMenu>
+        )}
+        {session && (
+          <SubMenu
+            label={dictionary['navigation'].documents || 'Documentos'}
+            icon={<i className='tabler-folder' />}
+            suffix={folders.length > 0 ? <CustomChip label={String(folders.length)} size='small' round='true' /> : null}
+          >
+            {folders.map(folder => (
+              <MenuItem key={folder.id} href={`/${locale}/documents/${folder.id}`}>
+                {folder.name}
+              </MenuItem>
+            ))}
+            {folders.length === 0 && <MenuItem disabled>Nenhuma pasta disponível</MenuItem>}
+            {canManageFolders && (
+              <MenuItem href={`/${locale}/documents`} icon={<i className='tabler-settings' />}>
+                {dictionary['navigation'].manageDocuments || 'Gerenciar Documentos'}
               </MenuItem>
             )}
           </SubMenu>

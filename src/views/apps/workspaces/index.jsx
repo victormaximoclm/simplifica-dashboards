@@ -24,6 +24,11 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Divider from '@mui/material/Divider'
 
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import InputLabel from '@mui/material/InputLabel'
+import FormControl from '@mui/material/FormControl'
+
 import { CLICKUP_WORKSPACE_CONFIG_DEFAULTS } from '@/app/constants/integration'
 
 const CLICKUP_EMPTY = { ...CLICKUP_WORKSPACE_CONFIG_DEFAULTS }
@@ -39,7 +44,23 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
   const [workspaceToDelete, setWorkspaceToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
 
+  const [plans, setPlans] = useState([])
+  const [planId, setPlanId] = useState('')
+  const [extraUserSlots, setExtraUserSlots] = useState(0)
+
+  const loadPlans = async () => {
+    try {
+      const res = await fetch(`${process.env.NEXT_PUBLIC_API_URL}/apps/plans`)
+      if (res.ok) setPlans(await res.json())
+    } catch {
+      setPlans([])
+    }
+  }
+
   const handleOpenCreate = () => {
+    setPlanId('')
+    setExtraUserSlots(0)
+    loadPlans()
     setEditingWorkspace(null)
     setWorkspaceName('')
     setClickup(CLICKUP_EMPTY)
@@ -48,6 +69,7 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
   }
 
   const handleOpenEdit = async workspace => {
+    loadPlans()
     setEditingWorkspace(workspace)
     setWorkspaceName(workspace.name)
     setClickup(CLICKUP_EMPTY)
@@ -78,6 +100,8 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
   }
 
   const handleClose = () => {
+    setPlanId('')
+    setExtraUserSlots(0)
     setOpenDialog(false)
     setEditingWorkspace(null)
     setWorkspaceName('')
@@ -129,6 +153,13 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
             enabled: true,
             configJson: { ...clickup }
           })
+        })
+      }
+      if (editingWorkspace && planId) {
+        await fetch(`${process.env.NEXT_PUBLIC_API_URL}/apps/workspaces/${workspaceId}/plan`, {
+          method: 'PATCH',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ planId, extraUserSlots: Number(extraUserSlots) })
         })
       }
 
@@ -214,6 +245,7 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
                     <TableCell>Nome</TableCell>
                     <TableCell>Slug</TableCell>
                     <TableCell>Usuários</TableCell>
+                    <TableCell>Plano</TableCell>
                     <TableCell>Criado em</TableCell>
                     <TableCell align='right'>Ações</TableCell>
                   </TableRow>
@@ -221,7 +253,7 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
                 <TableBody>
                   {workspaces.length === 0 ? (
                     <TableRow>
-                      <TableCell colSpan={5} align='center'>
+                      <TableCell colSpan={6} align='center'>
                         <Typography color='text.secondary'>Nenhum espaço de trabalho encontrado</Typography>
                       </TableCell>
                     </TableRow>
@@ -236,6 +268,18 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
                         </TableCell>
                         <TableCell>
                           <Chip label={ws._count?.users ?? 0} size='small' variant='tonal' color='secondary' />
+                        </TableCell>
+                        <TableCell>
+                          <Chip
+                            label={
+                              ws.plan
+                                ? `${ws.plan.name}${ws.extraUserSlots ? ` +${ws.extraUserSlots}` : ''}`
+                                : 'Sem plano'
+                            }
+                            size='small'
+                            variant='tonal'
+                            color={ws.plan ? 'success' : 'warning'}
+                          />
                         </TableCell>
                         <TableCell>{new Date(ws.createdAt).toLocaleDateString('pt-BR')}</TableCell>
                         <TableCell align='right'>
@@ -278,8 +322,32 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
             className='mbs-4'
           />
 
-          {/* Integração ClickUp */}
           <Divider>
+            <Chip label='Plano' size='small' icon={<i className='tabler-crown' />} variant='tonal' color='primary' />
+          </Divider>
+
+          <FormControl fullWidth>
+            <InputLabel>Plano</InputLabel>
+            <Select value={planId} label='Plano' onChange={e => setPlanId(e.target.value)}>
+              {plans.map(p => (
+                <MenuItem key={p.id} value={p.id}>
+                  {p.name} ({p.maxUsers === -1 ? 'ilimitado' : `até ${p.maxUsers}`})
+                </MenuItem>
+              ))}
+            </Select>
+          </FormControl>
+
+          <TextField
+            fullWidth
+            type='number'
+            label='Vagas extras de usuário'
+            value={extraUserSlots}
+            onChange={e => setExtraUserSlots(e.target.value)}
+            inputProps={{ min: 0 }}
+          />
+
+          {/* Integração ClickUp */}
+          {/*<Divider>
             <Chip
               label='Integração ClickUp'
               size='small'
@@ -289,7 +357,7 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
             />
           </Divider>
 
-          <TextField
+          *<TextField
             fullWidth
             label='Workspace ID (ClickUp)'
             placeholder='Ex: 12345678'
@@ -332,7 +400,7 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
             value={clickup.clientSecret}
             onChange={handleClickupChange('clientSecret')}
             type='password'
-          />
+          />*/}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose} color='secondary'>

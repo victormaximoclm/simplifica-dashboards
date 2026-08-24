@@ -13,6 +13,7 @@ import { isHighAdmin, getAssignableRoles } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
 import { inviteUserSchema, parseBody } from '@/libs/validations'
+import { hasAdminPermission } from '@/utils/adminPermission'
 
 // POST /api/apps/users/invite - Invite user by email (high admins only)
 export async function POST(req) {
@@ -25,7 +26,9 @@ export async function POST(req) {
     return response
   }
 
-  if (!isHighAdmin(session.user.role)) {
+  const canInvite = isHighAdmin(session.user.role) || hasAdminPermission(session.user.adminPermissions, 'users')
+
+  if (!canInvite) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
     response.headers.set('x-request-id', requestId)
     return response
@@ -42,10 +45,11 @@ export async function POST(req) {
   const { email, workspaceId, role, customRoleId } = parsed.data
 
   if (customRoleId) {
-    const targetWorkspaceId = workspaceId || updateData.workspaceId || targetUser?.workspaceId
     const roleCheck = await prisma.customRole.findUnique({ where: { id: customRoleId } })
-    if (!roleCheck || roleCheck.workspaceId !== targetWorkspaceId) {
-      return jsonWithRequestId({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400, requestId })
+    if (!roleCheck || roleCheck.workspaceId !== workspaceId) {
+      const response = NextResponse.json({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400 })
+      response.headers.set('x-request-id', requestId)
+      return response
     }
   }
 
@@ -64,7 +68,7 @@ export async function POST(req) {
       return response
     }
 
-    workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
+    workspace = await prisma.workspace.findUnique({ where: { id: workspaceId }, include: { plan: true } })
 
     if (!workspace) {
       const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
@@ -138,6 +142,30 @@ export async function POST(req) {
     const response = NextResponse.json({ message: 'Convite reenviado com sucesso' })
     response.headers.set('x-request-id', requestId)
     return response
+  }
+
+  if (needsWorkspace && workspace) {
+    if (!workspace.plan) {
+      logger.warn('workspace-sem-plano', { requestId, workspaceId })
+      // não bloqueia — segue o fluxo normalmente
+    } else {
+      const limit = workspace.plan.maxUsers === -1 ? Infinity : workspace.plan.maxUsers + workspace.extraUserSlots
+      const currentUserCount = await prisma.user.count({
+        where: { workspaceId, status: { in: ['active', 'pending'] } }
+      })
+
+      if (currentUserCount >= limit) {
+        const response = NextResponse.json(
+          {
+            message: `Limite de ${limit} usuários do plano "${workspace.plan.name}" atingido. Contrate mais espaço para convidar novos usuários.`,
+            code: 'USER_LIMIT_REACHED'
+          },
+          { status: 403 }
+        )
+        response.headers.set('x-request-id', requestId)
+        return response
+      }
+    }
   }
 
   // Create new user with pending status

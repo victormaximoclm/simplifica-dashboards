@@ -54,6 +54,7 @@ import CustomAvatar from '@core/components/mui/Avatar'
 // Util Imports
 import { getInitials } from '@/utils/getInitials'
 import { getLocalizedUrl } from '@/utils/i18n'
+import { hasAdminPermission } from '@/utils/adminPermission'
 
 // Style Imports
 import tableStyles from '@core/styles/table.module.css'
@@ -110,7 +111,7 @@ const userStatusObj = {
 // Column Definitions
 const columnHelper = createColumnHelper()
 
-const UserListTable = ({ tableData, workspaces }) => {
+const UserListTable = ({ tableData, workspaces, userUsage }) => {
   // States
   const [addUserOpen, setAddUserOpen] = useState(false)
   const [editUserOpen, setEditUserOpen] = useState(false)
@@ -126,6 +127,8 @@ const UserListTable = ({ tableData, workspaces }) => {
   const { data: session } = useSession()
   const callerRole = session?.user?.role
   const isHighAdmin = callerRole === 'superAdmin' || callerRole === 'subAdmin'
+  const canManageUsers = isHighAdmin || hasAdminPermission(session?.user?.adminPermissions, 'users')
+  const limitReached = userUsage && userUsage.limit !== Infinity && userUsage.count >= userUsage.limit
 
   const handleEdit = user => {
     setEditingUser(user)
@@ -364,7 +367,7 @@ const UserListTable = ({ tableData, workspaces }) => {
 
           // SubAdmin cannot manage SuperAdmin or SubAdmin targets
           const canManage =
-            isHighAdmin && !(callerRole === 'subAdmin' && (targetRole === 'superAdmin' || targetRole === 'subAdmin'))
+            canManageUsers && !(callerRole === 'subAdmin' && (targetRole === 'superAdmin' || targetRole === 'subAdmin'))
 
           return (
             <div className='flex items-center'>
@@ -476,15 +479,26 @@ const UserListTable = ({ tableData, workspaces }) => {
               placeholder='Pesquisar...'
               className='max-sm:is-full'
             />
-            {isHighAdmin && (
-              <Button
-                variant='contained'
-                startIcon={<i className='tabler-mail-plus' />}
-                onClick={() => setAddUserOpen(!addUserOpen)}
-                className='max-sm:is-full'
-              >
-                Convidar Usuário
-              </Button>
+            {canManageUsers && (
+              <div className='flex flex-col items-start sm:items-end gap-1'>
+                <Button
+                  variant='contained'
+                  startIcon={<i className='tabler-mail-plus' />}
+                  onClick={() => setAddUserOpen(!addUserOpen)}
+                  disabled={limitReached}
+                  className='max-sm:is-full'
+                >
+                  Convidar Usuário
+                </Button>
+                {userUsage && (
+                  <Typography variant='caption' color={limitReached ? 'error' : 'text.secondary'}>
+                    {userUsage.limit === Infinity
+                      ? `${userUsage.count} usuários — Plano ${userUsage.planName}`
+                      : `${userUsage.count}/${userUsage.limit} usuários — Plano ${userUsage.planName}`}
+                    {limitReached && ' • Limite atingido, contrate mais espaço'}
+                  </Typography>
+                )}
+              </div>
             )}
           </div>
         </div>
@@ -565,7 +579,7 @@ const UserListTable = ({ tableData, workspaces }) => {
           }
         }}
       />
-      {isHighAdmin && (
+      {canManageUsers && (
         <EditUserDrawer
           open={editUserOpen}
           handleClose={() => setEditUserOpen(false)}
