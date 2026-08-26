@@ -12,6 +12,8 @@ model Workspace {
   id            String                 @id @default(cuid())
   name          String
   slug          String                 @unique
+  isPrivate     Boolean                @default(false)
+  guests        WorkspaceGuest[]
   createdAt     DateTime               @default(now())
   updatedAt     DateTime               @updatedAt
   users         User[]
@@ -22,6 +24,27 @@ model Workspace {
   integrations  WorkspaceIntegration[]
   forms         Form[]
   customRoles   CustomRole[]
+}
+
+/**
+ * Convite de um usuário para um workspace privado que não é o seu (workspaceId de origem).
+ * `permission` define o nível de acesso ao conteúdo (dashboards/forms) do workspace:
+ * - "view":   somente visualizar
+ * - "edit":   visualizar + editar conteúdo existente
+ * - "create": visualizar + editar + criar conteúdo e gerenciar configurações do workspace
+ */
+model WorkspaceGuest {
+  id          String    @id @default(cuid())
+  workspaceId String
+  workspace   Workspace @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  userId      String
+  user        User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  permission  String    @default("view")
+  createdAt   DateTime  @default(now())
+  updatedAt   DateTime  @updatedAt
+
+  @@unique([workspaceId, userId])
+  @@index([userId])
 }
 
 model WorkspaceIntegration {
@@ -132,6 +155,7 @@ model User {
   termsAcceptedAt        DateTime?
   termsVersion           String?               @default("1.0")
   adminPermissions       AdminPermission[]
+  guestWorkspaces        WorkspaceGuest[]
 }
 
 model UserIntegration {

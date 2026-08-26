@@ -23,10 +23,26 @@ import TableContainer from '@mui/material/TableContainer'
 import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 import Divider from '@mui/material/Divider'
+import Switch from '@mui/material/Switch'
+import FormControlLabel from '@mui/material/FormControlLabel'
+import Autocomplete from '@mui/material/Autocomplete'
+import List from '@mui/material/List'
+import ListItem from '@mui/material/ListItem'
+import ListItemText from '@mui/material/ListItemText'
+import Select from '@mui/material/Select'
+import MenuItem from '@mui/material/MenuItem'
+import FormControl from '@mui/material/FormControl'
+import InputLabel from '@mui/material/InputLabel'
 
 import { CLICKUP_WORKSPACE_CONFIG_DEFAULTS } from '@/app/constants/integration'
 
 const CLICKUP_EMPTY = { ...CLICKUP_WORKSPACE_CONFIG_DEFAULTS }
+
+const GUEST_PERMISSION_OPTIONS = [
+  { value: 'view', label: 'Somente visualizar' },
+  { value: 'edit', label: 'Visualizar e editar' },
+  { value: 'create', label: 'Visualizar, editar e criar' }
+]
 
 const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
   const [workspaces, setWorkspaces] = useState(initialWorkspaces)
@@ -38,12 +54,19 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
   const [deleteDialog, setDeleteDialog] = useState(false)
   const [workspaceToDelete, setWorkspaceToDelete] = useState(null)
   const [deleting, setDeleting] = useState(false)
+  // Controle de acesso privado
+  const [isPrivate, setIsPrivate] = useState(false)
+  const [allUsers, setAllUsers] = useState([])
+  const [guests, setGuests] = useState([]) // [{ id, name, email, permission }]
+  const [loadingAccess, setLoadingAccess] = useState(false)
 
   const handleOpenCreate = () => {
     setEditingWorkspace(null)
     setWorkspaceName('')
     setClickup(CLICKUP_EMPTY)
     setError('')
+    setIsPrivate(false)
+    setGuests([])
     setOpenDialog(true)
   }
 
@@ -52,7 +75,10 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
     setWorkspaceName(workspace.name)
     setClickup(CLICKUP_EMPTY)
     setError('')
+    setIsPrivate(false)
+    setGuests([])
     setOpenDialog(true)
+    setLoadingAccess(true)
 
     // Busca integração existente
     try {
@@ -75,6 +101,36 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
     } catch {
       // sem integração ainda, ok
     }
+
+    // Busca dados completos do workspace (isPrivate + convidados) e lista de usuários
+    try {
+      const [wsRes, usersRes] = await Promise.all([
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/apps/workspaces/${workspace.id}`),
+        fetch(`${process.env.NEXT_PUBLIC_API_URL}/apps/users`)
+      ])
+
+      if (wsRes.ok) {
+        const wsData = await wsRes.json()
+
+        setIsPrivate(wsData.isPrivate ?? false)
+        setGuests(
+          (wsData.guests ?? []).map(g => ({
+            id: g.userId,
+            name: g.user?.name,
+            email: g.user?.email,
+            permission: g.permission ?? 'view'
+          }))
+        )
+      }
+
+      if (usersRes.ok) {
+        setAllUsers(await usersRes.json())
+      }
+    } catch {
+      // falha ao carregar controle de acesso, mantém padrão
+    } finally {
+      setLoadingAccess(false)
+    }
   }
 
   const handleClose = () => {
@@ -83,6 +139,22 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
     setWorkspaceName('')
     setClickup(CLICKUP_EMPTY)
     setError('')
+    setIsPrivate(false)
+    setGuests([])
+  }
+
+  const handleGuestsChange = (_, newValue) => {
+    setGuests(prev =>
+      newValue.map(u => {
+        const existing = prev.find(g => g.id === u.id)
+
+        return { id: u.id, name: u.name, email: u.email, permission: existing?.permission ?? 'view' }
+      })
+    )
+  }
+
+  const handleGuestPermissionChange = (userId, permission) => {
+    setGuests(prev => prev.map(g => (g.id === userId ? { ...g, permission } : g)))
   }
 
   const handleClickupChange = field => e => {
@@ -105,7 +177,11 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
       const res = await fetch(url, {
         method: editingWorkspace ? 'PUT' : 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ name: workspaceName.trim() })
+        body: JSON.stringify({
+          name: workspaceName.trim(),
+          isPrivate,
+          guests: guests.map(g => ({ userId: g.id, permission: g.permission }))
+        })
       })
 
       const data = await res.json()
@@ -278,61 +354,55 @@ const WorkspaceList = ({ workspaces: initialWorkspaces }) => {
             className='mbs-4'
           />
 
-          {/* Integração ClickUp */}
-          <Divider>
-            <Chip
-              label='Integração ClickUp'
-              size='small'
-              icon={<i className='tabler-brand-clickup' />}
-              variant='tonal'
-              color='primary'
-            />
-          </Divider>
-
-          <TextField
-            fullWidth
-            label='Workspace ID (ClickUp)'
-            placeholder='Ex: 12345678'
-            value={clickup.workspaceId}
-            onChange={handleClickupChange('workspaceId')}
+          <FormControlLabel
+            control={<Switch checked={isPrivate} onChange={e => setIsPrivate(e.target.checked)} />}
+            label='Workspace privado (acesso restrito por usuário)'
           />
-          <TextField
-            fullWidth
-            label='List ID (ClickUp)'
-            placeholder='Ex: 901234567'
-            value={clickup.listId}
-            onChange={handleClickupChange('listId')}
-          />
-          <TextField
-            fullWidth
-            label='Cargo ID (ClickUp)'
-            placeholder='Ex: 901234567'
-            value={clickup.cargoId}
-            onChange={handleClickupChange('cargoId')}
-          />
-          <TextField
-            fullWidth
-            label='Token de autenticação (ClickUp)'
-            placeholder='pk_...'
-            value={clickup.token}
-            onChange={handleClickupChange('token')}
-            type='password'
-          />
-          <TextField
-            fullWidth
-            label='Client ID(ClickUp)'
-            placeholder='Ex: ABC123XYZ'
-            value={clickup.clientId}
-            onChange={handleClickupChange('clientId')}
-          />
-          <TextField
-            fullWidth
-            label='Client Secret (ClickUp)'
-            placeholder='Ex: ...'
-            value={clickup.clientSecret}
-            onChange={handleClickupChange('clientSecret')}
-            type='password'
-          />
+          {isPrivate && (
+            <>
+              <Autocomplete
+                multiple
+                loading={loadingAccess}
+                options={allUsers}
+                getOptionLabel={u => `${u.name ?? 'Sem nome'} (${u.email ?? '—'})`}
+                value={guests}
+                onChange={handleGuestsChange}
+                isOptionEqualToValue={(a, b) => a.id === b.id}
+                renderInput={params => (
+                  <TextField {...params} label='Usuários convidados' placeholder='Selecione os usuários' />
+                )}
+              />
+              {guests.length > 0 && (
+                <List dense disablePadding>
+                  {guests.map(guest => (
+                    <ListItem
+                      key={guest.id}
+                      disableGutters
+                      secondaryAction={
+                        <FormControl size='small' sx={{ minWidth: 220 }}>
+                          <InputLabel id={`guest-permission-${guest.id}`}>Permissão</InputLabel>
+                          <Select
+                            labelId={`guest-permission-${guest.id}`}
+                            label='Permissão'
+                            value={guest.permission}
+                            onChange={e => handleGuestPermissionChange(guest.id, e.target.value)}
+                          >
+                            {GUEST_PERMISSION_OPTIONS.map(opt => (
+                              <MenuItem key={opt.value} value={opt.value}>
+                                {opt.label}
+                              </MenuItem>
+                            ))}
+                          </Select>
+                        </FormControl>
+                      }
+                    >
+                      <ListItemText primary={guest.name ?? 'Sem nome'} secondary={guest.email ?? '—'} />
+                    </ListItem>
+                  ))}
+                </List>
+              )}
+            </>
+          )}
         </DialogContent>
         <DialogActions>
           <Button onClick={handleClose} color='secondary'>

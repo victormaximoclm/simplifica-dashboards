@@ -7,10 +7,11 @@ import { authOptions } from '@/libs/auth'
 import { createAuditLog } from '@/libs/auditService'
 import { dashboardIncludes, stripDashboardSensitiveFields } from '@/libs/dashboardAccess'
 import { getRequestId, logger } from '@/libs/logger'
-import { isHighAdmin } from '@/utils/roleHelpers'
+import { isHighAdmin, canCreateWorkspaceContent } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
 import { createDashboardSchema, parseBody } from '@/libs/validations'
+import { resolveModuleWorkspaceScope, getAccessibleWorkspaceIds, workspaceAccessInclude } from '@/libs/workspaceAccess'
 
 function sanitizeDashboardTitle(value) {
   return String(value || 'Dashboard sem título')
@@ -63,9 +64,25 @@ export async function GET(req) {
   let where = {}
 
   if (isHighAdmin(userRole)) {
-    // High admins see all dashboards, optionally filtered by workspace
     if (workspaceFilter) {
-      where.workspaceId = workspaceFilter
+      // High admin pediu um workspace específico: valida acesso (checa isPrivate/convidados)
+      const scope = await resolveModuleWorkspaceScope(session, workspaceFilter)
+
+      if (scope.error) {
+        const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
+        response.headers.set('x-request-id', requestId)
+        return response
+      }
+
+      where.workspaceId = scope.workspaceId
+    } else {
+      // Nenhum filtro: restringe aos workspaces que ele realmente pode ver
+      const accessibleIds = await getAccessibleWorkspaceIds(session)
+
+      if (accessibleIds !== null) {
+        where.workspaceId = { in: accessibleIds }
+      }
+      // accessibleIds === null → superAdmin, sem filtro, vê tudo
     }
   } else if (userRole === 'admin') {
     // Admin sees all dashboards in their workspace
@@ -170,10 +187,25 @@ export async function POST(req) {
   const { iframeCode, workspaceId, allowedRoleIds, title: customTitle } = parsed.data
 
   // Validate workspace exists
-  const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    include: workspaceAccessInclude
+  })
 
   if (!workspace) {
     const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+    response.headers.set('x-request-id', requestId)
+    return response
+  }
+
+  // Impede subAdmin/convidado sem permissão "create" de criar dashboard num workspace privado
+  if (!canCreateWorkspaceContent(session.user, workspace)) {
+    logger.warn('dashboard-create-forbidden-workspace', {
+      requestId,
+      userId: session.user.id,
+      workspaceId
+    })
+    const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
     response.headers.set('x-request-id', requestId)
     return response
   }

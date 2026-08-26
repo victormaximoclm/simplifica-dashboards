@@ -5,9 +5,16 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/libs/auth'
 import { createAuditLog } from '@/libs/auditService'
 import { getRequestId, logger } from '@/libs/logger'
-import { isHighAdmin } from '@/utils/roleHelpers'
+import { canAccessWorkspace, canManageWorkspaceSettings } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { createWorkspaceSchema, parseBody } from '@/libs/validations'
+import { withCreatorOnPrivateGuestList, workspaceAccessInclude } from '@/libs/workspaceAccess'
+
+const guestInclude = {
+  guests: {
+    include: { user: { select: { id: true, name: true, email: true } } }
+  }
+}
 
 // GET /api/apps/workspaces/[id] - Get single workspace
 export async function GET(req, { params }) {
@@ -22,24 +29,22 @@ export async function GET(req, { params }) {
 
   const { id } = await params
 
-  // Users can only see their own workspace
-  if (!isHighAdmin(session.user.role) && session.user.workspaceId !== id) {
-    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-    response.headers.set('x-request-id', requestId)
-    return response
-  }
-
   const workspace = await prisma.workspace.findUnique({
     where: { id },
     include: {
-      users: {
-        select: { id: true, name: true, email: true, role: true, image: true }
-      }
+      users: { select: { id: true, name: true, email: true, role: true, image: true } },
+      ...guestInclude
     }
   })
 
   if (!workspace) {
     const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
+    response.headers.set('x-request-id', requestId)
+    return response
+  }
+
+  if (!canAccessWorkspace(session.user, workspace)) {
+    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
     response.headers.set('x-request-id', requestId)
     return response
   }
@@ -60,13 +65,24 @@ export async function PUT(req, { params }) {
     return response
   }
 
-  if (!isHighAdmin(session.user.role)) {
-    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+  const { id } = await params
+
+  const currentWorkspace = await prisma.workspace.findUnique({
+    where: { id },
+    include: workspaceAccessInclude
+  })
+
+  if (!currentWorkspace) {
+    const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
     response.headers.set('x-request-id', requestId)
     return response
   }
 
-  const { id } = await params
+  if (!canManageWorkspaceSettings(session.user, currentWorkspace)) {
+    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return response
+  }
 
   const parsed = parseBody(createWorkspaceSchema, await req.json())
 
@@ -76,7 +92,7 @@ export async function PUT(req, { params }) {
     return response
   }
 
-  const { name } = parsed.data
+  const { name, isPrivate, guests } = parsed.data
 
   const slug = name
     .trim()
@@ -95,9 +111,19 @@ export async function PUT(req, { params }) {
     return response
   }
 
+  const guestList = withCreatorOnPrivateGuestList(!!isPrivate, guests, session.user.id, session.user.role)
+
   const workspace = await prisma.workspace.update({
     where: { id },
-    data: { name: name.trim(), slug }
+    data: {
+      name: name?.trim(),
+      isPrivate: !!isPrivate,
+      guests: {
+        deleteMany: {},
+        create: guestList.map(g => ({ userId: g.userId, permission: g.permission }))
+      }
+    },
+    include: guestInclude
   })
 
   logger.info('workspace-update-success', { requestId, userId: session.user.id, workspaceId: workspace.id })
@@ -107,8 +133,18 @@ export async function PUT(req, { params }) {
     action: 'WORKSPACE_UPDATE',
     resource: 'workspace',
     resourceId: workspace.id,
-    before: { id, slug: existing?.slug, name: existing?.name },
-    after: { id: workspace.id, name: workspace.name, slug: workspace.slug },
+    before: {
+      id: currentWorkspace.id,
+      name: currentWorkspace.name,
+      slug: currentWorkspace.slug,
+      isPrivate: currentWorkspace.isPrivate
+    },
+    after: {
+      id: workspace.id,
+      name: workspace.name,
+      slug: workspace.slug,
+      isPrivate: workspace.isPrivate
+    },
     metadata: { requestId },
     requestId
   })
@@ -128,12 +164,6 @@ export async function DELETE(req, { params }) {
     return response
   }
 
-  if (!isHighAdmin(session.user.role)) {
-    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-    response.headers.set('x-request-id', requestId)
-    return response
-  }
-
   const { id } = await params
 
   // Get workspace info for the response
@@ -142,7 +172,8 @@ export async function DELETE(req, { params }) {
     include: {
       _count: {
         select: { users: true, dashboards: true }
-      }
+      },
+      ...workspaceAccessInclude
     }
   })
 
@@ -152,7 +183,13 @@ export async function DELETE(req, { params }) {
     return response
   }
 
-  // Cascade: delete all related users, dashboards, notifications
+  if (!canManageWorkspaceSettings(session.user, workspace)) {
+    const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return response
+  }
+
+  // Cascade: delete all related users, dashboards, notifications, convites
   await prisma.workspace.delete({ where: { id } })
 
   logger.info('workspace-delete-success', { requestId, userId: session.user.id, workspaceId: id })

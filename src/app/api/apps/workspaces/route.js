@@ -8,8 +8,9 @@ import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { createWorkspaceSchema, parseBody } from '@/libs/validations'
+import { getAccessibleWorkspaces, withCreatorOnPrivateGuestList } from '@/libs/workspaceAccess'
 
-// GET /api/apps/workspaces - List workspaces
+// GET /api/apps/workspaces - List workspaces (apenas os que o usuário pode acessar)
 export async function GET(req) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
@@ -20,24 +21,20 @@ export async function GET(req) {
     return response
   }
 
-  // Only high admins can list all workspaces
+  // Only high admins can list workspaces
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
     response.headers.set('x-request-id', requestId)
     return response
   }
 
-  const workspaces = await prisma.workspace.findMany({
-    include: {
-      _count: {
-        select: { users: true }
-      }
-    },
-    orderBy: { name: 'asc' }
+  // Nunca lista workspaces privados aos quais o usuário não foi convidado
+  const workspaces = await getAccessibleWorkspaces(session, {
+    _count: { select: { users: true } }
   })
 
   logger.debug('workspaces-list-success', { requestId, userId: session.user.id, count: workspaces.length })
-  const response = NextResponse.json(workspaces)
+  const response = NextResponse.json(workspaces.map(({ guests: _guests, ...ws }) => ws))
   response.headers.set('x-request-id', requestId)
   return response
 }
@@ -67,7 +64,7 @@ export async function POST(req) {
     return response
   }
 
-  const { name } = parsed.data
+  const { name, isPrivate, guests } = parsed.data
 
   const slug = name
     .trim()
@@ -84,8 +81,15 @@ export async function POST(req) {
     return response
   }
 
+  const guestList = withCreatorOnPrivateGuestList(!!isPrivate, guests, session.user.id, session.user.role)
+
   const workspace = await prisma.workspace.create({
-    data: { name: name.trim(), slug }
+    data: {
+      name: name.trim(),
+      slug,
+      isPrivate: !!isPrivate,
+      guests: { create: guestList.map(g => ({ userId: g.userId, permission: g.permission })) }
+    }
   })
 
   logger.info('workspace-create-success', { requestId, userId: session.user.id, workspaceId: workspace.id })
@@ -95,7 +99,7 @@ export async function POST(req) {
     action: 'WORKSPACE_CREATE',
     resource: 'workspace',
     resourceId: workspace.id,
-    after: { name: workspace.name, slug: workspace.slug },
+    after: { name: workspace.name, slug: workspace.slug, isPrivate: workspace.isPrivate },
     metadata: { requestId },
     requestId
   })

@@ -1,7 +1,8 @@
 import { cookies } from 'next/headers'
 
 import { prisma } from '@/libs/prisma'
-import { isHighAdmin } from '@/utils/roleHelpers'
+import { isHighAdmin, canManageWorkspaceContent, canCreateWorkspaceContent } from '@/utils/roleHelpers'
+import { workspaceAccessInclude } from '@/libs/workspaceAccess'
 
 /** Resolve workspace para criar/editar formulários (cookie para highAdmin) */
 export async function resolveFormWorkspaceId(session, formWorkspaceId = null) {
@@ -31,7 +32,34 @@ export async function listCustomRolesForForms(workspaceId) {
   })
 }
 
-/** Apenas highAdmin gerencia forms (qualquer workspace ativo) */
-export function canManageFormInWorkspace(session, _workspaceId) {
-  return isHighAdmin(session.user.role)
+/** highAdmin edita forms existentes, mas só em workspaces aos quais tem acesso de edição (respeita isPrivate/nível de convite) */
+export async function canManageFormInWorkspace(session, workspaceId) {
+  if (!isHighAdmin(session.user.role)) return false
+
+  if (!workspaceId) return false
+
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    include: workspaceAccessInclude
+  })
+
+  if (!workspace) return false
+
+  return canManageWorkspaceContent(session.user, workspace)
+}
+
+/** highAdmin cria forms novos, mas só em workspaces onde tem nível "create" (respeita isPrivate/nível de convite) */
+export async function canCreateFormInWorkspace(session, workspaceId) {
+  if (!isHighAdmin(session.user.role)) return false
+
+  if (!workspaceId) return false
+
+  const workspace = await prisma.workspace.findUnique({
+    where: { id: workspaceId },
+    include: workspaceAccessInclude
+  })
+
+  if (!workspace) return false
+
+  return canCreateWorkspaceContent(session.user, workspace)
 }

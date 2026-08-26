@@ -7,9 +7,10 @@ import { authOptions } from '@/libs/auth'
 import { createAuditLog } from '@/libs/auditService'
 import { dashboardIncludes, getAuthorizedDashboard, stripDashboardSensitiveFields } from '@/libs/dashboardAccess'
 import { getRequestId, logger } from '@/libs/logger'
-import { isHighAdmin } from '@/utils/roleHelpers'
+import { isHighAdmin, canManageWorkspaceContent } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
+import { workspaceAccessInclude } from '@/libs/workspaceAccess'
 
 function sanitizeDashboardTitle(value) {
   return String(value || 'Dashboard sem título')
@@ -102,6 +103,18 @@ export async function PUT(req, { params }) {
     return response
   }
 
+  const existingWorkspace = await prisma.workspace.findUnique({
+    where: { id: existing.workspaceId },
+    include: workspaceAccessInclude
+  })
+
+  if (!existingWorkspace || !canManageWorkspaceContent(session.user, existingWorkspace)) {
+    logger.warn('dashboard-update-forbidden-workspace', { requestId, userId: session.user.id, dashboardId: id })
+    const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
+    response.headers.set('x-request-id', requestId)
+    return response
+  }
+
   const updateData = {}
 
   if (iframeCode) {
@@ -120,11 +133,17 @@ export async function PUT(req, { params }) {
     updateData.title = sanitizeDashboardTitle(customTitle)
   }
 
-  if (workspaceId) {
-    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId } })
+  if (workspaceId && workspaceId !== existing.workspaceId) {
+    const ws = await prisma.workspace.findUnique({ where: { id: workspaceId }, include: workspaceAccessInclude })
 
     if (!ws) {
       const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+      response.headers.set('x-request-id', requestId)
+      return response
+    }
+
+    if (!canManageWorkspaceContent(session.user, ws)) {
+      const response = NextResponse.json({ message: 'Acesso negado ao workspace de destino' }, { status: 403 })
       response.headers.set('x-request-id', requestId)
       return response
     }
@@ -215,6 +234,18 @@ export async function DELETE(req, { params }) {
 
   if (!existing) {
     const response = NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
+    response.headers.set('x-request-id', requestId)
+    return response
+  }
+
+  const existingWorkspace = await prisma.workspace.findUnique({
+    where: { id: existing.workspaceId },
+    include: workspaceAccessInclude
+  })
+
+  if (!existingWorkspace || !canManageWorkspaceContent(session.user, existingWorkspace)) {
+    logger.warn('dashboard-delete-forbidden-workspace', { requestId, userId: session.user.id, dashboardId: id })
+    const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
     response.headers.set('x-request-id', requestId)
     return response
   }

@@ -27,7 +27,7 @@ const FormEditPage = async ({ params }) => {
 
     if (!form) redirect(`/${lang}/forms`)
 
-    if (!canManageFormInWorkspace(session, form.workspaceId)) {
+    if (!(await canManageFormInWorkspace(session, form.workspaceId))) {
       redirect(`/${lang}/forms`)
     }
   }

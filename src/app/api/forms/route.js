@@ -9,8 +9,9 @@ import { prisma } from '@/libs/prisma'
 import { createAuditLog } from '@/libs/auditService'
 import { createNotification } from '@/libs/notifications'
 import { buildFormListWhereForRole, getUserFormContext } from '@/libs/formAccess'
-import { canManageFormInWorkspace, resolveFormWorkspaceId } from '@/libs/formWorkspace'
+import { canCreateFormInWorkspace, resolveFormWorkspaceId } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
+import { resolveModuleWorkspaceScope, getAccessibleWorkspaceIds } from '@/libs/workspaceAccess'
 
 // GET /api/forms - lista forms do workspace filtrado por cargo ou customRole
 export async function GET(req) {
@@ -32,8 +33,34 @@ export async function GET(req) {
     if (isHighAdmin(role)) {
       const { searchParams } = new URL(req.url)
       const workspaceFilter = searchParams.get('workspaceId')
-      if (workspaceFilter) workspaceId = workspaceFilter
-      else workspaceId = (await resolveFormWorkspaceId(session)) || null
+
+      if (workspaceFilter) {
+        // High admin pediu um workspace específico: valida acesso (isPrivate/convidados)
+        const scope = await resolveModuleWorkspaceScope(session, workspaceFilter)
+
+        if (scope.error) {
+          const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
+          response.headers.set('x-request-id', requestId)
+          return response
+        }
+
+        workspaceId = scope.workspaceId
+      } else {
+        workspaceId = (await resolveFormWorkspaceId(session)) || null
+
+        // Se resolveu um workspace "padrão", ainda assim precisa validar acesso a ele
+        if (workspaceId) {
+          const scope = await resolveModuleWorkspaceScope(session, workspaceId)
+
+          if (scope.error) {
+            const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
+            response.headers.set('x-request-id', requestId)
+            return response
+          }
+
+          workspaceId = scope.workspaceId
+        }
+      }
     } else if (role === 'admin') {
       workspaceId = session.user.workspaceId
     } else {
@@ -111,16 +138,22 @@ export async function POST(req) {
       return response
     }
 
-    if (!canManageFormInWorkspace(session, workspaceId)) {
-      const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-      response.headers.set('x-request-id', requestId)
-      return response
-    }
-
     const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
 
     if (!workspace) {
       const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+      response.headers.set('x-request-id', requestId)
+      return response
+    }
+
+    // Impede subAdmin/convidado sem nível "create" de criar form dentro de um workspace privado
+    if (!(await canCreateFormInWorkspace(session, workspaceId))) {
+      logger.warn('form-create-forbidden-workspace', {
+        requestId,
+        userId: session.user.id,
+        workspaceId
+      })
+      const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
       response.headers.set('x-request-id', requestId)
       return response
     }

@@ -26,8 +26,15 @@ export const updateProfileSchema = v.object({
 })
 
 // ── Workspaces ──────────────────────────────
+export const workspaceGuestSchema = v.object({
+  userId: v.pipe(v.string(), v.minLength(1)),
+  permission: v.picklist(['view', 'edit', 'create'], 'Nível de permissão inválido')
+})
+
 export const createWorkspaceSchema = v.object({
-  name: v.pipe(v.string(), v.minLength(1, 'Nome é obrigatório'))
+  name: v.pipe(v.string(), v.minLength(1, 'Nome é obrigatório')),
+  isPrivate: v.optional(v.boolean()),
+  guests: v.optional(v.array(workspaceGuestSchema))
 })
 
 // ── Users ───────────────────────────────────

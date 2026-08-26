@@ -12,7 +12,8 @@ import { db as permissionData } from '@/fake-db/apps/permissions'
 import { db as profileData } from '@/fake-db/pages/userProfile'
 import { authOptions } from '@/libs/auth'
 import { prisma } from '@/libs/prisma'
-import { isHighAdmin } from '@/utils/roleHelpers'
+import { isHighAdmin, canAccessWorkspace } from '@/utils/roleHelpers'
+import { getAccessibleWorkspaces } from '@/libs/workspaceAccess'
 
 export const getUserData = async () => {
   const session = await getServerSession(authOptions)
@@ -86,11 +87,10 @@ export const getWorkspaces = async () => {
     return workspace ? [workspace] : []
   }
 
-  // High admin (superAdmin/subAdmin): return all workspaces
-  return prisma.workspace.findMany({
-    include: { _count: { select: { users: true } } },
-    orderBy: { createdAt: 'desc' }
-  })
+  // High admin (superAdmin/subAdmin): retorna apenas os workspaces acessíveis (respeita isPrivate/convites)
+  const workspaces = await getAccessibleWorkspaces(session, { _count: { select: { users: true } } })
+
+  return workspaces.map(({ guests: _guests, ...ws }) => ws)
 }
 
 export const getWorkspaceById = async id => {
@@ -98,18 +98,21 @@ export const getWorkspaceById = async id => {
 
   if (!session) return null
 
-  if (!isHighAdmin(session.user.role) && session.user.workspaceId !== id) {
-    return null
-  }
-
-  return prisma.workspace.findUnique({
+  const workspace = await prisma.workspace.findUnique({
     where: { id },
     include: {
       users: {
         select: { id: true, name: true, email: true, role: true, image: true }
-      }
+      },
+      guests: { select: { userId: true, permission: true } }
     }
   })
+
+  if (!workspace || !canAccessWorkspace(session.user, workspace)) {
+    return null
+  }
+
+  return workspace
 }
 
 export const getCurrentUserWorkspace = async () => {

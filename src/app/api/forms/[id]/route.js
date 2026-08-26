@@ -4,13 +4,14 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
-import { isHighAdmin } from '@/utils/roleHelpers'
+import { isHighAdmin, canAccessWorkspace } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { createAuditLog } from '@/libs/auditService'
 import { createNotification } from '@/libs/notifications'
 import { canNonHighAdminAccessForm, getUserFormContext } from '@/libs/formAccess'
 import { canManageFormInWorkspace } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
+import { workspaceAccessInclude } from '@/libs/workspaceAccess'
 
 // GET /api/forms/[id]
 export async function GET(req, { params }) {
@@ -28,7 +29,10 @@ export async function GET(req, { params }) {
 
     const form = await prisma.form.findUnique({
       where: { id },
-      include: { workspace: true, publicLinks: { orderBy: { createdAt: 'desc' }, take: 10 } }
+      include: {
+        workspace: { include: workspaceAccessInclude },
+        publicLinks: { orderBy: { createdAt: 'desc' }, take: 10 }
+      }
     })
 
     if (!form) {
@@ -39,7 +43,14 @@ export async function GET(req, { params }) {
 
     const role = session.user.role
 
-    if (!isHighAdmin(role)) {
+    if (isHighAdmin(role)) {
+      // highAdmin só acessa forms de workspaces aos quais tem acesso (isPrivate/convidados)
+      if (!canAccessWorkspace(session.user, form.workspace)) {
+        const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+        response.headers.set('x-request-id', requestId)
+        return response
+      }
+    } else {
       if (form.workspaceId !== session.user.workspaceId) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
         response.headers.set('x-request-id', requestId)
@@ -111,7 +122,7 @@ export async function PUT(req, { params }) {
       return response
     }
 
-    if (!canManageFormInWorkspace(session, form.workspaceId)) {
+    if (!(await canManageFormInWorkspace(session, form.workspaceId))) {
       const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
       response.headers.set('x-request-id', requestId)
       return response
@@ -198,7 +209,7 @@ export async function DELETE(req, { params }) {
       return response
     }
 
-    if (!canManageFormInWorkspace(session, form.workspaceId)) {
+    if (!(await canManageFormInWorkspace(session, form.workspaceId))) {
       const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
       response.headers.set('x-request-id', requestId)
       return response

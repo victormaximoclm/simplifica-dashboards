@@ -1,5 +1,6 @@
 import { prisma } from '@/libs/prisma'
-import { isHighAdmin } from '@/utils/roleHelpers'
+import { isHighAdmin, canAccessWorkspace } from '@/utils/roleHelpers'
+import { workspaceAccessInclude } from '@/libs/workspaceAccess'
 
 export const dashboardIncludes = {
   workspace: { select: { id: true, name: true } },
@@ -30,6 +31,16 @@ export async function getAuthorizedDashboard({ dashboardId, session }) {
   }
 
   if (isHighAdmin(session.user.role)) {
+    // highAdmin só acessa dashboards de workspaces aos quais tem acesso (respeita isPrivate/guests)
+    const workspace = await prisma.workspace.findUnique({
+      where: { id: dashboard.workspaceId },
+      select: { id: true, isPrivate: true, ...workspaceAccessInclude }
+    })
+
+    if (!workspace || !canAccessWorkspace(session.user, workspace)) {
+      return { ok: false, status: 403, message: 'Acesso negado' }
+    }
+
     return { ok: true, dashboard }
   }
 
