@@ -253,6 +253,20 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     })
   }, [fields, fetchDatasource])
 
+  // Chave estável com o valor dos campos "pai" (dependsOn). Usar `values` inteiro como
+  // dependência do efeito abaixo causava loop infinito: o efeito resetava o valor do campo
+  // filho a cada rodada, o que trocava a referência de `values` e disparava o efeito de novo
+  // indefinidamente (requests infinitas ao webhook). Essa chave só muda quando o valor do
+  // campo pai realmente muda.
+  const dependsOnKey = useMemo(
+    () =>
+      fields
+        .filter(f => f.dependsOn && (f.type === 'dynamic-list' || f.type === 'multi-select-dynamic'))
+        .map(f => `${f.id}:${JSON.stringify(values[f.dependsOn] ?? null)}`)
+        .join('|'),
+    [fields, values]
+  )
+
   useEffect(() => {
     fields.forEach(async field => {
       if (!field.dependsOn) return
@@ -284,7 +298,8 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
         setLoadingOptions(prev => ({ ...prev, [field.id]: false }))
       }
     })
-  }, [values, fields, fetchDatasource])
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [dependsOnKey, fields, fetchDatasource])
 
   const setValue = (fieldId, value) => setValues(prev => ({ ...prev, [fieldId]: value }))
 
