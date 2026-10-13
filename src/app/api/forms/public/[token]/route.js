@@ -29,6 +29,12 @@ export async function GET(req, { params }) {
 
     const inactiveReason = getPublicLinkInactiveReason(publicLink)
 
+    if (inactiveReason === 'revoked') {
+      const response = NextResponse.json({ message: 'Link desativado' }, { status: 403 })
+      response.headers.set('x-request-id', requestId)
+      return response
+    }
+
     if (inactiveReason === 'used') {
       const response = NextResponse.json({ message: 'Link já utilizado' }, { status: 403 })
       response.headers.set('x-request-id', requestId)

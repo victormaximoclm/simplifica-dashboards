@@ -4,7 +4,7 @@ import { redirect } from 'next/navigation'
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
-import { isHighAdmin } from '@/utils/roleHelpers'
+import { isHighAdmin, isSuperOnly } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { canNonHighAdminAccessForm, getUserFormContext } from '@/libs/formAccess'
 import { canGeneratePublicLinksInFill, canGeneratePublicLinks } from '@/libs/formPermissions'
@@ -43,7 +43,15 @@ const FormLinksPage = async ({ params }) => {
     ? await canGeneratePublicLinks(role)
     : await canGeneratePublicLinksInFill(role, form, ctx)
 
-  return <FormLinksView formId={form.id} formTitle={form.title} lang={lang} canGenerateLink={canGenerateLink} />
+  return (
+    <FormLinksView
+      formId={form.id}
+      formTitle={form.title}
+      lang={lang}
+      canGenerateLink={canGenerateLink}
+      canRevokeLink={isSuperOnly(role)}
+    />
+  )
 }
 
 export default FormLinksPage

@@ -1,26 +1,26 @@
 import { prisma } from '@/libs/prisma'
 
-/** Link público ainda aceita visualização e envio */
-export function isPublicLinkActive(link) {
-  if (!link) return false
-  if (link.used) return false
-  if (new Date() >= new Date(link.expiresAt)) return false
-  return true
-}
-
+/** Motivo pelo qual o link não aceita visualização/envio (null = ativo) */
 export function getPublicLinkInactiveReason(link) {
   if (!link) return 'invalid'
+  if (link.revokedAt) return 'revoked'
+  if (link.permanent) return null
   if (link.used) return 'used'
-  if (new Date() >= new Date(link.expiresAt)) return 'expired'
+  if (!link.expiresAt || new Date() >= new Date(link.expiresAt)) return 'expired'
   return null
 }
 
-// Gera link público com expiração em horas (padrão 24h)
-export async function generatePublicLink(formId, expiresInHours = 24) {
-  const expiresAt = new Date(Date.now() + expiresInHours * 60 * 60 * 1000)
+/** Link público ainda aceita visualização e envio */
+export function isPublicLinkActive(link) {
+  return getPublicLinkInactiveReason(link) === null
+}
+
+// Gera link público temporário (expira em horas, uso único) ou permanente (reutilizável, sem expiração)
+export async function generatePublicLink(formId, { permanent = false, expiresInHours = 24 } = {}) {
+  const expiresAt = permanent ? null : new Date(Date.now() + expiresInHours * 60 * 60 * 1000)
 
   return prisma.formPublicLink.create({
-    data: { formId, expiresAt }
+    data: { formId, expiresAt, permanent }
   })
 }
 
@@ -32,8 +32,11 @@ export async function validateToken(token) {
   })
 
   if (!link) throw new Error('Link inválido')
-  if (!isPublicLinkActive(link)) {
-    if (link.used) throw new Error('Link já utilizado')
+  const reason = getPublicLinkInactiveReason(link)
+
+  if (reason) {
+    if (reason === 'revoked') throw new Error('Link desativado')
+    if (reason === 'used') throw new Error('Link já utilizado')
     throw new Error('Link expirado')
   }
 
@@ -41,17 +44,26 @@ export async function validateToken(token) {
 }
 
 /**
- * Reserva o link para um único envio (atômico).
- * Marca used=true e expiresAt=agora para bloquear reenvio imediato.
+ * Reserva o link para um envio (atômico).
+ * Temporário: marca used=true e expiresAt=agora para bloquear reenvio imediato.
+ * Permanente: apenas valida que está ativo (não é consumido).
  * @returns {Promise<boolean>} true se o link foi consumido nesta requisição
  */
 export async function claimPublicLinkForSubmit({ token, formId }) {
   const now = new Date()
 
+  const permanent = await prisma.formPublicLink.count({
+    where: { token, formId, permanent: true, revokedAt: null }
+  })
+
+  if (permanent > 0) return true
+
   const result = await prisma.formPublicLink.updateMany({
     where: {
       token,
       formId,
+      permanent: false,
+      revokedAt: null,
       used: false,
       expiresAt: { gt: now }
     },
@@ -70,6 +82,14 @@ export async function consumeToken(token) {
   return prisma.formPublicLink.update({
     where: { token },
     data: { used: true, expiresAt: now }
+  })
+}
+
+// Desativa um link (temporário ou permanente)
+export async function revokePublicLink(linkId) {
+  return prisma.formPublicLink.update({
+    where: { id: linkId },
+    data: { revokedAt: new Date() }
   })
 }
 

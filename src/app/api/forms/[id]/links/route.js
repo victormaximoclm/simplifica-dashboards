@@ -9,6 +9,7 @@ import { prisma } from '@/libs/prisma'
 import { createAuditLog } from '@/libs/auditService'
 import { canNonHighAdminAccessForm, getUserFormContext, isFormHighAdminOnly } from '@/libs/formAccess'
 import { canGeneratePublicLinks } from '@/libs/formPermissions'
+import { generatePublicLink } from '@/libs/formlinkservice'
 
 // GET /api/forms/[id]/links - lista links gerados
 export async function GET(req, { params }) {
@@ -85,7 +86,14 @@ export async function POST(req, { params }) {
   try {
     const { id } = await params
     const body = await req.json()
-    const { expiresInHours = 24 } = body
+    const permanent = body.permanent === true
+    const expiresInHours = Number(body.expiresInHours ?? 24)
+
+    if (!permanent && (!Number.isFinite(expiresInHours) || expiresInHours < 1 || expiresInHours > 168)) {
+      const response = NextResponse.json({ message: 'Expiração deve estar entre 1 e 168 horas' }, { status: 400 })
+      response.headers.set('x-request-id', requestId)
+      return response
+    }
 
     const form = await prisma.form.findUnique({ where: { id } })
 
@@ -103,7 +111,7 @@ export async function POST(req, { params }) {
 
     const role = session.user.role
 
-    if (!canGeneratePublicLinks(role)) {
+    if (!(await canGeneratePublicLinks(role))) {
       const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
       response.headers.set('x-request-id', requestId)
       return response
@@ -122,12 +130,7 @@ export async function POST(req, { params }) {
       }
     }
 
-    const expiresAt = new Date()
-    expiresAt.setHours(expiresAt.getHours() + expiresInHours)
-
-    const publicLink = await prisma.formPublicLink.create({
-      data: { formId: id, expiresAt }
-    })
+    const publicLink = await generatePublicLink(id, { permanent, expiresInHours })
 
     await createAuditLog({
       userId: session.user.id,
@@ -135,7 +138,7 @@ export async function POST(req, { params }) {
       action: 'FORM_LINK_CREATE',
       entityType: 'form',
       entityId: id,
-      after: { linkId: publicLink.id, expiresAt },
+      after: { linkId: publicLink.id, permanent, expiresAt: publicLink.expiresAt },
       metadata: { requestId }
     })
 

@@ -22,6 +22,14 @@ const PublicFormPage = async ({ params }) => {
 
   const inactiveReason = getPublicLinkInactiveReason(publicLink)
 
+  if (inactiveReason === 'revoked') {
+    return (
+      <main className='min-h-screen flex items-center justify-center p-6'>
+        <p className='text-red-500 text-center'>Link desativado. Não é possível enviar respostas.</p>
+      </main>
+    )
+  }
+
   if (inactiveReason === 'used') {
     return (
       <main className='min-h-screen flex items-center justify-center p-6'>

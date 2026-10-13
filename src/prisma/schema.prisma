@@ -297,7 +297,9 @@ model FormPublicLink {
   formId    String
   form      Form     @relation(fields: [formId], references: [id], onDelete: Cascade)
   token     String   @unique @default(cuid())
-  expiresAt DateTime
+  expiresAt DateTime?
+  permanent Boolean  @default(false)
+  revokedAt DateTime?
   used      Boolean  @default(false)
   createdAt DateTime @default(now())
 }

@@ -19,11 +19,12 @@ import {
   formTitleCls
 } from './formStyles'
 
-const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false }) => {
+const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false, canRevokeLink = false }) => {
   const router = useRouter()
   const [links, setLinks] = useState([])
   const [loading, setLoading] = useState(true)
   const [generating, setGenerating] = useState(false)
+  const [linkType, setLinkType] = useState('temporary')
   const [expiresInHours, setExpiresInHours] = useState(24)
   const [copied, setCopied] = useState(null)
   const [error, setError] = useState(null)
@@ -52,7 +53,9 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false }) => 
       const res = await fetch(`/api/forms/${formId}/links`, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
-        body: JSON.stringify({ expiresInHours: Number(expiresInHours) })
+        body: JSON.stringify(
+          linkType === 'permanent' ? { permanent: true } : { expiresInHours: Number(expiresInHours) }
+        )
       })
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
@@ -69,6 +72,22 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false }) => 
       setError(err.message)
     } finally {
       setGenerating(false)
+    }
+  }
+
+  const revokeLink = async linkId => {
+    if (!window.confirm('Desativar este link? Ele deixará de aceitar respostas.')) return
+    setError(null)
+    try {
+      const res = await fetch(`/api/forms/${formId}/links/${linkId}`, { method: 'DELETE' })
+      if (!res.ok) {
+        const err = await res.json().catch(() => ({}))
+        throw new Error(err.message || 'Erro ao desativar link')
+      }
+      const updated = await res.json()
+      setLinks(prev => prev.map(l => (l.id === linkId ? { ...l, revokedAt: updated.revokedAt } : l)))
+    } catch (err) {
+      setError(err.message)
     }
   }
 
@@ -95,19 +114,32 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false }) => 
       {canGenerateLink && (
         <section className={`${formSectionCls} mb-6`}>
           <h2 className={`${formSectionTitleCls} mb-3`}>Gerar novo link</h2>
-          <p className={`${formCaptionCls} mb-3`}>Cada link é de uso único e expira automaticamente.</p>
+          <p className={`${formCaptionCls} mb-3`}>
+            {linkType === 'permanent'
+              ? 'Link permanente: não expira e aceita vários envios até ser desativado.'
+              : 'Link temporário: uso único e expira automaticamente.'}
+          </p>
           <div className='flex flex-wrap gap-3 items-end'>
             <label className={`flex flex-col gap-1 ${formCaptionCls}`}>
-              Expira em (horas)
-              <input
-                type='number'
-                min={1}
-                max={168}
-                value={expiresInHours}
-                onChange={e => setExpiresInHours(e.target.value)}
-                className={`${formInputCls} w-24`}
-              />
+              Tipo
+              <select value={linkType} onChange={e => setLinkType(e.target.value)} className={`${formInputCls} w-40`}>
+                <option value='temporary'>Temporário</option>
+                <option value='permanent'>Permanente</option>
+              </select>
             </label>
+            {linkType === 'temporary' && (
+              <label className={`flex flex-col gap-1 ${formCaptionCls}`}>
+                Expira em (horas)
+                <input
+                  type='number'
+                  min={1}
+                  max={168}
+                  value={expiresInHours}
+                  onChange={e => setExpiresInHours(e.target.value)}
+                  className={`${formInputCls} w-24`}
+                />
+              </label>
+            )}
             <button
               type='button'
               onClick={generateLink}
@@ -132,23 +164,32 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false }) => 
         ) : (
           <ul className='flex flex-col gap-2'>
             {links.map(link => {
-              const expired = new Date() > new Date(link.expiresAt)
-              const status = link.used ? 'Usado' : expired ? 'Expirado' : 'Ativo'
+              const revoked = !!link.revokedAt
+              const expired = !link.permanent && new Date() > new Date(link.expiresAt)
+              const active = !revoked && (link.permanent || (!link.used && !expired))
+              const status = revoked ? 'Desativado' : active ? 'Ativo' : link.used ? 'Usado' : 'Expirado'
               return (
                 <li key={link.id} className={formListItemCls}>
                   <div className='flex-1 min-w-0'>
                     <p className={`text-xs ${formMutedCls} truncate`}>{link.publicUrl}</p>
                     <p className={`text-xs ${formCaptionCls} mt-0.5`}>
-                      Expira: {new Date(link.expiresAt).toLocaleString('pt-BR')} · {status}
+                      {link.permanent
+                        ? 'Permanente'
+                        : `Expira: ${new Date(link.expiresAt).toLocaleString('pt-BR')}`}{' '}
+                      · {status}
                     </p>
                   </div>
-                  {!link.used && !expired && (
-                    <button
-                      onClick={() => copyUrl(link.publicUrl, link.id)}
-                      className={`shrink-0 ${btnSecondary}`}
-                    >
-                      {copied === link.id ? 'Copiado!' : 'Copiar'}
-                    </button>
+                  {active && (
+                    <div className='flex gap-2 shrink-0'>
+                      <button onClick={() => copyUrl(link.publicUrl, link.id)} className={btnSecondary}>
+                        {copied === link.id ? 'Copiado!' : 'Copiar'}
+                      </button>
+                      {canRevokeLink && (
+                        <button onClick={() => revokeLink(link.id)} className={btnSecondary}>
+                          Desativar
+                        </button>
+                      )}
+                    </div>
                   )}
                 </li>
               )

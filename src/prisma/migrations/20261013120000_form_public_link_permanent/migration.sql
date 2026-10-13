@@ -1,0 +1,4 @@
+-- AlterTable
+ALTER TABLE "FormPublicLink" ADD COLUMN "permanent" BOOLEAN NOT NULL DEFAULT false,
+ADD COLUMN "revokedAt" TIMESTAMP(3),
+ALTER COLUMN "expiresAt" DROP NOT NULL;

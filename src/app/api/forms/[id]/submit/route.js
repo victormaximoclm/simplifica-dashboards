@@ -48,7 +48,7 @@ export async function POST(req, { params }) {
       if (!claimed) {
         const existing = await prisma.formPublicLink.findUnique({
           where: { token: publicToken },
-          select: { used: true, expiresAt: true, formId: true }
+          select: { used: true, revokedAt: true, expiresAt: true, formId: true }
         })
 
         if (!existing || existing.formId !== id) {
@@ -67,9 +67,12 @@ export async function POST(req, { params }) {
           return response
         }
 
-        const message = existing.used
-          ? 'Link já utilizado. Não é possível enviar outra resposta.'
-          : 'Link expirado. Não é possível enviar respostas.'
+        const reason = existing.revokedAt ? 'link_revoked' : existing.used ? 'link_already_used' : 'link_expired'
+        const message = {
+          link_revoked: 'Link desativado. Não é possível enviar respostas.',
+          link_already_used: 'Link já utilizado. Não é possível enviar outra resposta.',
+          link_expired: 'Link expirado. Não é possível enviar respostas.'
+        }[reason]
 
         await createAuditLog({
           userId: `public:${publicToken}`,
@@ -77,7 +80,7 @@ export async function POST(req, { params }) {
           action: 'FORM_SUBMIT_REJECTED',
           entityType: 'form',
           entityId: id,
-          after: { reason: existing.used ? 'link_already_used' : 'link_expired' },
+          after: { reason },
           metadata: { requestId }
         })
 
