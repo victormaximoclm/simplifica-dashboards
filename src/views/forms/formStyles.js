@@ -82,9 +82,9 @@ export const formScrollCls = [
   'hover:[&::-webkit-scrollbar-thumb]:bg-[var(--mui-palette-primary-main)]'
 ].join(' ')
 
-/** Painel flutuante dos dropdowns (sem scroll próprio) */
+/** Painel flutuante dos dropdowns (sem scroll próprio): lista plana no fundo da paleta */
 export const formDropdownPanelCls = [
-  'absolute z-30 mt-1.5 w-full rounded-xl py-1.5 shadow-xl',
+  'absolute z-30 mt-1.5 w-full rounded-lg py-1 shadow-xl overflow-hidden',
   'border border-[var(--mui-palette-primary-main)]',
   inputPaper
 ].join(' ')
@@ -92,16 +92,23 @@ export const formDropdownPanelCls = [
 /** Painel de dropdown com lista rolável */
 export const formDropdownCls = [formDropdownPanelCls, 'max-h-52 overflow-y-auto', formScrollCls].join(' ')
 
-export const formDropdownItemCls = [
-  'w-[calc(100%-0.75rem)] mx-1.5 text-left px-3 py-2 rounded-lg text-sm !cursor-pointer transition-colors',
+/** Item da lista: sem fundo próprio (zera o cinza padrão do <button>), só realce no hover */
+const dropdownRowBase = [
+  'block w-full text-left px-3.5 py-2 text-sm !cursor-pointer transition-colors',
+  '!bg-transparent !border-0 !rounded-none !shadow-none',
   textWhite,
-  'hover:bg-[var(--mui-palette-primary-lightOpacity)]'
+  'hover:!bg-[var(--mui-palette-primary-lightOpacity)]'
 ].join(' ')
 
+export const formDropdownItemCls = dropdownRowBase
+
+/** Item já escolhido: letra laranja + fundo levemente escurecido */
+export const formDropdownItemSelectedCls =
+  '!text-[var(--mui-palette-primary-main)] !bg-[var(--mui-palette-action-hover)] font-medium'
+
 export const formDropdownAddCls = [
-  'w-[calc(100%-0.75rem)] mx-1.5 text-left px-3 py-2 rounded-lg text-sm !cursor-pointer transition-colors flex items-center gap-2',
-  'text-[var(--mui-palette-primary-main)] font-medium',
-  'hover:bg-[var(--mui-palette-primary-lightOpacity)]'
+  dropdownRowBase,
+  'flex items-center gap-2 !text-[var(--mui-palette-primary-main)] font-medium'
 ].join(' ')
 
 /** Gatilho do FormSelect (mesmo visual do input) */
@@ -116,17 +123,18 @@ export const formSelectTriggerCls = [
 ].join(' ')
 
 export const formDropdownOptionCls = [
-  'flex items-center justify-between gap-2 mx-1.5 px-3 py-2 rounded-lg text-sm transition-colors',
+  'flex items-center justify-between gap-2 px-3.5 py-2 text-sm transition-colors',
   textWhite,
   cursor
 ].join(' ')
 
 export const formDropdownOptionActiveCls = 'bg-[var(--mui-palette-primary-lightOpacity)]'
 
+/** Selecionada: letra laranja + fundo levemente escurecido */
 export const formDropdownOptionSelectedCls =
-  'bg-[var(--mui-palette-primary-main)] text-[var(--mui-palette-primary-contrastText)] font-medium'
+  'bg-[var(--mui-palette-action-hover)] !text-[var(--mui-palette-primary-main)] font-medium'
 
-export const formDropdownEmptyCls = `px-4 py-2 text-sm ${textWhiteSoft}`
+export const formDropdownEmptyCls = `px-3.5 py-2 text-sm ${textWhiteSoft}`
 
 export const formChipCls = [
   'inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium',

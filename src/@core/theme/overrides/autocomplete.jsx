@@ -49,6 +49,8 @@ const autocomplete = skin => ({
         })
       },
       listbox: ({ theme }) => ({
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'var(--mui-palette-primary-mainOpacity) transparent',
         '& .MuiAutocomplete-option': {
           paddingBlock: theme.spacing(2),
           marginInline: theme.spacing(2),

@@ -12,6 +12,8 @@ const menu = skin => ({
     styleOverrides: {
       paper: ({ theme }) => ({
         marginBlockStart: theme.spacing(0.5),
+        scrollbarWidth: 'thin',
+        scrollbarColor: 'var(--mui-palette-primary-mainOpacity) transparent',
         ...(skin !== 'bordered' && {
           boxShadow: 'var(--mui-customShadows-lg)'
         })

@@ -17,6 +17,7 @@ import {
   formDropdownAddCls,
   formDropdownCls,
   formDropdownItemCls,
+  formDropdownItemSelectedCls,
   formErrorCls,
   formFieldsWrapCls,
   formHeadingCls,
@@ -871,7 +872,7 @@ const StaticSingleSelect = ({ opts, value, onChange, onBlur }) => {
             <li key={opt.value}>
               <button
                 type='button'
-                className={formDropdownItemCls}
+                className={`${formDropdownItemCls} ${opt.value === value ? formDropdownItemSelectedCls : ''}`}
                 onClick={() => {
                   onChange(opt.value)
                   setOpen(false)
@@ -921,7 +922,11 @@ const StaticMultiSelect = ({ opts, selected, onChange, fieldError }) => {
         <ul className={formDropdownCls}>
           {opts.map(opt => (
             <li key={opt.value}>
-              <button type='button' className={formDropdownItemCls} onClick={() => toggle(opt.value)}>
+              <button
+                type='button'
+                className={`${formDropdownItemCls} ${selected.includes(opt.value) ? formDropdownItemSelectedCls : ''}`}
+                onClick={() => toggle(opt.value)}
+              >
                 <div className='flex items-center gap-2'>
                   <input
                     type='checkbox'
@@ -1184,7 +1189,7 @@ const DynamicListInput = ({ field, value, options, loading, onChange, onBlur }) 
                 <li key={opt.value}>
                   <button
                     type='button'
-                    className={formDropdownItemCls}
+                    className={`${formDropdownItemCls} ${opt.value === value ? formDropdownItemSelectedCls : ''}`}
                     onClick={() => {
                       onChange(opt.value)
                       setSearch('')
