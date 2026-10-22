@@ -56,7 +56,7 @@ function isFieldEmpty(val, field, values = {}) {
 
 function validateFieldRegex(field, val) {
   const regex = field.validation?.regex?.trim()
-  if (!regex || val === undefined || val === '' || val === null) return null
+  if (!regex || val === undefined || val === '' || val === null || typeof val === 'object') return null
   try {
     return new RegExp(regex).test(String(val)) ? null : field.validation?.message || 'Valor inválido'
   } catch {
@@ -365,7 +365,10 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       if (!isFieldVisible(field, values)) continue
 
       if (isFieldRequired(field, values) && isFieldEmpty(values[field.id], field, values)) {
-        const msg = `O campo "${field.label}" é obrigatório.`
+        const msg =
+          field.type === 'address-lookup'
+            ? `Selecione um endereço da lista de sugestões em "${field.label}".`
+            : `O campo "${field.label}" é obrigatório.`
         setError(msg)
         toast.error(msg, { position: 'bottom-center' })
         return
@@ -476,8 +479,12 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
     for (const field of currentFields) {
       if (!isFieldVisible(field, values)) continue
       if (isFieldRequired(field, values) && isFieldEmpty(values[field.id], field, values)) {
-        setError(`O campo "${field.label}" é obrigatório.`)
-        toast.error(`O campo "${field.label}" é obrigatório.`, { position: 'bottom-center' })
+        const msg =
+          field.type === 'address-lookup'
+            ? `Selecione um endereço da lista de sugestões em "${field.label}".`
+            : `O campo "${field.label}" é obrigatório.`
+        setError(msg)
+        toast.error(msg, { position: 'bottom-center' })
         return
       }
       const regexError = validateFieldRegex(field, values[field.id])
@@ -968,28 +975,98 @@ const CpfLookupInput = ({ field, cpfValue, nameValue, cpfError, loading, onCpfCh
   </FormFieldWrap>
 )
 
+// Endereço digitado à mão, usado só quando a busca não retorna sugestões ou está indisponível
+const manualAddress = text => ({
+  display: text.trim(),
+  manual: true,
+  street: '',
+  neighborhood: '',
+  city: '',
+  state: '',
+  postcode: '',
+  lat: null,
+  lon: null
+})
+
 const AddressLookupInput = ({ field, value, onChange }) => {
-  const [query, setQuery] = useState('')
+  const [query, setQuery] = useState(value?.display ?? '')
   const [suggestions, setSuggestions] = useState([])
   const [open, setOpen] = useState(false)
+  const [loading, setLoading] = useState(false)
+  const [searchError, setSearchError] = useState(null)
+  const [searched, setSearched] = useState(false)
   const debounceRef = useRef(null)
+  const requestRef = useRef(0)
+  const containerRef = useRef(null)
+
+  useEffect(() => {
+    const handle = e => {
+      if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false)
+    }
+    document.addEventListener('mousedown', handle)
+    return () => {
+      document.removeEventListener('mousedown', handle)
+      clearTimeout(debounceRef.current)
+    }
+  }, [])
 
   const search = q => {
     clearTimeout(debounceRef.current)
+    const requestId = ++requestRef.current
+    setSearchError(null)
+
+    if (!q || q.trim().length < 4) {
+      setSuggestions([])
+      setSearched(false)
+      setLoading(false)
+      return
+    }
+
     debounceRef.current = setTimeout(async () => {
-      if (!q || q.length < 4) return setSuggestions([])
-      const res = await fetch(
-        `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q)}&format=json&addressdetails=1&limit=5&countrycodes=br`,
-        { headers: { 'Accept-Language': 'pt-BR' } }
-      )
-      const data = await res.json()
-      setSuggestions(data)
-      setOpen(true)
+      setLoading(true)
+      try {
+        const res = await fetch(
+          `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q.trim())}&format=json&addressdetails=1&limit=5&countrycodes=br`,
+          { headers: { 'Accept-Language': 'pt-BR' } }
+        )
+        if (!res.ok) throw new Error(`HTTP ${res.status}`)
+        const data = await res.json()
+        if (requestId !== requestRef.current) return // resposta de uma busca antiga
+        const results = Array.isArray(data) ? data : []
+        setSuggestions(results)
+        setSearched(true)
+        setOpen(true)
+
+        // A API não conhece o endereço: libera o texto digitado, sob responsabilidade do usuário
+        if (results.length === 0) onChange(manualAddress(q))
+      } catch {
+        if (requestId !== requestRef.current) return
+        setSuggestions([])
+        setSearchError('Não foi possível consultar a busca de endereços agora.')
+        // API indisponível ou limitando requisições: não bloqueia o formulário, vale o texto digitado
+        onChange(manualAddress(q))
+      } finally {
+        if (requestId === requestRef.current) setLoading(false)
+      }
     }, 600)
   }
 
+  const handleInput = e => {
+    const text = e.target.value
+    setQuery(text)
+    // Editar o texto invalida a seleção (ou o texto livre) anterior: só vale o endereço escolhido na lista,
+    // ou o texto digitado quando a busca para ele não retorna nenhuma sugestão
+    if (value !== undefined && value !== '') onChange(undefined)
+    search(text)
+  }
+
   const select = item => {
-    const { road, suburb, city, town, village, state, postcode } = item.address
+    requestRef.current++
+    clearTimeout(debounceRef.current)
+    setLoading(false)
+    setSearched(false)
+    setSearchError(null)
+    const { road, suburb, city, town, village, state, postcode } = item.address ?? {}
     onChange({
       display: item.display_name,
       street: road ?? '',
@@ -1008,17 +1085,26 @@ const AddressLookupInput = ({ field, value, onChange }) => {
   return (
     <FormFieldWrap>
       <FormLabel required={field.required}>{field.label}</FormLabel>
-      <div className='relative'>
+      <div className='relative' ref={containerRef}>
         <input
           type='text'
           value={query}
-          onChange={e => {
-            setQuery(e.target.value)
-            search(e.target.value)
-          }}
+          onChange={handleInput}
+          onFocus={() => suggestions.length > 0 && setOpen(true)}
           placeholder={field.placeholder ?? 'Digite o endereço...'}
           className={formInputCls}
+          autoComplete='off'
         />
+        {loading && <p className='text-xs opacity-70 mt-1'>Buscando endereços...</p>}
+        {!loading && value?.manual && (
+          <p className='text-xs opacity-70 mt-1'>
+            {searchError ?? 'Endereço não encontrado na busca.'} O texto digitado será enviado como está; confira se
+            está completo e correto.
+          </p>
+        )}
+        {!loading && !searchError && query.trim() && !value && suggestions.length > 0 && !open && (
+          <p className='text-xs text-red-500 mt-1'>Selecione um endereço da lista de sugestões.</p>
+        )}
         {open && suggestions.length > 0 && (
           <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
             {suggestions.map(s => (
