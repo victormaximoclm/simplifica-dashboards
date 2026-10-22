@@ -1,5 +1,6 @@
 'use client'
 
+import FormSelect from '../FormSelect'
 import {
   btnIcon,
   formBuilderFieldLabelCls,
@@ -386,17 +387,11 @@ const ExtraFieldsEditor = ({ extraFields, onChange }) => {
           </Field>
 
           <Field label='Tipo'>
-            <select
+            <FormSelect
               value={ef.type}
-              onChange={e => updateExtra(ef.id, { type: e.target.value })}
-              className={formInputCls}
-            >
-              {EXTRA_FIELD_TYPES.map(t => (
-                <option key={t} value={t}>
-                  {t}
-                </option>
-              ))}
-            </select>
+              onChange={v => updateExtra(ef.id, { type: v })}
+              options={EXTRA_FIELD_TYPES.map(t => ({ value: t, label: t }))}
+            />
           </Field>
 
           {ef.type === 'select' && (
@@ -490,24 +485,24 @@ const ConditionalEditor = ({ field, allFields, onChange }) => {
           {/* Ação + Operador */}
           <div className='flex gap-2'>
             <Field label='Ação'>
-              <select
+              <FormSelect
                 value={visibility.action}
-                onChange={e => update({ action: e.target.value })}
-                className={formInputCls}
-              >
-                <option value='show'>Mostrar</option>
-                <option value='hide'>Ocultar</option>
-              </select>
+                onChange={v => update({ action: v })}
+                options={[
+                  { value: 'show', label: 'Mostrar' },
+                  { value: 'hide', label: 'Ocultar' }
+                ]}
+              />
             </Field>
             <Field label='Quando'>
-              <select
+              <FormSelect
                 value={visibility.operator}
-                onChange={e => update({ operator: e.target.value })}
-                className={formInputCls}
-              >
-                <option value='AND'>Todas (AND)</option>
-                <option value='OR'>Qualquer (OR)</option>
-              </select>
+                onChange={v => update({ operator: v })}
+                options={[
+                  { value: 'AND', label: 'Todas (AND)' },
+                  { value: 'OR', label: 'Qualquer (OR)' }
+                ]}
+              />
             </Field>
           </div>
 
@@ -524,47 +519,35 @@ const ConditionalEditor = ({ field, allFields, onChange }) => {
                 </div>
 
                 <Field label='Campo'>
-                  <select
+                  <FormSelect
                     value={rule.fieldId}
-                    onChange={e => updateRule(i, { fieldId: e.target.value, value: '' })}
-                    className={formInputCls}
-                  >
-                    <option value=''>Selecione...</option>
-                    {eligibleFields.map(f => (
-                      <option key={f.id} value={f.id}>
-                        {f.label}
-                      </option>
-                    ))}
-                  </select>
+                    onChange={v => updateRule(i, { fieldId: v, value: '' })}
+                    options={eligibleFields.map(f => ({ value: f.id, label: f.label }))}
+                    searchable={eligibleFields.length > 6}
+                  />
                 </Field>
 
                 <Field label='Operador'>
-                  <select
+                  <FormSelect
                     value={rule.op}
-                    onChange={e => updateRule(i, { op: e.target.value })}
-                    className={formInputCls}
-                  >
-                    <option value='eq'>Igual a</option>
-                    <option value='neq'>Diferente de</option>
-                    <option value='contains'>Contém</option>
-                  </select>
+                    onChange={v => updateRule(i, { op: v })}
+                    options={[
+                      { value: 'eq', label: 'Igual a' },
+                      { value: 'neq', label: 'Diferente de' },
+                      { value: 'contains', label: 'Contém' }
+                    ]}
+                  />
                 </Field>
 
                 {rule.fieldId && (
                   <Field label='Valor'>
                     {valueOptions.length > 0 ? (
-                      <select
+                      <FormSelect
                         value={rule.value}
-                        onChange={e => updateRule(i, { value: e.target.value })}
-                        className={formInputCls}
-                      >
-                        <option value=''>Selecione...</option>
-                        {valueOptions.map(o => (
-                          <option key={o.value} value={o.value}>
-                            {o.label}
-                          </option>
-                        ))}
-                      </select>
+                        onChange={v => updateRule(i, { value: v })}
+                        options={valueOptions}
+                        searchable={valueOptions.length > 6}
+                      />
                     ) : (
                       <input
                         type='text'
@@ -634,27 +617,27 @@ const RequiredConditionEditor = ({ field, allFields, onChange }) => {
       <p className={formCaptionCls}>Este campo se torna obrigatório somente se a condição abaixo for atendida.</p>
 
       <Field label='Obrigatório somente se'>
-        <select value={req?.fieldId ?? ''} onChange={e => setReqField(e.target.value)} className={formInputCls}>
-          <option value=''>Nunca (usa config. base)</option>
-          {eligibleFields.map(f => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+        <FormSelect
+          value={req?.fieldId ?? ''}
+          onChange={setReqField}
+          placeholder='Nunca (usa config. base)'
+          options={[
+            { value: '', label: 'Nunca (usa config. base)' },
+            ...eligibleFields.map(f => ({ value: f.id, label: f.label }))
+          ]}
+          searchable={eligibleFields.length > 6}
+        />
       </Field>
 
       {req?.fieldId && (
         <Field label='For igual a'>
           {valueOptions.length > 0 ? (
-            <select value={req.value ?? ''} onChange={e => setReqValue(e.target.value)} className={formInputCls}>
-              <option value=''>Selecione...</option>
-              {valueOptions.map(o => (
-                <option key={o.value} value={o.value}>
-                  {o.label}
-                </option>
-              ))}
-            </select>
+            <FormSelect
+              value={req.value ?? ''}
+              onChange={setReqValue}
+              options={valueOptions}
+              searchable={valueOptions.length > 6}
+            />
           ) : (
             <input
               type='text'
@@ -685,18 +668,16 @@ const DependsOnEditor = ({ field, allFields, onChange }) => {
       </p>
 
       <Field label='Campo pai'>
-        <select
+        <FormSelect
           value={field.dependsOn ?? ''}
-          onChange={e => onChange({ ...field, dependsOn: e.target.value || null })}
-          className={formInputCls}
-        >
-          <option value=''>Nenhum (carrega sempre)</option>
-          {eligible.map(f => (
-            <option key={f.id} value={f.id}>
-              {f.label}
-            </option>
-          ))}
-        </select>
+          onChange={v => onChange({ ...field, dependsOn: v || null })}
+          placeholder='Nenhum (carrega sempre)'
+          options={[
+            { value: '', label: 'Nenhum (carrega sempre)' },
+            ...eligible.map(f => ({ value: f.id, label: f.label }))
+          ]}
+          searchable={eligible.length > 6}
+        />
       </Field>
 
       {field.dependsOn && (

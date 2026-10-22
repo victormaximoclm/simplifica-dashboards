@@ -5,6 +5,7 @@ import { useRouter } from 'next/navigation'
 import { toast } from 'react-toastify'
 
 import FormTextField from './FormTextField'
+import FormSelect from './FormSelect'
 
 import {
   btnPrimary,
@@ -853,7 +854,7 @@ const StaticSingleSelect = ({ opts, value, onChange, onBlur }) => {
         <i className='tabler-chevron-down text-sm' />
       </button>
       {open && (
-        <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+        <ul className={formDropdownCls}>
           <li>
             <button
               type='button'
@@ -917,7 +918,7 @@ const StaticMultiSelect = ({ opts, selected, onChange, fieldError }) => {
         <i className='tabler-chevron-down text-sm' />
       </button>
       {open && (
-        <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+        <ul className={formDropdownCls}>
           {opts.map(opt => (
             <li key={opt.value}>
               <button type='button' className={formDropdownItemCls} onClick={() => toggle(opt.value)}>
@@ -1024,10 +1025,12 @@ const AddressLookupInput = ({ field, value, onChange }) => {
 
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
+      const controller = new AbortController()
+      const timeoutId = setTimeout(() => controller.abort(), 6000) // rede que não responde não pode travar o formulário
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q.trim())}&format=json&addressdetails=1&limit=5&countrycodes=br`,
-          { headers: { 'Accept-Language': 'pt-BR' } }
+          { headers: { 'Accept-Language': 'pt-BR' }, signal: controller.signal }
         )
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
@@ -1038,7 +1041,8 @@ const AddressLookupInput = ({ field, value, onChange }) => {
         setOpen(true)
 
         // A API não conhece o endereço: libera o texto digitado, sob responsabilidade do usuário
-        if (results.length === 0) onChange(manualAddress(q))
+        // Com sugestões, exige a escolha de uma delas
+        onChange(results.length === 0 ? manualAddress(q) : undefined)
       } catch {
         if (requestId !== requestRef.current) return
         setSuggestions([])
@@ -1046,6 +1050,7 @@ const AddressLookupInput = ({ field, value, onChange }) => {
         // API indisponível ou limitando requisições: não bloqueia o formulário, vale o texto digitado
         onChange(manualAddress(q))
       } finally {
+        clearTimeout(timeoutId)
         if (requestId === requestRef.current) setLoading(false)
       }
     }, 600)
@@ -1054,9 +1059,9 @@ const AddressLookupInput = ({ field, value, onChange }) => {
   const handleInput = e => {
     const text = e.target.value
     setQuery(text)
-    // Editar o texto invalida a seleção (ou o texto livre) anterior: só vale o endereço escolhido na lista,
-    // ou o texto digitado quando a busca para ele não retorna nenhuma sugestão
-    if (value !== undefined && value !== '') onChange(undefined)
+    // Editar o texto invalida a seleção anterior. O texto digitado vale como endereço livre enquanto a busca
+    // não responde (ou não retorna sugestões); se ela trouxer sugestões, passa a exigir a escolha de uma
+    onChange(text.trim() ? manualAddress(text) : undefined)
     search(text)
   }
 
@@ -1096,7 +1101,7 @@ const AddressLookupInput = ({ field, value, onChange }) => {
           autoComplete='off'
         />
         {loading && <p className='text-xs opacity-70 mt-1'>Buscando endereços...</p>}
-        {!loading && value?.manual && (
+        {!loading && value?.manual && (searched || searchError) && (
           <p className='text-xs opacity-70 mt-1'>
             {searchError ?? 'Endereço não encontrado na busca.'} O texto digitado será enviado como está; confira se
             está completo e correto.
@@ -1106,7 +1111,7 @@ const AddressLookupInput = ({ field, value, onChange }) => {
           <p className='text-xs text-red-500 mt-1'>Selecione um endereço da lista de sugestões.</p>
         )}
         {open && suggestions.length > 0 && (
-          <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+          <ul className={formDropdownCls}>
             {suggestions.map(s => (
               <li key={s.place_id}>
                 <button type='button' className={formDropdownItemCls} onClick={() => select(s)}>
@@ -1171,7 +1176,7 @@ const DynamicListInput = ({ field, value, options, loading, onChange, onBlur }) 
           className={`${formInputCls} pl-9`}
         />
         {open && !loading && (
-          <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+          <ul className={formDropdownCls}>
             {filtered.length === 0 ? (
               <li className={`px-3 py-2 text-sm ${formMutedCls}`}>Nenhuma opção encontrada</li>
             ) : (
@@ -1276,18 +1281,11 @@ const MultiInputField = ({ field, value, onChange }) => {
                         />
                       )}
                       {ef.type === 'select' && (
-                        <select
+                        <FormSelect
                           value={item[ef.key] ?? ''}
-                          onChange={e => updateExtra(index, ef.key, e.target.value)}
-                          className={formInputCls}
-                        >
-                          <option value=''>Selecione...</option>
-                          {(ef.options ?? []).map(o => (
-                            <option key={o} value={o}>
-                              {o}
-                            </option>
-                          ))}
-                        </select>
+                          onChange={v => updateExtra(index, ef.key, v)}
+                          options={(ef.options ?? []).map(o => ({ value: o, label: o }))}
+                        />
                       )}
                       {ef.type === 'checkbox' && (
                         <label className='flex items-center gap-2 cursor-pointer mt-1'>
@@ -1392,7 +1390,7 @@ const MultiSelectDynamicInput = ({ field, value, options, loading, onChange }) =
           />
 
           {open && !loading && (
-            <ul className={formDropdownCls} style={{ backgroundColor: 'var(--mui-palette-background-default)' }}>
+            <ul className={formDropdownCls}>
               {filtered.length === 0 && !showCustomAdd && (
                 <li className={`px-3 py-2 text-sm ${formMutedCls}`}>Nenhuma opção encontrada</li>
               )}
@@ -1463,18 +1461,11 @@ const MultiSelectDynamicInput = ({ field, value, options, loading, onChange }) =
                           />
                         )}
                         {ef.type === 'select' && (
-                          <select
+                          <FormSelect
                             value={item[ef.key] ?? ''}
-                            onChange={e => updateExtra(index, ef.key, e.target.value)}
-                            className={formInputCls}
-                          >
-                            <option value=''>Selecione...</option>
-                            {(ef.options ?? []).map(o => (
-                              <option key={o} value={o}>
-                                {o}
-                              </option>
-                            ))}
-                          </select>
+                            onChange={v => updateExtra(index, ef.key, v)}
+                            options={(ef.options ?? []).map(o => ({ value: o, label: o }))}
+                          />
                         )}
                         {ef.type === 'checkbox' && (
                           <label className='flex items-center gap-2 cursor-pointer mt-1'>

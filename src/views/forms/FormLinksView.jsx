@@ -3,6 +3,8 @@
 import { useState, useEffect } from 'react'
 import { useRouter } from 'next/navigation'
 
+import FormSelect from './FormSelect'
+
 import {
   btnPrimary,
   btnSecondary,
@@ -122,10 +124,16 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false, canRe
           <div className='flex flex-wrap gap-3 items-end'>
             <label className={`flex flex-col gap-1 ${formCaptionCls}`}>
               Tipo
-              <select value={linkType} onChange={e => setLinkType(e.target.value)} className={`${formInputCls} w-40`}>
-                <option value='temporary'>Temporário</option>
-                <option value='permanent'>Permanente</option>
-              </select>
+              <div className='w-40'>
+                <FormSelect
+                  value={linkType}
+                  onChange={setLinkType}
+                  options={[
+                    { value: 'temporary', label: 'Temporário' },
+                    { value: 'permanent', label: 'Permanente' }
+                  ]}
+                />
+              </div>
             </label>
             {linkType === 'temporary' && (
               <label className={`flex flex-col gap-1 ${formCaptionCls}`}>

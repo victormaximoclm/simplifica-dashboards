@@ -74,23 +74,59 @@ export const formSectionCls = [inputPaper, 'border', borderDivider, 'rounded-xl 
 
 export const formPageCls = 'p-4 sm:p-6 max-w-full'
 
-export const formDropdownCls = [
-  'absolute z-20 mt-1 w-full max-h-48 overflow-y-auto rounded-lg shadow-lg py-1',
-  'border border-[var(--mui-palette-primary-main)]',
-  '!bg-[var(--mui-palette-background-default)]'
+/** Scrollbar fina na cor primary (substitui a barra padrão do navegador) */
+export const formScrollCls = [
+  '[scrollbar-width:thin] [scrollbar-color:var(--mui-palette-primary-mainOpacity)_transparent]',
+  '[&::-webkit-scrollbar]:w-1.5 [&::-webkit-scrollbar-track]:bg-transparent',
+  '[&::-webkit-scrollbar-thumb]:rounded-full [&::-webkit-scrollbar-thumb]:bg-[var(--mui-palette-primary-mainOpacity)]',
+  'hover:[&::-webkit-scrollbar-thumb]:bg-[var(--mui-palette-primary-main)]'
 ].join(' ')
 
+/** Painel flutuante dos dropdowns (sem scroll próprio) */
+export const formDropdownPanelCls = [
+  'absolute z-30 mt-1.5 w-full rounded-xl py-1.5 shadow-xl',
+  'border border-[var(--mui-palette-primary-main)]',
+  inputPaper
+].join(' ')
+
+/** Painel de dropdown com lista rolável */
+export const formDropdownCls = [formDropdownPanelCls, 'max-h-52 overflow-y-auto', formScrollCls].join(' ')
+
 export const formDropdownItemCls = [
-  'w-full text-left px-3 py-2 text-sm !cursor-pointer transition-colors',
+  'w-[calc(100%-0.75rem)] mx-1.5 text-left px-3 py-2 rounded-lg text-sm !cursor-pointer transition-colors',
   textWhite,
-  'hover:bg-[var(--mui-palette-primary-lighterOpacity)]'
+  'hover:bg-[var(--mui-palette-primary-lightOpacity)]'
 ].join(' ')
 
 export const formDropdownAddCls = [
-  'w-full text-left px-3 py-2 text-sm !cursor-pointer transition-colors flex items-center gap-2',
-  textWhite,
-  'hover:bg-[var(--mui-palette-primary-lighterOpacity)]'
+  'w-[calc(100%-0.75rem)] mx-1.5 text-left px-3 py-2 rounded-lg text-sm !cursor-pointer transition-colors flex items-center gap-2',
+  'text-[var(--mui-palette-primary-main)] font-medium',
+  'hover:bg-[var(--mui-palette-primary-lightOpacity)]'
 ].join(' ')
+
+/** Gatilho do FormSelect (mesmo visual do input) */
+export const formSelectTriggerCls = [
+  'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-sm text-left transition',
+  inputPaper,
+  borderDivider,
+  textWhite,
+  cursor,
+  'disabled:opacity-50 disabled:cursor-not-allowed',
+  inputFocus
+].join(' ')
+
+export const formDropdownOptionCls = [
+  'flex items-center justify-between gap-2 mx-1.5 px-3 py-2 rounded-lg text-sm transition-colors',
+  textWhite,
+  cursor
+].join(' ')
+
+export const formDropdownOptionActiveCls = 'bg-[var(--mui-palette-primary-lightOpacity)]'
+
+export const formDropdownOptionSelectedCls =
+  'bg-[var(--mui-palette-primary-main)] text-[var(--mui-palette-primary-contrastText)] font-medium'
+
+export const formDropdownEmptyCls = `px-4 py-2 text-sm ${textWhiteSoft}`
 
 export const formChipCls = [
   'inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium',
