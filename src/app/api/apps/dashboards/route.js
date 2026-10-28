@@ -11,7 +11,8 @@ import { isHighAdmin, canCreateWorkspaceContent } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
 import { createDashboardSchema, parseBody } from '@/libs/validations'
-import { resolveModuleWorkspaceScope, getAccessibleWorkspaceIds, workspaceAccessInclude } from '@/libs/workspaceAccess'
+import { resolveFormWorkspaceId } from '@/libs/formWorkspace'
+import { resolveModuleWorkspaceScope, workspaceAccessInclude } from '@/libs/workspaceAccess'
 
 function sanitizeDashboardTitle(value) {
   return String(value || 'Dashboard sem título')
@@ -76,13 +77,24 @@ export async function GET(req) {
 
       where.workspaceId = scope.workspaceId
     } else {
-      // Nenhum filtro: restringe aos workspaces que ele realmente pode ver
-      const accessibleIds = await getAccessibleWorkspaceIds(session)
+      // Nenhum filtro: usa o workspace ativo (cookie), igual ao módulo de forms
+      const activeWorkspaceId = await resolveFormWorkspaceId(session)
 
-      if (accessibleIds !== null) {
-        where.workspaceId = { in: accessibleIds }
+      if (!activeWorkspaceId) {
+        const response = NextResponse.json([])
+        response.headers.set('x-request-id', requestId)
+        return response
       }
-      // accessibleIds === null → superAdmin, sem filtro, vê tudo
+
+      const scope = await resolveModuleWorkspaceScope(session, activeWorkspaceId)
+
+      if (scope.error) {
+        const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
+        response.headers.set('x-request-id', requestId)
+        return response
+      }
+
+      where.workspaceId = scope.workspaceId
     }
   } else if (userRole === 'admin') {
     // Admin sees all dashboards in their workspace

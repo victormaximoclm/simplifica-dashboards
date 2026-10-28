@@ -53,12 +53,23 @@ const DashboardManage = ({ workspaces }) => {
     allowedRoleIds: []
   })
 
-  const fetchDashboards = useCallback(async () => {
-    const res = await fetch('/api/apps/dashboards', { cache: 'no-store' })
+  // Workspace ativo do WorkspaceSwitcher (localStorage, com fallback no cookie)
+  const getActiveWorkspaceId = () => {
+    const fromStorage = localStorage.getItem('activeWorkspaceId')
 
-    if (res.ok) {
-      setDashboards(await res.json())
-    }
+    if (fromStorage) return fromStorage
+
+    const match = document.cookie.match(/(?:^|;\s*)activeWorkspaceId=([^;]*)/)
+
+    return match ? decodeURIComponent(match[1]) : null
+  }
+
+  const fetchDashboards = useCallback(async () => {
+    const activeWsId = getActiveWorkspaceId()
+    const url = activeWsId ? `/api/apps/dashboards?workspaceId=${activeWsId}` : '/api/apps/dashboards'
+    const res = await fetch(url, { cache: 'no-store' })
+
+    setDashboards(res.ok ? await res.json() : [])
   }, [])
 
   const notifyDashboardsChanged = () => {
@@ -75,6 +86,9 @@ const DashboardManage = ({ workspaces }) => {
 
   useEffect(() => {
     fetchDashboards()
+    window.addEventListener('workspace-changed', fetchDashboards)
+
+    return () => window.removeEventListener('workspace-changed', fetchDashboards)
   }, [fetchDashboards])
 
   useEffect(() => {
@@ -89,6 +103,14 @@ const DashboardManage = ({ workspaces }) => {
 
   const handleOpenCreate = () => {
     resetForm()
+
+    // Pré-seleciona o workspace ativo para o novo painel
+    const activeWsId = getActiveWorkspaceId()
+
+    if (activeWsId && workspaces.some(ws => ws.id === activeWsId)) {
+      setFormData(prev => ({ ...prev, workspaceId: activeWsId }))
+    }
+
     setDialogOpen(true)
   }
 
