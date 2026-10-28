@@ -12,6 +12,7 @@ import { canNonHighAdminAccessForm, getUserFormContext } from '@/libs/formAccess
 import { canManageFormInWorkspace } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
 import { workspaceAccessInclude } from '@/libs/workspaceAccess'
+import { toClientForm } from '@/libs/formSanitize'
 
 // GET /api/forms/[id]
 export async function GET(req, { params }) {
@@ -77,7 +78,8 @@ export async function GET(req, { params }) {
       }
     }
 
-    const response = NextResponse.json(form)
+    // URLs de webhook só para quem edita o form
+    const response = NextResponse.json(canManageForms(role) ? form : toClientForm(form))
     response.headers.set('x-request-id', requestId)
     return response
   } catch (error) {

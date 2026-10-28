@@ -6,6 +6,7 @@ import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { canNonHighAdminAccessForm, getUserFormContext } from '@/libs/formAccess'
 import FormFillView from '@/views/forms/FormFillView'
+import { toClientForm } from '@/libs/formSanitize'
 import { canGeneratePublicLinksInFill } from '@/libs/formPermissions'
 
 const FormFillPage = async ({ params }) => {
@@ -46,7 +47,7 @@ const FormFillPage = async ({ params }) => {
 
   const canManage = await canGeneratePublicLinksInFill(role, form, ctx)
 
-  return <FormFillView form={form} canManage={canManage} lang={lang} />
+  return <FormFillView form={toClientForm(form)} canManage={canManage} lang={lang} />
 }
 
 export default FormFillPage

@@ -3,6 +3,7 @@
 import { prisma } from '@/libs/prisma'
 import { getPublicLinkInactiveReason } from '@/libs/formlinkservice'
 import FormFillView from '@/views/forms/FormFillView'
+import { toClientForm } from '@/libs/formSanitize'
 
 const PublicFormPage = async ({ params }) => {
   const { token } = await params
@@ -51,7 +52,7 @@ const PublicFormPage = async ({ params }) => {
   return (
     <main className='min-h-screen bg-gray-50 dark:bg-gray-950 py-8'>
       <FormFillView
-        form={{
+        form={toClientForm({
           id: form.id,
           title: form.title,
           description: form.description,
@@ -60,7 +61,7 @@ const PublicFormPage = async ({ params }) => {
           expiresAt: publicLink.expiresAt,
           pagination: form.pagination,
           refreshOnSubmit: form.refreshOnSubmit
-        }}
+        })}
         publicToken={token}
         permanentLink={publicLink.permanent}
       />

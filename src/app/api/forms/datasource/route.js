@@ -4,62 +4,100 @@ import { NextResponse } from 'next/server'
 import { getServerSession } from 'next-auth'
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
-import { executeDatasource, resolveAccessToken } from '@/libs/formDatasource'
+import { prisma } from '@/libs/prisma'
+import { executeDatasource } from '@/libs/formDatasource'
+import { getUserFormContext } from '@/libs/formAccess'
+import { canSubmitForm } from '@/libs/formPermissions'
+import { isPublicLinkActive } from '@/libs/formlinkservice'
+import { createRateLimit } from '@/libs/rateLimit'
 
-// GET /api/forms/datasource?provider=&method=&workspaceId=&publicToken=
+const datasourceLimiter = createRateLimit({ interval: 60_000, limit: 120 })
+
+// Tipo de campo → método do datasource webhook
+const FIELD_METHODS = {
+  'dynamic-list': 'getRows',
+  'multi-select-dynamic': 'getRows',
+  'cpf-lookup': 'lookup'
+}
+
+const json = (requestId, body, status = 200) => {
+  const response = NextResponse.json(body, { status })
+  response.headers.set('x-request-id', requestId)
+  return response
+}
+
+/** Mesmo acesso de quem pode preencher: link público ativo do form ou sessão com permissão de envio */
+async function canUseFormDatasource({ form, session, publicToken }) {
+  if (publicToken) {
+    const link = await prisma.formPublicLink.findUnique({ where: { token: publicToken } })
+    return Boolean(link && link.formId === form.id && form.allowPublicLink && isPublicLinkActive(link))
+  }
+
+  if (!session?.user) return false
+
+  const ctx = await getUserFormContext(session.user.id)
+  return canSubmitForm(session, form, ctx)
+}
+
+// GET /api/forms/datasource?formId=&fieldId=&publicToken=&dependsOnValue=&searchValue=
+// A URL do webhook vem sempre da config do campo salva no banco — nunca do cliente
 export async function GET(req) {
   const requestId = getRequestId(req)
-  const session = await getServerSession(authOptions)
 
   try {
+    const rate = await datasourceLimiter.check(req)
+    if (!rate.success) {
+      logger.warn('datasource-rate-limit', { requestId })
+      return json(requestId, { message: 'Muitas requisições' }, 429)
+    }
+
     const { searchParams } = new URL(req.url)
-    const provider = searchParams.get('provider')
-    const method = searchParams.get('method')
-    const workspaceId = searchParams.get('workspaceId')
-    const publicToken = searchParams.get('publicToken')
     const formId = searchParams.get('formId')
     const fieldId = searchParams.get('fieldId')
+    const publicToken = searchParams.get('publicToken')
 
-    if (!provider || !method) {
-      const response = NextResponse.json({ message: 'Provider e method são obrigatórios' }, { status: 400 })
-      response.headers.set('x-request-id', requestId)
-      return response
+    if (!formId || !fieldId) {
+      return json(requestId, { message: 'formId e fieldId são obrigatórios' }, 400)
     }
+
+    const session = publicToken ? null : await getServerSession(authOptions)
 
     if (!session && !publicToken) {
-      const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
-      response.headers.set('x-request-id', requestId)
-      return response
+      return json(requestId, { message: 'Não autorizado' }, 401)
     }
 
-    const config = {}
-    for (const [key, value] of searchParams.entries()) {
-      if (!['provider', 'method', 'workspaceId', 'publicToken', 'formId', 'fieldId'].includes(key)) {
-        config[key] = value
-      }
+    const form = await prisma.form.findUnique({ where: { id: formId } })
+
+    if (!form || !(await canUseFormDatasource({ form, session, publicToken }))) {
+      logger.warn('datasource-forbidden', { requestId, formId, isPublic: Boolean(publicToken) })
+      return json(requestId, { message: 'Acesso negado' }, 403)
     }
 
-    if (formId) config.formId = formId
-    if (fieldId) config.fieldId = fieldId
-    if (workspaceId) config.workspaceId = workspaceId
+    const fields = Array.isArray(form.fields) ? form.fields : []
+    const field = fields.find(f => f.id === fieldId)
+    const method = FIELD_METHODS[field?.type]
+    const url = field?.dataSource?.url || field?.dataSource?.webhookUrl
 
-    const accessToken = await resolveAccessToken({
-      session,
-      provider,
-      publicToken,
-      workspaceId
-    })
+    if (!method || !url) {
+      return json(requestId, { message: 'Campo sem fonte de dados' }, 404)
+    }
 
-    const result = await executeDatasource({ provider, method, config, accessToken })
+    const config = { url }
 
-    const response = NextResponse.json(result)
-    response.headers.set('x-request-id', requestId)
-    return response
+    if (method === 'getRows' && field.dependsOn && searchParams.has('dependsOnValue')) {
+      config.dependsOnParam = field.dependsOnParam || 'dependsOnValue'
+      config.dependsOnValue = searchParams.get('dependsOnValue')
+    }
+
+    if (method === 'lookup') {
+      config.searchValue = searchParams.get('searchValue')
+    }
+
+    const result = await executeDatasource({ provider: 'webhook', method, config, accessToken: null })
+
+    return json(requestId, result)
   } catch (error) {
-    const status = error.message?.includes('não configurada') ? 404 : 500
     logger.error('datasource-error', { requestId, error: error.message })
-    const response = NextResponse.json({ message: error.message || 'Erro ao buscar dados' }, { status })
-    response.headers.set('x-request-id', requestId)
-    return response
+    return json(requestId, { message: error.message || 'Erro ao buscar dados' }, 500)
   }
 }

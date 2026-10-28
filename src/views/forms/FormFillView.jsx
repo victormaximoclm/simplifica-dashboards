@@ -34,86 +34,16 @@ import {
   formChipRemoveBtnCls
 } from './formStyles'
 
+import {
+  fieldKeyOf,
+  hasDataSource,
+  isFieldEmpty,
+  isFieldRequired,
+  isFieldVisible,
+  validateFieldRegex
+} from '@/libs/formRules'
+
 const WEBHOOK_FIELD_TYPES = new Set(['dynamic-list', 'multi-select-dynamic', 'cpf-lookup'])
-
-const DATASOURCE_METHODS = {
-  webhook: {
-    'dynamic-list': 'getRows',
-    'multi-select-dynamic': 'getRows',
-    'cpf-lookup': 'lookup'
-  }
-}
-
-function isFieldEmpty(val, field, values = {}) {
-  if (field.type === 'multi-select-dynamic' || field.type === 'multi-input') {
-    return !Array.isArray(val) || val.length === 0
-  }
-  if (field.type === 'checkbox') return !val
-  if (field.type === 'cpf-lookup' && field.returnNameFieldId && field.required) {
-    const nameVal = values[field.returnNameFieldId]
-    return val === undefined || val === '' || val === null || !nameVal
-  }
-  return val === undefined || val === '' || val === null
-}
-
-function validateFieldRegex(field, val) {
-  const regex = field.validation?.regex?.trim()
-  if (!regex || val === undefined || val === '' || val === null || typeof val === 'object') return null
-  try {
-    return new RegExp(regex).test(String(val)) ? null : field.validation?.message || 'Valor inválido'
-  } catch {
-    return null // regex inválido no builder não quebra o fill
-  }
-}
-
-function isFieldVisible(field, values) {
-  // Novo: visibility com N regras
-  const v = field.visibility
-  if (v?.rules?.length > 0) {
-    const results = v.rules.map(rule => {
-      const raw = values[rule.fieldId]
-
-      if (Array.isArray(raw)) {
-        // multi-select: compara item a item (string ou { value, label, ... }), nunca concatena em string
-        const items = raw.map(item => String(item?.value ?? item ?? ''))
-        const target = String(rule.value)
-
-        if (rule.op === 'eq') return items.some(item => item === target)
-        if (rule.op === 'neq') return !items.some(item => item === target)
-        if (rule.op === 'contains') return items.some(item => item.includes(target))
-        return true
-      }
-
-      const val = String(raw ?? '')
-      if (rule.op === 'eq') return val === String(rule.value)
-      if (rule.op === 'neq') return val !== String(rule.value)
-      if (rule.op === 'contains') return val.includes(rule.value)
-      return true
-    })
-    const satisfied = v.operator === 'AND' ? results.every(Boolean) : results.some(Boolean)
-    return v.action === 'show' ? satisfied : !satisfied
-  }
-
-  // Legado: condition simples
-  if (field.condition?.fieldId) {
-    const actual = String(values[field.condition.fieldId] ?? '')
-    return actual === String(field.condition.value ?? '')
-  }
-
-  return true
-}
-
-function isFieldRequired(field, values) {
-  // Se tem requiredCondition, ela sobrescreve o required base
-  if (field.requiredCondition?.fieldId) {
-    const { fieldId, value } = field.requiredCondition
-    const actual = values[fieldId]
-    const actualStr = actual === undefined || actual === null ? '' : String(actual)
-    return actualStr === String(value)
-  }
-  // Sem condição, usa o required estático
-  return !!field.required
-}
 
 const REFILL_DELAY_MS = 2000
 
@@ -200,33 +130,12 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
   const fetchDatasource = useCallback(
     async (field, extra = {}) => {
-      const ds = field.dataSource
-      if (!WEBHOOK_FIELD_TYPES.has(field.type) && !ds?.provider) return null
+      if (!WEBHOOK_FIELD_TYPES.has(field.type)) return null
 
-      const provider = WEBHOOK_FIELD_TYPES.has(field.type) ? 'webhook' : ds.provider
-      const method = DATASOURCE_METHODS[provider]?.[field.type]
-      if (!method) return null
-
-      const params = new URLSearchParams({
-        provider,
-        method,
-        workspaceId: form.workspaceId,
-        formId: form.id,
-        fieldId: field.id
-      })
+      // URL e método do webhook são resolvidos no servidor a partir do formId/fieldId
+      const params = new URLSearchParams({ formId: form.id, fieldId: field.id })
 
       if (publicToken) params.set('publicToken', publicToken)
-
-      const configKeys = {
-        webhook: ['url', 'webhookUrl']
-      }
-
-      for (const key of configKeys[provider] ?? []) {
-        const val = ds?.[key] ?? extra[key]
-        if (val !== undefined && val !== null && val !== '') {
-          params.set(key, Array.isArray(val) ? val.join(',') : String(val))
-        }
-      }
 
       Object.entries(extra).forEach(([k, v]) => {
         if (v !== undefined && v !== null && v !== '') params.set(k, String(v))
@@ -240,15 +149,14 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
       return res.json()
     },
-    [form.id, form.workspaceId, publicToken]
+    [form.id, publicToken]
   )
 
   useEffect(() => {
     fields.forEach(async field => {
       if (field.type !== 'dynamic-list' && field.type !== 'multi-select-dynamic') return
       if (field.dependsOn) return
-      const listUrl = field.dataSource?.url || field.dataSource?.webhookUrl
-      if (!listUrl) return
+      if (!hasDataSource(field)) return
 
       setLoadingOptions(prev => ({ ...prev, [field.id]: true }))
       try {
@@ -289,16 +197,12 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
         return
       }
 
-      const listUrl = field.dataSource?.url || field.dataSource?.webhookUrl
-      if (!listUrl) return
+      if (!hasDataSource(field)) return
 
       setLoadingOptions(prev => ({ ...prev, [field.id]: true }))
       try {
-        const paramName = field.dependsOnParam || 'dependsOnValue'
-        const data = await fetchDatasource(field, {
-          dependsOnParam: paramName,
-          dependsOnValue: parentValue
-        })
+        // O nome do query param (dependsOnParam) vem da config do campo, no servidor
+        const data = await fetchDatasource(field, { dependsOnValue: parentValue })
         setOptions(prev => ({ ...prev, [field.id]: Array.isArray(data) ? data : [] }))
         setValue(field.id, '') // reseta seleção anterior
       } catch {
@@ -314,8 +218,7 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
   const handleCpfLookup = async field => {
     const cpf = values[field.id]
-    const listUrl = field.dataSource?.url || field.dataSource?.webhookUrl
-    if (!cpf || !listUrl) return
+    if (!cpf || !hasDataSource(field)) return
 
     setLoadingOptions(prev => ({ ...prev, [field.id]: true }))
     setCpfErrors(prev => ({ ...prev, [field.id]: null }))
@@ -417,7 +320,7 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
       // Remapeia id → fieldKey no payload
       const remappedFields = Object.fromEntries(
         fields.map(f => {
-          const key = f.fieldKey?.trim() || f.id
+          const key = fieldKeyOf(f)
           if (f.type === 'cpf-lookup') {
             return [
               key,

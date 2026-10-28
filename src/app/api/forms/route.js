@@ -78,7 +78,6 @@ export async function GET(req) {
         title: true,
         description: true,
         workspaceId: true,
-        webhookUrl: true,
         allowPublicLink: true,
         allowedCargos: true,
         allowedRoles: true,

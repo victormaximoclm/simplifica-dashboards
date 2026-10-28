@@ -9,6 +9,10 @@ import { createAuditLog } from '@/libs/auditService'
 import { getUserFormContext } from '@/libs/formAccess'
 import { canSubmitForm } from '@/libs/formPermissions'
 import { claimPublicLinkForSubmit } from '@/libs/formlinkservice'
+import { validateSubmission } from '@/libs/formSanitize'
+import { createRateLimit } from '@/libs/rateLimit'
+
+const submitLimiter = createRateLimit({ interval: 60_000, limit: 30 })
 
 // POST /api/forms/[id]/submit - dispara webhook n8n
 export async function POST(req, { params }) {
@@ -16,6 +20,14 @@ export async function POST(req, { params }) {
   const session = await getServerSession(authOptions)
 
   try {
+    const rate = await submitLimiter.check(req)
+    if (!rate.success) {
+      logger.warn('form-submit-rate-limit', { requestId })
+      const response = NextResponse.json({ message: 'Muitos envios em sequência. Aguarde um instante.' }, { status: 429 })
+      response.headers.set('x-request-id', requestId)
+      return response
+    }
+
     const { id } = await params
     const body = await req.json()
     const { data, fields: fieldsPayload, publicToken } = body
@@ -28,6 +40,16 @@ export async function POST(req, { params }) {
 
     if (!form) {
       const response = NextResponse.json({ message: 'Formulário não encontrado' }, { status: 404 })
+      response.headers.set('x-request-id', requestId)
+      return response
+    }
+
+    // Só repassa ao n8n o que o formulário geraria: campos conhecidos, obrigatórios e regex conferidos
+    const validation = validateSubmission(form.fields, fields)
+
+    if (validation.error) {
+      logger.warn('form-submit-invalid', { requestId, formId: id, reason: validation.error })
+      const response = NextResponse.json({ message: validation.error }, { status: 400 })
       response.headers.set('x-request-id', requestId)
       return response
     }
@@ -127,7 +149,7 @@ export async function POST(req, { params }) {
             workspaceId: session.user.workspaceId ?? submitCtx?.workspaceId ?? form.workspaceId
           }
         : null,
-      fields
+      fields: validation.fields
     }
 
     const webhookResponse = await fetch(form.webhookUrl, {
