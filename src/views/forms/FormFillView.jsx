@@ -115,7 +115,11 @@ function isFieldRequired(field, values) {
   return !!field.required
 }
 
-const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => {
+const REFILL_DELAY_MS = 2000
+
+const FormFillView = ({ form, publicToken = null, permanentLink = false, canManage = false, lang }) => {
+  // Link público de uso único não aceita novo envio; interno e link permanente sim
+  const canRefill = !publicToken || permanentLink
   const [values, setValues] = useState(() => {
     const initial = {}
     const fs = Array.isArray(form.fields) ? form.fields : []
@@ -140,7 +144,10 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
   const [error, setError] = useState(null)
   const [currentPage, setCurrentPage] = useState(0)
   const [fieldErrors, setFieldErrors] = useState({})
+  const refillTimerRef = useRef(null)
   const router = useRouter()
+
+  useEffect(() => () => clearTimeout(refillTimerRef.current), [])
   const handleGoLinks = () => router.push(`/${lang}/forms/${form.id}/links`)
 
   const fields = Array.isArray(form.fields) ? form.fields : []
@@ -445,8 +452,9 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
       }
 
       setSubmitted(true)
-      if (form.refreshOnSubmit) {
-        window.location.reload()
+      if (form.refreshOnSubmit && canRefill) {
+        // Mostra a confirmação por alguns segundos e volta ao formulário em branco
+        refillTimerRef.current = setTimeout(handleReset, REFILL_DELAY_MS)
       }
     } catch (err) {
       setError(err.message)
@@ -457,7 +465,8 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
   }
 
   const handleReset = () => {
-    if (publicToken) return
+    if (!canRefill) return
+    clearTimeout(refillTimerRef.current)
     const initial = {}
     fields.forEach(f => {
       if (f.type === 'checkbox') {
@@ -527,11 +536,13 @@ const FormFillView = ({ form, publicToken = null, canManage = false, lang }) => 
         <i className={`tabler-circle-check text-5xl ${formSuccessIconCls}`} />
         <h4 className={`text-xl font-semibold ${formHeadingCls}`}>Enviado com sucesso</h4>
         <p className={formMutedCls}>
-          {publicToken
+          {!canRefill
             ? 'Suas respostas foram registradas. Este link é de uso único e não aceita novos envios.'
-            : 'Suas respostas foram registradas.'}
+            : form.refreshOnSubmit
+              ? 'Suas respostas foram registradas. O formulário será reiniciado em instantes.'
+              : 'Suas respostas foram registradas.'}
         </p>
-        {!publicToken && (
+        {canRefill && (
           <button type='button' onClick={handleReset} className={`${btnPrimary} ${formFieldsWrapCls}`}>
             Preencher novamente
           </button>

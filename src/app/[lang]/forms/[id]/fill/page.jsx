@@ -27,7 +27,8 @@ const FormFillPage = async ({ params }) => {
       allowedCargos: true,
       allowedRoles: true,
       allowPublicLink: true,
-      pagination: true
+      pagination: true,
+      refreshOnSubmit: true
     }
   })
 

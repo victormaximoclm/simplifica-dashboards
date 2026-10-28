@@ -57,6 +57,7 @@ export default async function PublicFormPage({ params }) {
           expiresAt: link.expiresAt
         }}
         publicToken={token}
+        permanentLink={link.permanent}
       />
     </div>
   )

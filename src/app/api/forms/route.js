@@ -169,7 +169,7 @@ export async function POST(req) {
         allowedCargos: allowedCargos ?? [],
         allowedRoles: allowedRoles ?? [],
         pagination: pagination ?? { enabled: false, perPage: 10 },
-        refreshOnSubmit: refreshOnSubmit
+        refreshOnSubmit: Boolean(refreshOnSubmit)
       }
     })
 

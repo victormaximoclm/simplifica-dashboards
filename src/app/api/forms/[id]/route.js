@@ -139,7 +139,7 @@ export async function PUT(req, { params }) {
         allowedCargos: allowedCargos ?? [],
         allowedRoles: allowedRoles ?? [],
         pagination: pagination ?? { enabled: false, perPage: 10 },
-        refreshOnSubmit: refreshOnSubmit
+        refreshOnSubmit: refreshOnSubmit === undefined ? undefined : Boolean(refreshOnSubmit)
       }
     })
 

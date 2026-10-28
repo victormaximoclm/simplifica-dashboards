@@ -58,9 +58,11 @@ const PublicFormPage = async ({ params }) => {
           fields: form.fields,
           workspaceId: form.workspaceId,
           expiresAt: publicLink.expiresAt,
-          pagination: form.pagination
+          pagination: form.pagination,
+          refreshOnSubmit: form.refreshOnSubmit
         }}
         publicToken={token}
+        permanentLink={publicLink.permanent}
       />
     </main>
   )
