@@ -200,6 +200,11 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
             )}
           </SubMenu>
         )}
+        {session && (
+          <MenuItem href={`/${locale}/documents`} icon={<i className='tabler-folder' />}>
+            {dictionary['navigation'].documents || 'Documentos'}
+          </MenuItem>
+        )}
         {(isHighAdmin || isAdmin) && (
           <MenuSection label={dictionary['navigation'].appsPages}>
             <MenuItem href={`/${locale}/apps/user/list`} icon={<i className='tabler-user' />}>
