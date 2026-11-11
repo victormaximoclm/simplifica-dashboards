@@ -15,6 +15,10 @@ async function main() {
     {
       key: 'users',
       name: 'Usuários'
+    },
+    {
+      key: 'documents',
+      name: 'Documentos'
     }
   ]
 

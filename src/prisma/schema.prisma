@@ -24,6 +24,9 @@ model Workspace {
   integrations  WorkspaceIntegration[]
   forms         Form[]
   customRoles   CustomRole[]
+  documentFolders DocumentFolder[]
+  documentFiles   DocumentFile[]
+  documentHtmlTemplates DocumentHtmlTemplate[]
 }
 
 /**
@@ -156,6 +159,9 @@ model User {
   termsVersion           String?               @default("1.0")
   adminPermissions       AdminPermission[]
   guestWorkspaces        WorkspaceGuest[]
+  documentFolders        DocumentFolder[]      @relation("DocumentFolderCreator")
+  documentFiles          DocumentFile[]        @relation("DocumentFileCreator")
+  documentHtmlTemplates  DocumentHtmlTemplate[] @relation("DocumentHtmlTemplateCreator")
 }
 
 model UserIntegration {
@@ -339,4 +345,77 @@ model AdminPermission {
 
   @@unique([userId, moduleKey, action])
   @@index([userId])
+}
+
+/**
+ * Pasta do módulo de Documentos. `parentId` nulo = raiz do workspace.
+ * Nomes são únicos (sem diferenciar maiúsculas) entre irmãs — validado na aplicação, pois NULL não colide em índice único.
+ */
+model DocumentFolder {
+  id          String           @id @default(cuid())
+  name        String
+  parentId    String?
+  parent      DocumentFolder?  @relation("DocumentFolderTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    DocumentFolder[] @relation("DocumentFolderTree")
+  workspaceId String
+  workspace   Workspace        @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  createdById String?
+  createdBy   User?            @relation("DocumentFolderCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  files       DocumentFile[]
+  createdAt   DateTime         @default(now())
+  updatedAt   DateTime         @updatedAt
+
+  @@index([workspaceId, parentId])
+}
+
+/**
+ * Arquivo do módulo de Documentos. O conteúdo fica no storage (src/libs/storage.js) sob `storageKey`,
+ * gerado no servidor — nunca derivado do nome enviado pelo usuário.
+ */
+model DocumentFile {
+  id          String          @id @default(cuid())
+  name        String
+  folderId    String?
+  folder      DocumentFolder? @relation(fields: [folderId], references: [id], onDelete: Cascade)
+  workspaceId String
+  workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  mimeType    String
+  size        Int
+  storageKey  String          @unique
+  createdById String?
+  createdBy   User?           @relation("DocumentFileCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  htmlContent DocumentHtmlContent?
+  createdAt   DateTime        @default(now())
+  updatedAt   DateTime        @updatedAt
+
+  @@index([workspaceId, folderId])
+}
+
+// Conteúdo editável (JSON do editor) dos documentos HTML criados no módulo; o .html renderizado fica no storage
+model DocumentHtmlContent {
+  fileId    String       @id
+  file      DocumentFile @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  title     String
+  content   Json
+  templateId String?
+  template   DocumentHtmlTemplate? @relation(fields: [templateId], references: [id], onDelete: SetNull)
+  updatedAt DateTime     @updatedAt
+
+  @@index([templateId])
+}
+
+// Template HTML do workspace (SuperAdmin/SubAdmin) usado ao criar documentos no editor; sem template = padrão Simplifica
+model DocumentHtmlTemplate {
+  id          String                @id @default(cuid())
+  workspaceId String
+  workspace   Workspace             @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
+  name        String
+  html        String
+  createdById String?
+  createdBy   User?                 @relation("DocumentHtmlTemplateCreator", fields: [createdById], references: [id], onDelete: SetNull)
+  documents   DocumentHtmlContent[]
+  createdAt   DateTime              @default(now())
+  updatedAt   DateTime              @updatedAt
+
+  @@unique([workspaceId, name])
 }
