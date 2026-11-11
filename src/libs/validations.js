@@ -59,6 +59,77 @@ export const createCustomRoleSchema = v.object({
   workspaceId: v.pipe(v.string(), v.minLength(1, 'Workspace é obrigatório'))
 })
 
+// ── Documents ───────────────────────────────
+const documentNameSchema = v.pipe(
+  v.string('Nome é obrigatório'),
+  v.trim(),
+  v.minLength(1, 'Nome é obrigatório'),
+  v.maxLength(255, 'O nome deve ter no máximo 255 caracteres'),
+  v.check(value => !/[/\\]/.test(value), 'O nome não pode conter / ou \\'),
+  v.check(value => ![...value].some(char => char.charCodeAt(0) < 32 || char.charCodeAt(0) === 127), 'Nome inválido'),
+  v.check(value => value !== '.' && value !== '..', 'Nome inválido')
+)
+
+export const createFolderSchema = v.object({
+  name: documentNameSchema,
+  workspaceId: v.pipe(v.string(), v.minLength(1, 'Workspace é obrigatório')),
+  parentId: v.optional(v.nullable(v.string()))
+})
+
+export const renameSchema = v.object({
+  name: documentNameSchema
+})
+
+export const moveSchema = v.object({
+  targetFolderId: v.optional(v.nullable(v.string()), null)
+})
+
+/** Campos de texto do multipart de upload (formData.get devolve null quando o campo não vem) */
+export const uploadFieldsSchema = v.object({
+  workspaceId: v.pipe(v.string('Workspace é obrigatório'), v.minLength(1, 'Workspace é obrigatório')),
+  folderId: v.nullable(v.string())
+})
+
+// Documento HTML (editor): `content` é o JSON do editor, validado/limpo em documentHtml.js
+const htmlDocumentTitleSchema = v.pipe(
+  v.string('Título é obrigatório'),
+  v.trim(),
+  v.minLength(1, 'Título é obrigatório'),
+  v.maxLength(200, 'O título deve ter no máximo 200 caracteres')
+)
+
+export const createHtmlDocumentSchema = v.object({
+  workspaceId: v.pipe(v.string('Workspace é obrigatório'), v.minLength(1, 'Workspace é obrigatório')),
+  folderId: v.optional(v.nullable(v.string()), null),
+  title: htmlDocumentTitleSchema,
+  content: v.record(v.string(), v.unknown(), 'Conteúdo do documento inválido'),
+  templateId: v.optional(v.nullable(v.string()), null)
+})
+
+export const updateHtmlDocumentSchema = v.object({
+  title: htmlDocumentTitleSchema,
+  content: v.record(v.string(), v.unknown(), 'Conteúdo do documento inválido'),
+  templateId: v.optional(v.nullable(v.string()), null)
+})
+
+const htmlTemplateNameSchema = v.pipe(
+  v.string('Nome do template é obrigatório'),
+  v.trim(),
+  v.minLength(1, 'Nome do template é obrigatório'),
+  v.maxLength(120, 'O nome do template deve ter no máximo 120 caracteres')
+)
+
+export const createHtmlTemplateSchema = v.object({
+  workspaceId: v.pipe(v.string('Workspace é obrigatório'), v.minLength(1, 'Workspace é obrigatório')),
+  name: htmlTemplateNameSchema,
+  html: v.string('Informe o HTML do template')
+})
+
+export const updateHtmlTemplateSchema = v.object({
+  name: htmlTemplateNameSchema,
+  html: v.string('Informe o HTML do template')
+})
+
 // ── Notifications ───────────────────────────
 export const dismissNotificationSchema = v.object({
   id: v.pipe(v.string(), v.minLength(1, 'ID da notificação é obrigatório'))
