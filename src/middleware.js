@@ -1,4 +1,5 @@
 import { NextResponse } from 'next/server'
+
 import { getToken } from 'next-auth/jwt'
 
 // Rotas públicas (após remover prefixo /br|en|fr|ar). Mantém setup, convites e APIs sem sessão funcionando.
@@ -28,9 +29,11 @@ function normalizePath(pathname) {
 function loginRedirectUrl(request) {
   const url = request.nextUrl.clone()
   const bp = request.nextUrl.basePath || ''
+
   url.pathname = (bp + '/login').replace(/\/+/g, '/') || '/login'
   url.search = ''
-  return url
+  
+return url
 }
 
 function withRequestId(requestId, res) {
@@ -44,6 +47,7 @@ export async function middleware(req) {
   const normalizedPath = normalizePath(pathname)
   const requestHeaders = new Headers(req.headers)
   const requestId = req.headers.get('x-request-id') || crypto.randomUUID()
+
   requestHeaders.set('x-request-id', requestId)
 
   if (publicRoutes.some(route => normalizedPath === route || normalizedPath.startsWith(`${route}/`))) {
@@ -63,6 +67,7 @@ export async function middleware(req) {
   }
 
   const token = await getToken({ req, secret: process.env.NEXTAUTH_SECRET })
+
   if (!token || !token.id) {
     return withRequestId(requestId, NextResponse.redirect(loginRedirectUrl(req)))
   }

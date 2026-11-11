@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
 import { useRouter } from 'next/navigation'
 
 import FormSelect from './FormSelect'
@@ -33,8 +34,10 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false, canRe
 
   const loadLinks = async () => {
     setLoading(true)
+
     try {
       const res = await fetch(`/api/forms/${formId}/links`)
+
       if (!res.ok) throw new Error('Erro ao carregar links')
       setLinks(await res.json())
     } catch (err) {
@@ -51,6 +54,7 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false, canRe
   const generateLink = async () => {
     setGenerating(true)
     setError(null)
+
     try {
       const res = await fetch(`/api/forms/${formId}/links`, {
         method: 'POST',
@@ -59,12 +63,17 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false, canRe
           linkType === 'permanent' ? { permanent: true } : { expiresInHours: Number(expiresInHours) }
         )
       })
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+
         throw new Error(err.message || 'Erro ao gerar link')
       }
+
       const link = await res.json()
+
       setLinks(prev => [link, ...prev])
+
       if (link.publicUrl) {
         await navigator.clipboard.writeText(link.publicUrl)
         setCopied(link.id)
@@ -80,13 +89,18 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false, canRe
   const revokeLink = async linkId => {
     if (!window.confirm('Desativar este link? Ele deixará de aceitar respostas.')) return
     setError(null)
+
     try {
       const res = await fetch(`/api/forms/${formId}/links/${linkId}`, { method: 'DELETE' })
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+
         throw new Error(err.message || 'Erro ao desativar link')
       }
+
       const updated = await res.json()
+
       setLinks(prev => prev.map(l => (l.id === linkId ? { ...l, revokedAt: updated.revokedAt } : l)))
     } catch (err) {
       setError(err.message)
@@ -176,7 +190,9 @@ const FormLinksView = ({ formId, formTitle, lang, canGenerateLink = false, canRe
               const expired = !link.permanent && new Date() > new Date(link.expiresAt)
               const active = !revoked && (link.permanent || (!link.used && !expired))
               const status = revoked ? 'Desativado' : active ? 'Ativo' : link.used ? 'Usado' : 'Expirado'
-              return (
+
+              
+return (
                 <li key={link.id} className={formListItemCls}>
                   <div className='flex-1 min-w-0'>
                     <p className={`text-xs ${formMutedCls} truncate`}>{link.publicUrl}</p>

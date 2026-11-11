@@ -1,6 +1,7 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
@@ -46,8 +47,10 @@ export async function GET(req, { params }) {
       requestId
     })
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const ipRate = await embedIpLimiter.check(req)
@@ -61,8 +64,10 @@ export async function GET(req, { params }) {
       ip: req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || 'unknown'
     })
     const response = NextResponse.json({ message: 'Muitas requisições' }, { status: 429 })
+
     response.headers.set('x-request-id', requestId)
-    return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
+    
+return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
   }
 
   if (!isSameOriginReferer(req) || !req.headers.get('cookie')) {
@@ -87,23 +92,30 @@ export async function GET(req, { params }) {
       requestId
     })
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
+    
+return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
   }
 
   const access = await getAuthorizedDashboard({ dashboardId: id, session })
 
   if (!access.ok) {
     const response = NextResponse.json({ message: access.message }, { status: access.status })
+
     response.headers.set('x-request-id', requestId)
-    return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
+    
+return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
   }
 
   const targetUrl = buildPowerBiTarget(access.dashboard.embedUrl)
+
   if (!targetUrl) {
     const response = NextResponse.json({ message: 'Origem do dashboard não permitida' }, { status: 400 })
+
     response.headers.set('x-request-id', requestId)
-    return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
+    
+return applyRateLimitHeaders(response, ipRate.success ? userRate : ipRate)
   }
 
   const internalToken = createEmbedToken({

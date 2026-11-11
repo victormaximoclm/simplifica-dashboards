@@ -23,6 +23,7 @@ export async function POST(req) {
   }
 
   const access = await getAuthorizedDashboard({ dashboardId, session })
+
   if (!access.ok) {
     return jsonWithRequestId({ message: access.message }, { status: access.status, requestId })
   }

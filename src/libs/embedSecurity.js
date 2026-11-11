@@ -26,6 +26,7 @@ export function createEmbedToken({ userId, dashboardId }) {
     dashboardId,
     exp: Math.floor(Date.now() / 1000) + TOKEN_TTL_SECONDS
   }
+
   const payloadBase64 = toBase64Url(JSON.stringify(payload))
   const signature = sign(payloadBase64)
 
@@ -55,6 +56,7 @@ export function verifyEmbedToken(token) {
 
 export function isSameOriginReferer(req) {
   const referer = req.headers.get('referer')
+
   if (!referer) return false
 
   try {

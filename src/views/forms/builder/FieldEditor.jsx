@@ -173,13 +173,16 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
               const isObj = typeof opt === 'object'
               const label = isObj ? opt.label : opt
               const value = isObj ? opt.value : opt
-              return (
+
+              
+return (
                 <div key={idx} className='flex gap-2 items-center'>
                   <input
                     type='text'
                     value={label}
                     onChange={e => {
                       const next = [...(field.options ?? [])]
+
                       next[idx] = field.useCustomValues
                         ? { label: e.target.value, value: isObj ? opt.value : opt }
                         : e.target.value
@@ -194,6 +197,7 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
                       value={value}
                       onChange={e => {
                         const next = [...(field.options ?? [])]
+
                         next[idx] = { label, value: e.target.value }
                         update('options', next)
                       }}
@@ -232,6 +236,7 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
             <div
               onClick={() => {
                 const next = !field.useCustomValues
+
                 // Converte opções ao alternar
                 const converted = (field.options ?? []).map(opt =>
                   next
@@ -243,6 +248,7 @@ const FieldEditor = ({ field, onChange, onClose, allFields }) => {
                       ? opt.label
                       : opt
                 )
+
                 onChange({ ...field, useCustomValues: next, options: converted })
               }}
               className={`w-10 h-5 rounded-full transition-colors cursor-pointer ${field.useCustomValues ? 'bg-[var(--mui-palette-primary-main)]' : formBuilderToggleOffCls} relative`}
@@ -436,6 +442,7 @@ const CONDITIONAL_TYPES = new Set(['select', 'dynamic-list', 'checkbox'])
 
 const ConditionalEditor = ({ field, allFields, onChange }) => {
   const eligibleFields = (allFields ?? []).filter(f => f.id !== field.id && CONDITIONAL_TYPES.has(f.type))
+
   if (eligibleFields.length === 0) return null
 
   // Migração: condition legado → visibility novo
@@ -450,15 +457,19 @@ const ConditionalEditor = ({ field, allFields, onChange }) => {
       : { operator: 'AND', action: 'show', rules: [] })
 
   const update = patch => onChange({ ...field, visibility: { ...visibility, ...patch }, condition: undefined })
+
   const updateRule = (i, patch) => {
     const rules = visibility.rules.map((r, idx) => (idx === i ? { ...r, ...patch } : r))
+
     update({ rules })
   }
+
   const addRule = () => update({ rules: [...visibility.rules, { fieldId: '', op: 'eq', value: '' }] })
   const removeRule = i => update({ rules: visibility.rules.filter((_, idx) => idx !== i) })
 
   const getValueOptions = fieldId => {
     const f = eligibleFields.find(x => x.id === fieldId)
+
     if (!f) return []
     if (f.type === 'checkbox')
       return [
@@ -466,7 +477,8 @@ const ConditionalEditor = ({ field, allFields, onChange }) => {
         { label: 'Desmarcado', value: 'false' }
       ]
     if (f.type === 'select') return (f.options ?? []).map(o => (typeof o === 'object' ? o : { label: o, value: o }))
-    return []
+    
+return []
   }
 
   const hasRules = visibility.rules.length > 0
@@ -509,7 +521,9 @@ const ConditionalEditor = ({ field, allFields, onChange }) => {
           {/* Regras */}
           {visibility.rules.map((rule, i) => {
             const valueOptions = getValueOptions(rule.fieldId)
-            return (
+
+            
+return (
               <div key={i} className='flex flex-col gap-2 p-3 rounded-lg border border-[var(--mui-palette-divider)]'>
                 <div className='flex items-center justify-between'>
                   <span className={formCaptionCls}>Condição {i + 1}</span>
@@ -585,8 +599,10 @@ const RequiredConditionEditor = ({ field, allFields, onChange }) => {
   const setReqField = fieldId => {
     if (!fieldId) {
       onChange({ ...field, requiredCondition: null })
-      return
+      
+return
     }
+
     onChange({ ...field, requiredCondition: { fieldId, value: '' } })
   }
 
@@ -606,7 +622,8 @@ const RequiredConditionEditor = ({ field, allFields, onChange }) => {
         typeof o === 'object' ? { label: o.label, value: o.value } : { label: o, value: o }
       )
     if (f.type === 'dynamic-list') return []
-    return []
+    
+return []
   }
 
   const valueOptions = getValueOptions(controllerField)
@@ -657,6 +674,7 @@ const DependsOnEditor = ({ field, allFields, onChange }) => {
   const eligible = (allFields ?? []).filter(
     f => f.id !== field.id && ['dynamic-list', 'select', 'cpf-lookup'].includes(f.type)
   )
+
   if (eligible.length === 0) return null
 
   return (

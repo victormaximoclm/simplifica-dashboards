@@ -1,8 +1,9 @@
 // Third-party Imports
+import crypto from 'crypto'
+
 import CredentialProvider from 'next-auth/providers/credentials'
 import GoogleProvider from 'next-auth/providers/google'
 import { PrismaAdapter } from '@auth/prisma-adapter'
-import crypto from 'crypto'
 
 import { createAuditLog } from '@/libs/auditService'
 import { touchUserActivity } from '@/libs/activity'
@@ -137,6 +138,7 @@ export const authOptions = {
   events: {
     async signIn({ user, account }) {
       if (!user?.id) return
+
       const dbUser = await prisma.user.findUnique({
         where: { id: user.id },
         select: { workspaceId: true }

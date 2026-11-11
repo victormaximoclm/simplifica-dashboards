@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
 import { isSuperOnly } from '@/utils/roleHelpers'
@@ -16,8 +18,10 @@ export async function DELETE(req, { params }) {
 
   const respond = (body, status) => {
     const response = NextResponse.json(body, { status })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (!session) return respond({ message: 'Não autorizado' }, 401)
@@ -53,6 +57,7 @@ export async function DELETE(req, { params }) {
     return respond(revoked, 200)
   } catch (error) {
     logger.error('form-link-revoke-error', { requestId, error: error.message })
-    return respond({ message: 'Erro ao desativar link' }, 500)
+    
+return respond({ message: 'Erro ao desativar link' }, 500)
   }
 }

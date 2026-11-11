@@ -14,6 +14,8 @@ import Button from '@mui/material/Button'
 import classnames from 'classnames'
 
 // Component Imports
+import Alert from '@mui/material/Alert'
+
 import DirectionalIcon from '@components/DirectionalIcon'
 import Logo from '@components/layout/shared/Logo'
 import CustomTextField from '@core/components/mui/TextField'
@@ -49,7 +51,6 @@ const MaskImg = styled('img')({
   zIndex: -1
 })
 
-import Alert from '@mui/material/Alert'
 import { useState } from 'react'
 
 const ForgotPassword = ({ mode }) => {
@@ -77,18 +78,25 @@ const ForgotPassword = ({ mode }) => {
     e.preventDefault()
     setError('')
     setSuccess('')
+
     if (!email) {
       setError('Digite seu e-mail.')
-      return
+      
+return
     }
+
     setLoading(true)
+
     const res = await fetch('/api/auth/forgot-password', {
       method: 'POST',
       headers: { 'Content-Type': 'application/json' },
       body: JSON.stringify({ email })
     })
+
     const data = await res.json()
+
     setLoading(false)
+
     if (res.ok) {
       setSuccess(data.message || 'Se o email estiver cadastrado, enviaremos instruções.')
     } else {

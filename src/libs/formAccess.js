@@ -29,7 +29,8 @@ export function isFormHighAdminOnly(form) {
 export function canNonHighAdminAccessForm(role, form, ctx = {}) {
   if (isFormHighAdminOnly(form)) return false
   if (role === 'admin') return true
-  return canAccessForm(form, ctx)
+  
+return canAccessForm(form, ctx)
 }
 
 export async function canAccessForm(form, ctx) {
@@ -38,6 +39,7 @@ export async function canAccessForm(form, ctx) {
 
   const { prisma } = await import('@/libs/prisma')
   const formsModule = await prisma.module.findUnique({ where: { key: 'forms' } })
+
   if (!formsModule) return false
 
   const perm = await prisma.rolePermission.findFirst({
@@ -48,7 +50,9 @@ export async function canAccessForm(form, ctx) {
       resourceId: form.id
     }
   })
-  return !!perm
+
+  
+return !!perm
 }
 
 /*export async function filterFormsForRole(forms, role, ctx = {}) {
@@ -85,6 +89,7 @@ export async function buildFormListWhereForRole(role, workspaceId, ctx = {}) {
   // Busca IDs de forms permitidos via RolePermission
   const { prisma } = await import('@/libs/prisma')
   const formsModule = await prisma.module.findUnique({ where: { key: 'forms' } })
+
   if (!formsModule) return { id: 'none' }
 
   const perms = await prisma.rolePermission.findMany({
@@ -97,6 +102,7 @@ export async function buildFormListWhereForRole(role, workspaceId, ctx = {}) {
   })
 
   const formIds = perms.map(p => p.resourceId).filter(Boolean)
+
   if (formIds.length === 0) return { id: 'none' }
 
   return { workspaceId, id: { in: formIds } }

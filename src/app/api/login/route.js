@@ -16,20 +16,25 @@ export async function POST(req) {
 
   if (!rate.success) {
     logger.warn('login-rate-limited', { requestId })
+
     const response = NextResponse.json(
       { message: ['Muitas tentativas. Aguarde um momento antes de tentar novamente.'] },
       { status: 429 }
     )
+
     response.headers.set('x-request-id', requestId)
-    return withRate(response)
+    
+return withRate(response)
   }
 
   const parsed = parseBody(loginSchema, await req.json())
 
   if (!parsed.success) {
     const response = NextResponse.json({ message: [parsed.message] }, { status: 400 })
+
     response.headers.set('x-request-id', requestId)
-    return withRate(response)
+    
+return withRate(response)
   }
 
   const { email, password } = parsed.data
@@ -57,8 +62,10 @@ export async function POST(req) {
         { message: ['Sua conta está inativa. Contate o administrador.'] },
         { status: 403, statusText: 'Forbidden' }
       )
+
       response.headers.set('x-request-id', requestId)
-      return withRate(response)
+      
+return withRate(response)
     }
 
     // Block pending users (haven't accepted invite yet)
@@ -67,8 +74,10 @@ export async function POST(req) {
         { message: ['Aceite o convite enviado ao seu email antes de fazer login.'] },
         { status: 403, statusText: 'Forbidden' }
       )
+
       response.headers.set('x-request-id', requestId)
-      return withRate(response)
+      
+return withRate(response)
     }
 
     // Check password (bcrypt only)
@@ -85,16 +94,21 @@ export async function POST(req) {
 
       logger.info('login-success', { requestId, userId: filteredUserData.id })
       const response = NextResponse.json(filteredUserData)
+
       response.headers.set('x-request-id', requestId)
-      return withRate(response)
+      
+return withRate(response)
     }
   }
 
   logger.warn('login-invalid-credentials', { requestId, email })
+
   const response = NextResponse.json(
     { message: ['Email ou senha inválidos'] },
     { status: 401, statusText: 'Unauthorized Access' }
   )
+
   response.headers.set('x-request-id', requestId)
-  return withRate(response)
+  
+return withRate(response)
 }

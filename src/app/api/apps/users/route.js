@@ -16,8 +16,10 @@ export async function GET(req) {
   if (!session) {
     logger.warn('users-list-unauthorized', { requestId })
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const where = isHighAdmin(session.user.role) ? {} : { workspaceId: session.user.workspaceId }
@@ -40,6 +42,8 @@ export async function GET(req) {
 
   logger.debug('users-list-success', { requestId, userId: session.user.id, count: users.length })
   const response = NextResponse.json(users)
+
   response.headers.set('x-request-id', requestId)
-  return response
+  
+return response
 }

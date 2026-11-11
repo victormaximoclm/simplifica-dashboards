@@ -1,6 +1,8 @@
-import { getServerSession } from 'next-auth'
-import { authOptions } from '@/libs/auth'
 import { cookies } from 'next/headers'
+
+import { getServerSession } from 'next-auth'
+
+import { authOptions } from '@/libs/auth'
 import Roles from '@views/apps/roles'
 import SuperAdminGuard from '@/hocs/SuperAdminGuard'
 import NotAuthorized from '@views/NotAuthorized'
@@ -10,6 +12,7 @@ const RolesApp = async () => {
   const isHighAdmin = ['superAdmin', 'subAdmin'].includes(session?.user?.role)
 
   const cookieStore = await cookies()
+
   const workspaceId = isHighAdmin
     ? (cookieStore.get('activeWorkspaceId')?.value ?? null)
     : (session?.user?.workspaceId ?? null)

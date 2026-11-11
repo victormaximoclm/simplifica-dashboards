@@ -8,6 +8,7 @@ export const dashboardIncludes = {
     include: { customRole: { select: { id: true, name: true } } }
   }
 }
+
 export function stripDashboardSensitiveFields(dashboard) {
   if (!dashboard) return dashboard
 

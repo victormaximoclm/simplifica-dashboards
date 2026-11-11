@@ -11,7 +11,9 @@ export function stripFieldSecrets(fields) {
   return fields.map(field => {
     if (!field?.dataSource) return field
     const { url, webhookUrl, ...dataSource } = field.dataSource
-    return { ...field, dataSource: { ...dataSource, hasSource: Boolean(url || webhookUrl) } }
+
+    
+return { ...field, dataSource: { ...dataSource, hasSource: Boolean(url || webhookUrl) } }
   })
 }
 
@@ -19,7 +21,9 @@ export function stripFieldSecrets(fields) {
 export function toClientForm(form) {
   // eslint-disable-next-line no-unused-vars
   const { webhookUrl, ...rest } = form
-  return { ...rest, fields: stripFieldSecrets(form.fields) }
+
+  
+return { ...rest, fields: stripFieldSecrets(form.fields) }
 }
 
 const isEmptyValue = val => val === undefined || val === null || val === '' || val === false
@@ -42,12 +46,14 @@ export function validateSubmission(formFields, payload) {
 
   const known = new Set(fields.map(fieldKeyOf))
   const unknown = Object.keys(payload).filter(key => !known.has(key))
+
   if (unknown.length > 0) {
     return { error: 'O envio contém campos que não pertencem ao formulário.' }
   }
 
   // Reconstrói os valores por id, como o FormFillView guarda antes de remapear
   const values = {}
+
   for (const field of fields) {
     const raw = payload[fieldKeyOf(field)]
 
@@ -55,6 +61,7 @@ export function validateSubmission(formFields, payload) {
       if (raw !== undefined && raw !== null && (typeof raw !== 'object' || Array.isArray(raw))) {
         return { error: `Valor inválido em "${field.label}".` }
       }
+
       values[field.id] = raw?.cpf
       if (raw?.value !== undefined) values[`${field.id}__value`] = raw.value
     } else {
@@ -70,12 +77,15 @@ export function validateSubmission(formFields, payload) {
     }
 
     const regexError = validateFieldRegex(field, values[field.id])
+
     if (regexError) return { error: `"${field.label}": ${regexError}` }
   }
 
   const clean = {}
+
   for (const field of fields) {
     const key = fieldKeyOf(field)
+
     if (!(key in payload)) continue
 
     if (!isFieldVisible(field, values)) {

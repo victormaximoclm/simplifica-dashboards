@@ -52,5 +52,6 @@ export async function PUT(req) {
   })
 
   logger.info('account-password-change-success', { requestId, userId: user.id })
-  return jsonWithRequestId({ message: 'Password changed successfully' }, { requestId })
+  
+return jsonWithRequestId({ message: 'Password changed successfully' }, { requestId })
 }

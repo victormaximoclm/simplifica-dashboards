@@ -67,7 +67,8 @@ export async function PUT(req, { params }) {
     metadata: { requestId },
     requestId
   })
-  return jsonWithRequestId(role, { requestId })
+  
+return jsonWithRequestId(role, { requestId })
 }
 
 // DELETE /api/apps/custom-roles/[id] - Delete custom role (superAdmin/subAdmin)
@@ -114,5 +115,6 @@ export async function DELETE(req, { params }) {
     metadata: { requestId },
     requestId
   })
-  return jsonWithRequestId({ message: 'Cargo excluído' }, { requestId })
+  
+return jsonWithRequestId({ message: 'Cargo excluído' }, { requestId })
 }

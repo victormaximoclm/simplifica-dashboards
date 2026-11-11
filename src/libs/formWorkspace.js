@@ -17,7 +17,9 @@ export async function resolveFormWorkspaceId(session, formWorkspaceId = null) {
     if (activeWsId) return activeWsId
 
     const first = await prisma.workspace.findFirst({ orderBy: { name: 'asc' }, select: { id: true } })
-    return first?.id ?? null
+
+    
+return first?.id ?? null
   }
 
   return null

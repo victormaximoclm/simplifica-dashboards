@@ -43,6 +43,7 @@ export default function AuditLogsTable({ title, subheader, endpoint, searchLabel
 
   useEffect(() => {
     let active = true
+
     Promise.all([
       fetch('/api/apps/workspaces', { cache: 'no-store' }).then(r => (r.ok ? r.json() : [])),
       fetch('/api/apps/users', { cache: 'no-store' }).then(r => (r.ok ? r.json() : []))
@@ -61,14 +62,17 @@ export default function AuditLogsTable({ title, subheader, endpoint, searchLabel
 
   useEffect(() => {
     let active = true
+
     const fetchData = async () => {
       setLoading(true)
       setError('')
+
       try {
         const params = new URLSearchParams({
           page: String(page),
           pageSize: '20'
         })
+
         if (query) params.set('q', query)
         if (tenantId) params.set('tenantId', tenantId)
         if (userId) params.set('userId', userId)
@@ -77,6 +81,7 @@ export default function AuditLogsTable({ title, subheader, endpoint, searchLabel
 
         const res = await fetch(`${endpoint}?${params.toString()}`, { cache: 'no-store' })
         const data = await res.json()
+
         if (!res.ok) throw new Error(data.message || 'Erro ao carregar audit logs')
         if (!active) return
         setRows(data.items || [])
@@ -90,7 +95,9 @@ export default function AuditLogsTable({ title, subheader, endpoint, searchLabel
     }
 
     fetchData()
-    return () => {
+
+    
+return () => {
       active = false
     }
   }, [endpoint, page, query, tenantId, userId, from, to])

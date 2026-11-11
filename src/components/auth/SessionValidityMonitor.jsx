@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from 'react'
 
-import { signOut, useSession } from 'next-auth/react'
 import { useParams } from 'next/navigation'
+
+import { signOut, useSession } from 'next-auth/react'
 
 const POLL_MS = 25000
 
@@ -28,6 +29,7 @@ export default function SessionValidityMonitor() {
     const run = async () => {
       if (ticking.current) return
       ticking.current = true
+
       try {
         const res = await fetch('/api/auth/session-status', {
           cache: 'no-store',
@@ -40,6 +42,7 @@ export default function SessionValidityMonitor() {
 
         if (data.ok === false && (data.reason === 'inactive' || data.reason === 'removed')) {
           const msg = MESSAGES[data.reason]
+
           await signOut({
             callbackUrl: `/${lang}/login?error=${encodeURIComponent(msg)}`,
             redirect: true
@@ -52,6 +55,7 @@ export default function SessionValidityMonitor() {
 
     run()
     const interval = setInterval(run, POLL_MS)
+
     const onVisible = () => {
       if (document.visibilityState === 'visible') run()
     }

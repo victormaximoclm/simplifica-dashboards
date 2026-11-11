@@ -81,6 +81,7 @@ const DashboardManage = ({ workspaces }) => {
   const fetchCustomRoles = useCallback(async () => {
     if (!formData.workspaceId) return
     const res = await fetch(`/api/apps/custom-roles?workspaceId=${formData.workspaceId}`)
+
     if (res.ok) setCustomRoles(await res.json())
   }, [formData.workspaceId])
 

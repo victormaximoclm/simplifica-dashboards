@@ -1,6 +1,7 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+
 import { usePathname } from 'next/navigation'
 
 const CLIENT_THROTTLE_MS = 60 * 1000
@@ -34,6 +35,7 @@ const ActivityTracker = () => {
   useEffect(() => {
     const onPointerDown = () => markActivity(false)
     const onKeyDown = () => markActivity(false)
+
     const onVisibilityChange = () => {
       if (document.visibilityState === 'visible') markActivity(false)
     }

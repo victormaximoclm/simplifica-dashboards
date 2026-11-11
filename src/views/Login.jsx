@@ -122,6 +122,7 @@ const Login = ({ mode }) => {
 
   useEffect(() => {
     const msg = searchParams.get('error')
+
     if (!msg) return
 
     const decoded = decodeURIComponent(msg)
@@ -146,13 +147,16 @@ const Login = ({ mode }) => {
     if (res && res.ok && res.error === null) {
       // Vars
       const redirectURL = getSafeRedirectPath(searchParams.get('redirectTo'))
+
       router.replace(getLocalizedUrl(redirectURL, locale))
     } else {
       // Trata diferentes formatos de erro
       let errorMsg = 'Email ou senha inválidos'
+
       if (res?.error) {
         try {
           const error = JSON.parse(res.error)
+
           if (typeof error === 'string') errorMsg = error
           else if (Array.isArray(error?.message)) errorMsg = error.message.join(' ')
           else if (typeof error?.message === 'string') errorMsg = error.message
@@ -161,6 +165,7 @@ const Login = ({ mode }) => {
           errorMsg = res.error
         }
       }
+
       setErrorState({ message: errorMsg })
     }
   }

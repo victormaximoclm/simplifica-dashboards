@@ -129,7 +129,8 @@ export async function GET(req) {
   }))
 
   logger.debug('notifications-list-success', { requestId, userId: currentUser.id, count: result.length })
-  return jsonWithRequestId(result, { requestId })
+  
+return jsonWithRequestId(result, { requestId })
 }
 
 // PATCH — marcar como lida(s); só IDs que o usuário tem permissão para ver
@@ -223,7 +224,8 @@ export async function PATCH(req) {
   })
 
   logger.info('notifications-mark-read-success', { requestId, userId: currentUser.id, count: ids.length, readAll: Boolean(readAll) })
-  return jsonWithRequestId({ message: 'OK' }, { requestId })
+  
+return jsonWithRequestId({ message: 'OK' }, { requestId })
 }
 
 // DELETE — ocultar para o usuário; só se a notificação estiver no escopo de visibilidade
@@ -284,5 +286,6 @@ export async function DELETE(req) {
     .catch(() => {})
 
   logger.info('notification-dismiss-success', { requestId, userId: currentUser.id, notificationId: id })
-  return jsonWithRequestId({ message: 'Notificação ocultada' }, { requestId })
+  
+return jsonWithRequestId({ message: 'Notificação ocultada' }, { requestId })
 }

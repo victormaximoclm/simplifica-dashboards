@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
@@ -22,16 +24,20 @@ export async function GET(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const { id, provider } = await params
 
   if (!isHighAdmin(session.user.role) && session.user.id !== id) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   try {
@@ -39,21 +45,27 @@ export async function GET(req, { params }) {
 
     if (!integration) {
       const response = NextResponse.json({ message: 'Integração não encontrada' }, { status: 404 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     // Remove o token da resposta por segurança
     const { token, ...safeIntegration } = integration
 
     const response = NextResponse.json(safeIntegration)
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     logger.error('user-integration-get-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao buscar integração' }, { status: 500 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 }
 
@@ -66,8 +78,10 @@ export async function DELETE(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const { id, provider } = await params
@@ -75,8 +89,10 @@ export async function DELETE(req, { params }) {
 
   if (!isHighAdmin(session.user.role) && session.user.id !== id) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   try {
@@ -84,8 +100,10 @@ export async function DELETE(req, { params }) {
 
     if (!existing) {
       const response = NextResponse.json({ message: 'Integração não encontrada' }, { status: 404 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     await deleteUserIntegration(id, provider)
@@ -114,12 +132,16 @@ export async function DELETE(req, { params }) {
     })
 
     const response = NextResponse.json({ message: 'Integração desvinculada com sucesso' })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     logger.error(`${provider}-integration-delete-error`, { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao desvincular integração' }, { status: 500 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 }

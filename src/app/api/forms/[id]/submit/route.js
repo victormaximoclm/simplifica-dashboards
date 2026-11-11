@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
@@ -21,11 +23,14 @@ export async function POST(req, { params }) {
 
   try {
     const rate = await submitLimiter.check(req)
+
     if (!rate.success) {
       logger.warn('form-submit-rate-limit', { requestId })
       const response = NextResponse.json({ message: 'Muitos envios em sequência. Aguarde um instante.' }, { status: 429 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const { id } = await params
@@ -40,8 +45,10 @@ export async function POST(req, { params }) {
 
     if (!form) {
       const response = NextResponse.json({ message: 'Formulário não encontrado' }, { status: 404 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     // Só repassa ao n8n o que o formulário geraria: campos conhecidos, obrigatórios e regex conferidos
@@ -50,8 +57,10 @@ export async function POST(req, { params }) {
     if (validation.error) {
       logger.warn('form-submit-invalid', { requestId, formId: id, reason: validation.error })
       const response = NextResponse.json({ message: validation.error }, { status: 400 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     let isPublicSubmission = false
@@ -61,8 +70,10 @@ export async function POST(req, { params }) {
     if (publicToken) {
       if (!form.allowPublicLink) {
         const response = NextResponse.json({ message: 'Links públicos não habilitados' }, { status: 403 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
 
       const claimed = await claimPublicLinkForSubmit({ token: publicToken, formId: id })
@@ -85,11 +96,14 @@ export async function POST(req, { params }) {
           })
 
           const response = NextResponse.json({ message: 'Token inválido' }, { status: 403 })
+
           response.headers.set('x-request-id', requestId)
-          return response
+          
+return response
         }
 
         const reason = existing.revokedAt ? 'link_revoked' : existing.used ? 'link_already_used' : 'link_expired'
+
         const message = {
           link_revoked: 'Link desativado. Não é possível enviar respostas.',
           link_already_used: 'Link já utilizado. Não é possível enviar outra resposta.',
@@ -107,8 +121,10 @@ export async function POST(req, { params }) {
         })
 
         const response = NextResponse.json({ message }, { status: 403 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
 
       const publicLink = await prisma.formPublicLink.findUnique({
@@ -121,8 +137,10 @@ export async function POST(req, { params }) {
     } else {
       if (!session) {
         const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
 
       submitCtx = await getUserFormContext(session.user.id)
@@ -131,8 +149,10 @@ export async function POST(req, { params }) {
 
       if (!canSubmit) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
     }
 
@@ -160,10 +180,12 @@ export async function POST(req, { params }) {
 
     if (!webhookResponse.ok) {
       const webhookError = await webhookResponse.text().catch(() => '')
+
       logger.error('webhook-error', { requestId, formId: id, status: webhookResponse.status })
 
       // ✅ Audit log de falha — cobre sessão autenticada e link público
       const auditUserId = session?.user?.id ?? `public:${publicLinkId ?? publicToken}`
+
       await createAuditLog({
         userId: auditUserId,
         tenantId: form.workspaceId,
@@ -178,12 +200,15 @@ export async function POST(req, { params }) {
         { message: 'Erro ao enviar dados', webhookMessage: webhookError },
         { status: 500 }
       )
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     // ✅ Audit log de sucesso — removida a guarda `if (session)`, cobre os dois fluxos
     const auditUserId = session?.user?.id ?? `public:${publicLinkId ?? publicToken}`
+
     await createAuditLog({
       userId: auditUserId,
       tenantId: form.workspaceId,
@@ -197,12 +222,16 @@ export async function POST(req, { params }) {
     logger.info('form-submit-success', { requestId, formId: id, isPublicSubmission })
 
     const response = NextResponse.json({ message: 'Formulário enviado com sucesso' })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     logger.error('form-submit-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao enviar formulário' }, { status: 500 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 }

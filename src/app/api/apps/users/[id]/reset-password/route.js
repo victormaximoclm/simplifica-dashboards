@@ -16,14 +16,18 @@ export async function PUT(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const { id } = await params
@@ -32,8 +36,10 @@ export async function PUT(req, { params }) {
 
   if (!newPassword || typeof newPassword !== 'string' || newPassword.length < 6) {
     const response = NextResponse.json({ message: 'Nova senha deve ter pelo menos 6 caracteres' }, { status: 400 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const targetUser = await prisma.user.findUnique({
@@ -43,8 +49,10 @@ export async function PUT(req, { params }) {
 
   if (!targetUser) {
     const response = NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Cannot reset own password via this endpoint
@@ -53,15 +61,19 @@ export async function PUT(req, { params }) {
       { message: 'Use as configurações de conta para alterar sua própria senha' },
       { status: 400 }
     )
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // SubAdmin can only reset passwords for admin and user roles
   if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
     const response = NextResponse.json({ message: 'SubAdmin não pode alterar senha de SuperAdmin ou SubAdmin' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10)
@@ -82,6 +94,8 @@ export async function PUT(req, { params }) {
     requestId
   })
   const response = NextResponse.json({ message: 'Senha alterada com sucesso' })
+
   response.headers.set('x-request-id', requestId)
-  return response
+  
+return response
 }

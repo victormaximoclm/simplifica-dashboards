@@ -7,7 +7,8 @@ export function getPublicLinkInactiveReason(link) {
   if (link.permanent) return null
   if (link.used) return 'used'
   if (!link.expiresAt || new Date() >= new Date(link.expiresAt)) return 'expired'
-  return null
+  
+return null
 }
 
 /** Link público ainda aceita visualização e envio */
@@ -79,7 +80,9 @@ export async function claimPublicLinkForSubmit({ token, formId }) {
 // Marca link como usado após submit (legado — preferir claimPublicLinkForSubmit)
 export async function consumeToken(token) {
   const now = new Date()
-  return prisma.formPublicLink.update({
+
+  
+return prisma.formPublicLink.update({
     where: { token },
     data: { used: true, expiresAt: now }
   })

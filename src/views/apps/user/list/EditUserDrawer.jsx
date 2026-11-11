@@ -31,6 +31,7 @@ const EditUserDrawer = ({ open, handleClose, user, workspaces, callerRole, calle
   const [passwordErr, setPasswordErr] = useState(null)
   const [passwordLoading, setPasswordLoading] = useState(false)
   const [permissionDrawerOpen, setPermissionDrawerOpen] = useState(false)
+
   const [snackbar, setSnackbar] = useState({
     open: false,
     severity: 'success',

@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { createAuditLog } from '@/libs/auditService'
 import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
@@ -18,8 +20,10 @@ export async function GET(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   try {
@@ -27,18 +31,23 @@ export async function GET(req, { params }) {
 
     if (!isHighAdmin(session.user.role) && session.user.workspaceId !== id) {
       const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const integration = await getWorkspaceIntegration(id, provider)
     const payload = isHighAdmin(session.user.role) ? integration : sanitizeWorkspaceIntegration(integration)
 
     const response = NextResponse.json(payload)
+
     response.headers.set('x-request-id', getRequestId(req))
-    return response
+    
+return response
   } catch (error) {
     console.error(error)
+
     const response = NextResponse.json(
       {
         error: 'Failed to fetch integration'
@@ -61,19 +70,25 @@ export async function PUT(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   try {
     const { id, provider } = await params
+
     console.log({ id, provider })
+
     if (!id || !provider) {
       return NextResponse.json({ error: 'Missing id or provider' }, { status: 400 })
     }
@@ -109,8 +124,10 @@ export async function PUT(req, { params }) {
     })
 
     const response = NextResponse.json(integration)
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     console.error(error)
 

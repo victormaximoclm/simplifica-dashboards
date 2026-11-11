@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 import Button from '@mui/material/Button'
 import Checkbox from '@mui/material/Checkbox'
 import Dialog from '@mui/material/Dialog'
@@ -12,7 +14,6 @@ import Grid from '@mui/material/Grid'
 import IconButton from '@mui/material/IconButton'
 import Paper from '@mui/material/Paper'
 import Typography from '@mui/material/Typography'
-import { useEffect, useState } from 'react'
 
 const AdminPermissionDrawer = ({ open, handleClose, user, onSave }) => {
   const [permissions, setPermissions] = useState([])
@@ -46,7 +47,8 @@ const AdminPermissionDrawer = ({ open, handleClose, user, onSave }) => {
 
       if (!res.ok) {
         setPermissions([])
-        return
+        
+return
       }
 
       const data = await res.json()

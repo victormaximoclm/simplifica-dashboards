@@ -61,6 +61,7 @@ async function fetchWebhookJson(url, init = {}) {
 /** Lista dinâmica — chama webhook e retorna [{ label, value }] */
 export async function getRows(_accessToken, config) {
   const baseUrl = config.url || config.webhookUrl
+
   if (!baseUrl) throw new Error('URL do webhook é obrigatória')
 
   const url = new URL(baseUrl)
@@ -71,7 +72,9 @@ export async function getRows(_accessToken, config) {
   }
 
   const data = await fetchWebhookJson(url.toString(), { method: 'GET' })
-  return normalizeOptions(data)
+
+  
+return normalizeOptions(data)
 }
 
 /** Busca por CPF via GET ?cpf=valor */
@@ -83,6 +86,7 @@ export async function lookup(_accessToken, config) {
   if (!searchValue) throw new Error('CPF é obrigatório')
 
   const url = new URL(baseUrl)
+
   url.searchParams.set('cpf', String(searchValue).trim())
 
   const data = await fetchWebhookJson(url.toString(), { method: 'GET' })

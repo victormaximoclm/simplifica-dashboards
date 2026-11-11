@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { authOptions } from '@/libs/auth'
 import { getRequestId } from '@/libs/logger'
 import { isClickUpWorkspaceConfigured } from '@/app/constants/integration'
@@ -13,16 +15,20 @@ export async function GET(req) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const workspaceId = session.user.workspaceId
 
   if (!workspaceId) {
     const response = NextResponse.json({ message: 'Usuário não pertence a nenhum workspace' }, { status: 400 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Busca integração do workspace para obter clientId e redirectUri
@@ -33,8 +39,10 @@ export async function GET(req) {
       { message: 'Workspace não possui integração ClickUp configurada ou ativa' },
       { status: 400 }
     )
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const { clientId } = integration.configJson
@@ -46,6 +54,8 @@ export async function GET(req) {
   })
 
   const response = NextResponse.redirect(`https://app.clickup.com/api?${params.toString()}`)
+
   response.headers.set('x-request-id', requestId)
-  return response
+  
+return response
 }

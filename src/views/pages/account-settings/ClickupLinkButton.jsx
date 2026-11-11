@@ -2,6 +2,8 @@
 
 import { useState, useEffect } from 'react'
 
+import { useSearchParams, useRouter } from 'next/navigation'
+
 import Card from '@mui/material/Card'
 import CardContent from '@mui/material/CardContent'
 import Typography from '@mui/material/Typography'
@@ -16,7 +18,6 @@ import DialogActions from '@mui/material/DialogActions'
 import CircularProgress from '@mui/material/CircularProgress'
 
 import { useSession } from 'next-auth/react'
-import { useSearchParams, useRouter } from 'next/navigation'
 
 import { toast } from 'react-toastify'
 

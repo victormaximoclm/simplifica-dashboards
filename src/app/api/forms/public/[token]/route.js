@@ -1,6 +1,7 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { getPublicLinkInactiveReason } from '@/libs/formlinkservice'
@@ -23,28 +24,36 @@ export async function GET(req, { params }) {
 
     if (!publicLink) {
       const response = NextResponse.json({ message: 'Link inválido' }, { status: 404 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const inactiveReason = getPublicLinkInactiveReason(publicLink)
 
     if (inactiveReason === 'revoked') {
       const response = NextResponse.json({ message: 'Link desativado' }, { status: 403 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     if (inactiveReason === 'used') {
       const response = NextResponse.json({ message: 'Link já utilizado' }, { status: 403 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     if (inactiveReason === 'expired') {
       const response = NextResponse.json({ message: 'Link expirado' }, { status: 403 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const { form } = publicLink
@@ -59,12 +68,16 @@ export async function GET(req, { params }) {
       token,
       expiresAt: publicLink.expiresAt
     })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     logger.error('form-public-get-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao buscar formulário' }, { status: 500 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 }

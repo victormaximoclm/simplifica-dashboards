@@ -13,6 +13,7 @@ import { createCustomRoleSchema, parseBody } from '@/libs/validations'
 export async function GET(req) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
+
   if (!session) return jsonWithRequestId({ message: 'Não autorizado' }, { status: 401, requestId })
 
   const { searchParams } = new URL(req.url)
@@ -33,24 +34,31 @@ export async function GET(req) {
 
   const rolesWithCounts = roles.map(role => {
     const moduleCounts = {}
+
     role.permissions.forEach(p => {
       const key = p.module.key
+
       moduleCounts[key] = (moduleCounts[key] || 0) + 1
     })
-    return { ...role, moduleCounts }
+    
+return { ...role, moduleCounts }
   })
-  return jsonWithRequestId(rolesWithCounts, { requestId })
+
+  
+return jsonWithRequestId(rolesWithCounts, { requestId })
 }
 
 // POST /api/apps/custom-roles - Create custom role (superAdmin only)
 export async function POST(req) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
+
   if (!session) return jsonWithRequestId({ message: 'Não autorizado' }, { status: 401, requestId })
   if (session.user.role !== 'superAdmin' && session.user.role !== 'subAdmin')
     return jsonWithRequestId({ message: 'Acesso negado' }, { status: 403, requestId })
 
   const parsed = parseBody(createCustomRoleSchema, await req.json())
+
   if (!parsed.success) return jsonWithRequestId({ message: parsed.message }, { status: 400, requestId })
 
   const { name, workspaceId } = parsed.data
@@ -58,6 +66,7 @@ export async function POST(req) {
   const existing = await prisma.customRole.findFirst({
     where: { workspaceId, name: name.trim() }
   })
+
   if (existing)
     return jsonWithRequestId(
       { message: 'Já existe um cargo com esse nome neste workspace' },
@@ -79,5 +88,6 @@ export async function POST(req) {
     metadata: { requestId },
     requestId
   })
-  return jsonWithRequestId(role, { status: 201, requestId })
+  
+return jsonWithRequestId(role, { status: 201, requestId })
 }

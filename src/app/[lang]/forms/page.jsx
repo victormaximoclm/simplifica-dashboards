@@ -1,6 +1,7 @@
 // app/[lang]/forms/page.jsx
 
 import { redirect } from 'next/navigation'
+
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
@@ -28,6 +29,7 @@ const FormsPage = async ({ params }) => {
     workspaceId = await resolveFormWorkspaceId(session)
   } else if (userRole === 'admin') {
     workspaceId = session.user.workspaceId
+
     if (!workspaceId) {
       return <EmptyState canManage={canManageForms(userRole)} reason='no-workspace' />
     }

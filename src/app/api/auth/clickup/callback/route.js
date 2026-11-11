@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
 import { getWorkspaceIntegration } from '@/libs/workspaceIntegrations'
@@ -98,6 +100,8 @@ export async function GET(req) {
     logger.error('clickup-callback-error', { requestId, error: error.message })
 
     const errorKey = error.message.includes('não encontrado') ? 'clickup_not_in_workspace' : 'clickup_error'
-    return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/br/pages/account-settings?error=${errorKey}`)
+
+    
+return NextResponse.redirect(`${process.env.NEXT_PUBLIC_APP_URL}/br/pages/account-settings?error=${errorKey}`)
   }
 }

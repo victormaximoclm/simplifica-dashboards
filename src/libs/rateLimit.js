@@ -31,7 +31,8 @@ function checkInMemory({ bucket, keyValue, interval, limit }) {
 
   if (!record || now - record.start > interval) {
     tokenStore.set(keyValue, { start: now, count: 1 })
-    return { success: true, remaining: limit - 1, limit, reset: Math.ceil(interval / 1000) }
+    
+return { success: true, remaining: limit - 1, limit, reset: Math.ceil(interval / 1000) }
   }
 
   record.count += 1

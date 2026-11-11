@@ -19,11 +19,13 @@ import Typography from '@mui/material/Typography'
 import Divider from '@mui/material/Divider'
 import MenuItem from '@mui/material/MenuItem'
 import Button from '@mui/material/Button'
+
+import { signOut, useSession } from 'next-auth/react'
+
 import LanguageDropdown from './LanguageDropdown'
 import ModeDropdown from './ModeDropdown'
 
 // Third-party Imports
-import { signOut, useSession } from 'next-auth/react'
 
 // Hook Imports
 import { useSettings } from '@core/hooks/useSettings'

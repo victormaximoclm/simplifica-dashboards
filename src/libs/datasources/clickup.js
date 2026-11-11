@@ -11,6 +11,7 @@ export async function getListTasks(accessToken, { listId, labelField = 'name', v
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const url = new URL(`${CLICKUP_API}/list/${listId}/task`)
+
     url.searchParams.append('page', String(page))
     url.searchParams.append('include_closed', 'false')
     url.searchParams.append('subtasks', 'false')
@@ -21,6 +22,7 @@ export async function getListTasks(accessToken, { listId, labelField = 'name', v
     })
 
     const data = await res.json()
+
     if (!res.ok) throw new Error(data.err || 'Erro ao buscar tasks')
 
     const tasks = Array.isArray(data?.tasks) ? data.tasks : []
@@ -51,6 +53,7 @@ export async function findTaskByField(accessToken, { listId, searchFieldId, sear
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const url = new URL(`${CLICKUP_API}/list/${listId}/task`)
+
     url.searchParams.append('page', String(page))
     url.searchParams.append('include_closed', 'false')
     url.searchParams.append('subtasks', 'false')
@@ -61,6 +64,7 @@ export async function findTaskByField(accessToken, { listId, searchFieldId, sear
     })
 
     const data = await res.json()
+
     if (!res.ok) throw new Error(data.err || 'Erro ao buscar tasks')
 
     const tasks = Array.isArray(data?.tasks) ? data.tasks : []
@@ -82,6 +86,7 @@ export async function findTaskByField(accessToken, { listId, searchFieldId, sear
 
       for (const fieldId of returnFields) {
         const field = fields.find(f => f.id === fieldId)
+
         result[fieldId] = extractFieldValue(field)
       }
 
@@ -99,11 +104,14 @@ function extractFieldValue(field) {
   if (!field) return null
 
   const raw = field.value
+
   if (raw === null || raw === undefined) return null
 
   if (field.type === 'drop_down' && Array.isArray(field.type_config?.options)) {
     const option = field.type_config.options.find(o => Number(o.orderindex) === Number(raw))
-    return option?.name ?? null
+
+    
+return option?.name ?? null
   }
 
   if (typeof raw === 'string') return raw.trim()
@@ -117,5 +125,7 @@ function extractFieldValue(field) {
 function getCustomFieldValue(task, fieldIdentifier) {
   const fields = Array.isArray(task.custom_fields) ? task.custom_fields : []
   const field = fields.find(f => f.id === fieldIdentifier || f.name?.toLowerCase() === fieldIdentifier.toLowerCase())
-  return extractFieldValue(field)
+
+  
+return extractFieldValue(field)
 }

@@ -1,5 +1,7 @@
 import crypto from 'crypto'
+
 import pino from 'pino'
+
 import { trackServerError } from '@/libs/errorTracking'
 
 const SENSITIVE_KEY_PARTS = ['password', 'token', 'secret', 'authorization', 'cookie', 'set-cookie', 'email']
@@ -13,7 +15,8 @@ function isSensitiveKey(key) {
 function maskValue(value) {
   if (typeof value === 'string') {
     if (value.length <= 6) return '***'
-    return `${value.slice(0, 2)}***${value.slice(-2)}`
+    
+return `${value.slice(0, 2)}***${value.slice(-2)}`
   }
 
   return '***'
@@ -59,6 +62,7 @@ function buildEntry(level, message, meta = {}) {
 
 function write(level, message, meta) {
   const entry = buildEntry(level, message, sanitizeMeta(meta))
+
   baseLogger[level](entry, message)
 }
 
@@ -79,6 +83,7 @@ export const logger = {
 
 export function captureException(error, context = {}) {
   const safeContext = sanitizeMeta(context)
+
   logger.error('captured-exception', {
     error: error instanceof Error ? error.message : String(error),
     ...safeContext
@@ -110,5 +115,6 @@ export function applyRateLimitHeaders(response, rate) {
   response.headers.set('X-RateLimit-Limit', String(rate.limit))
   response.headers.set('X-RateLimit-Remaining', String(rate.remaining))
   response.headers.set('X-RateLimit-Reset', String(rate.reset))
-  return response
+  
+return response
 }

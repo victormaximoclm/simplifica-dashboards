@@ -39,7 +39,8 @@ export async function GET(req) {
   }
 
   logger.info('account-settings-read-success', { requestId, userId: user.id })
-  return jsonWithRequestId(user, { requestId })
+  
+return jsonWithRequestId(user, { requestId })
 }
 
 // PUT update current user profile
@@ -78,7 +79,8 @@ export async function PUT(req) {
   })
 
   logger.info('account-settings-update-success', { requestId, userId: user.id })
-  return jsonWithRequestId(user, { requestId })
+  
+return jsonWithRequestId(user, { requestId })
 }
 
 // DELETE current user account
@@ -100,5 +102,6 @@ export async function DELETE(req) {
   })
 
   logger.info('account-settings-delete-success', { requestId, userEmail: session.user.email })
-  return jsonWithRequestId({ message: 'Account deleted successfully' }, { requestId })
+  
+return jsonWithRequestId({ message: 'Account deleted successfully' }, { requestId })
 }

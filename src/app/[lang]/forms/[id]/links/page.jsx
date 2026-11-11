@@ -1,6 +1,7 @@
 // app/[lang]/forms/[id]/links/page.jsx
 
 import { redirect } from 'next/navigation'
+
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'

@@ -131,7 +131,8 @@ const AcceptInvite = ({ mode }) => {
 
     if (!agreedToTerms) {
       setError('Você precisa aceitar os Termos de Uso')
-      return
+      
+return
     }
 
     if (!name.trim()) {

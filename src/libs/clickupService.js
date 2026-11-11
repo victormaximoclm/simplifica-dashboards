@@ -81,6 +81,7 @@ export async function extractCargo(accessToken, listId, userEmail, cargoId) {
 
   for (let page = 0; page < MAX_PAGES; page++) {
     const url = new URL(`${CLICKUP_API}/list/${listId}/task`)
+
     url.searchParams.append('page', String(page))
     url.searchParams.append('include_closed', 'false')
     url.searchParams.append('subtasks', 'false')
@@ -92,6 +93,7 @@ export async function extractCargo(accessToken, listId, userEmail, cargoId) {
     })
 
     const data = await res.json()
+
     if (!res.ok) throw new Error(data.err || 'Erro ao buscar tasks da lista')
 
     const tasks = Array.isArray(data?.tasks) ? data.tasks : []
@@ -107,15 +109,19 @@ export async function extractCargo(accessToken, listId, userEmail, cargoId) {
 
       // Encontra o campo cargo pelo ID
       const cargoField = fields.find(f => f.id === cargoId)
+
       if (!cargoField) return null
 
       const raw = cargoField.value
+
       if (raw === null || raw === undefined) return null
 
       // Traduz o índice do dropdown para o label
       if (cargoField.type === 'drop_down' && Array.isArray(cargoField.type_config?.options)) {
         const option = cargoField.type_config.options.find(o => Number(o.orderindex) === Number(raw))
-        return option?.name ?? null
+
+        
+return option?.name ?? null
       }
 
       return typeof raw === 'string' ? raw.trim() : String(raw)

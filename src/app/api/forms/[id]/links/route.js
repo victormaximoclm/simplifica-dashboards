@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
@@ -18,8 +20,10 @@ export async function GET(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   try {
@@ -28,8 +32,10 @@ export async function GET(req, { params }) {
 
     if (!form) {
       const response = NextResponse.json({ message: 'Formulário não encontrado' }, { status: 404 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const role = session.user.role
@@ -37,15 +43,20 @@ export async function GET(req, { params }) {
     if (!isHighAdmin(role)) {
       if (form.workspaceId !== session.user.workspaceId) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
 
       const ctx = role !== 'admin' ? await getUserFormContext(session.user.id) : {}
+
       if (!canNonHighAdminAccessForm(role, form, ctx)) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
     }
 
@@ -56,19 +67,24 @@ export async function GET(req, { params }) {
     })
 
     const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
+
     const response = NextResponse.json(
       links.map(link => ({
         ...link,
         publicUrl: `${baseUrl}/f/${link.token}`
       }))
     )
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     logger.error('form-links-list-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao listar links' }, { status: 500 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 }
 
@@ -79,8 +95,10 @@ export async function POST(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   try {
@@ -91,42 +109,55 @@ export async function POST(req, { params }) {
 
     if (!permanent && (!Number.isFinite(expiresInHours) || expiresInHours < 1 || expiresInHours > 168)) {
       const response = NextResponse.json({ message: 'Expiração deve estar entre 1 e 168 horas' }, { status: 400 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const form = await prisma.form.findUnique({ where: { id } })
 
     if (!form) {
       const response = NextResponse.json({ message: 'Formulário não encontrado' }, { status: 404 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     if (!form.allowPublicLink) {
       const response = NextResponse.json({ message: 'Links públicos não habilitados' }, { status: 403 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const role = session.user.role
 
     if (!(await canGeneratePublicLinks(role))) {
       const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     if (!isHighAdmin(role)) {
       if (form.workspaceId !== session.user.workspaceId) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
+
       if (isFormHighAdminOnly(form)) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
     }
 
@@ -151,12 +182,16 @@ export async function POST(req, { params }) {
       },
       { status: 201 }
     )
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     logger.error('form-link-create-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao gerar link público' }, { status: 500 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 }

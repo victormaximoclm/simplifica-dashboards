@@ -5,20 +5,24 @@ function parseCsvLine(line) {
 
   for (let i = 0; i < line.length; i++) {
     const char = line[i]
+
     if (char === '"') {
       inQuotes = !inQuotes
       continue
     }
+
     if (char === ',' && !inQuotes) {
       result.push(current.trim())
       current = ''
       continue
     }
+
     current += char
   }
 
   result.push(current.trim())
-  return result
+  
+return result
 }
 
 function parseCsv(text) {
@@ -36,6 +40,7 @@ export async function getRows(_accessToken, { url, labelColumn = 0, valueColumn 
   if (!url) throw new Error('URL do CSV é obrigatória')
 
   const res = await fetch(url)
+
   if (!res.ok) throw new Error('Erro ao buscar CSV')
 
   const rows = parseCsv(await res.text())

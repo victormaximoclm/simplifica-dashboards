@@ -10,10 +10,13 @@ function redact(input) {
   return Object.fromEntries(
     Object.entries(input).map(([key, value]) => {
       const lowered = key.toLowerCase()
+
       if (REDACT_KEYS.some(k => lowered.includes(k.toLowerCase()))) {
         return [key, '***']
       }
-      return [key, redact(value)]
+
+      
+return [key, redact(value)]
     })
   )
 }
@@ -38,6 +41,7 @@ export async function createAuditLog({
 
   const normalizedResource = resource || entityType
   const normalizedResourceId = resourceId || entityId
+
   try {
     await prisma.auditLog.create({
       data: {
@@ -65,10 +69,12 @@ export async function createAuditLog({
 export async function createDedupedAuditLog({ dedupeWindowMinutes = 15, ...input }) {
   const now = new Date()
   const from = new Date(now.getTime() - dedupeWindowMinutes * 60 * 1000)
+
   const action = String(input.action || '')
     .trim()
     .replace(/-/g, '_')
     .toUpperCase()
+
   const resource = input.resource || input.entityType
   const resourceId = input.resourceId || input.entityId || null
 

@@ -17,15 +17,19 @@ export async function PUT(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     logger.warn('user-update-forbidden', { requestId, userId: session.user.id, role: session.user.role })
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const { id } = await params
@@ -35,6 +39,7 @@ export async function PUT(req, { params }) {
   if (customRoleId) {
     const targetWorkspaceId = workspaceId || updateData.workspaceId || targetUser?.workspaceId
     const roleCheck = await prisma.customRole.findUnique({ where: { id: customRoleId } })
+
     if (!roleCheck || roleCheck.workspaceId !== targetWorkspaceId) {
       return jsonWithRequestId({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400, requestId })
     }
@@ -47,8 +52,10 @@ export async function PUT(req, { params }) {
 
   if (!targetUser) {
     const response = NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
@@ -56,8 +63,10 @@ export async function PUT(req, { params }) {
       { message: 'SubAdmin não pode modificar SuperAdmin ou SubAdmin' },
       { status: 403 }
     )
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Super Admin cannot change their own role
@@ -65,8 +74,10 @@ export async function PUT(req, { params }) {
 
   if (currentUser && currentUser.id === id && session.user.role === 'superAdmin' && role && role !== 'superAdmin') {
     const response = NextResponse.json({ message: 'Super Admin não pode alterar o próprio cargo' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const updateData = {}
@@ -80,8 +91,10 @@ export async function PUT(req, { params }) {
         { message: 'Você não tem permissão para atribuir este cargo' },
         { status: 403 }
       )
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     updateData.role = role
@@ -94,8 +107,10 @@ export async function PUT(req, { params }) {
         { message: 'Usuários pendentes não podem ter o status alterado. Remova e convide novamente.' },
         { status: 400 }
       )
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     updateData.status = status
@@ -110,8 +125,10 @@ export async function PUT(req, { params }) {
 
       if (!workspace) {
         const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+
         response.headers.set('x-request-id', requestId)
-        return response
+        
+return response
       }
 
       updateData.workspaceId = workspaceId
@@ -124,8 +141,10 @@ export async function PUT(req, { params }) {
 
   if (Object.keys(updateData).length === 0) {
     const response = NextResponse.json({ message: 'Nenhum campo para atualizar' }, { status: 400 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Get original user data for notification
@@ -186,8 +205,10 @@ export async function PUT(req, { params }) {
     requestId
   })
   const response = NextResponse.json(user)
+
   response.headers.set('x-request-id', requestId)
-  return response
+  
+return response
 }
 
 // DELETE /api/apps/users/[id] - Delete user (high admins only)
@@ -197,14 +218,18 @@ export async function DELETE(req, { params }) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const { id } = await params
@@ -216,14 +241,18 @@ export async function DELETE(req, { params }) {
 
   if (!targetUser) {
     const response = NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
     const response = NextResponse.json({ message: 'SubAdmin não pode deletar SuperAdmin ou SubAdmin' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Prevent deleting own account
@@ -231,8 +260,10 @@ export async function DELETE(req, { params }) {
 
   if (currentUser && currentUser.id === id) {
     const response = NextResponse.json({ message: 'Não é possível deletar sua própria conta' }, { status: 400 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Get user data before deleting for notification
@@ -266,6 +297,8 @@ export async function DELETE(req, { params }) {
     requestId
   })
   const response = NextResponse.json({ message: 'Usuário deletado' })
+
   response.headers.set('x-request-id', requestId)
-  return response
+  
+return response
 }

@@ -110,6 +110,7 @@ const NotificationDropdown = () => {
     setOpen(false)
     setExpandedId(null)
   }
+
   const handleToggle = () => setOpen(prev => !prev)
 
   const markAsRead = async notificationId => {

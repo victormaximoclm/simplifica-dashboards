@@ -1,7 +1,9 @@
 'use client'
 
 import { useState, useEffect, useCallback, useRef, useMemo } from 'react'
+
 import { useRouter } from 'next/navigation'
+
 import { toast } from 'react-toastify'
 
 import FormTextField from './FormTextField'
@@ -50,9 +52,11 @@ const REFILL_DELAY_MS = 2000
 const FormFillView = ({ form, publicToken = null, permanentLink = false, canManage = false, lang }) => {
   // Link público de uso único não aceita novo envio; interno e link permanente sim
   const canRefill = !publicToken || permanentLink
+
   const [values, setValues] = useState(() => {
     const initial = {}
     const fs = Array.isArray(form.fields) ? form.fields : []
+
     fs.forEach(f => {
       if (f.type === 'checkbox') {
         initial[f.id] = false
@@ -65,6 +69,7 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
     return initial
   })
+
   const [options, setOptions] = useState({})
   const [cpfErrors, setCpfErrors] = useState({})
   const [loadingOptions, setLoadingOptions] = useState({})
@@ -84,10 +89,12 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
   const hiddenFieldIds = useMemo(() => {
     const ids = new Set()
+
     fields.forEach(f => {
       if (f.type === 'cpf-lookup' && f.returnNameFieldId) ids.add(f.returnNameFieldId)
     })
-    return ids
+    
+return ids
   }, [fields])
 
   const visibleFields = useMemo(
@@ -97,31 +104,39 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
   useEffect(() => {
     const hiddenFields = fields.filter(f => !isFieldVisible(f, values))
+
     if (hiddenFields.length === 0) return
 
     const toClean = hiddenFields.filter(f => {
       const val = values[f.id]
-      return val !== undefined && val !== null && val !== '' && val !== false
+
+      
+return val !== undefined && val !== null && val !== '' && val !== false
     })
 
     if (toClean.length === 0) return
 
     setValues(prev => {
       const next = { ...prev }
+
       toClean.forEach(f => {
         next[f.id] = f.type === 'checkbox' ? false : undefined
       })
-      return next
+      
+return next
     })
   }, [values, fields])
 
   const pages = useMemo(() => {
     const perPage = form.pagination?.enabled ? (form.pagination?.perPage ?? 10) : Infinity
     const result = []
+
     for (let i = 0; i < visibleFields.length; i += perPage) {
       result.push(visibleFields.slice(i, i + perPage))
     }
-    return result.length > 0 ? result : [[]]
+
+    
+return result.length > 0 ? result : [[]]
   }, [visibleFields, form.pagination])
 
   const totalPages = pages.length
@@ -142,8 +157,10 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
       })
 
       const res = await fetch(`/api/forms/datasource?${params}`)
+
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+
         throw new Error(err.message || 'Erro ao carregar dados')
       }
 
@@ -159,8 +176,10 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
       if (!hasDataSource(field)) return
 
       setLoadingOptions(prev => ({ ...prev, [field.id]: true }))
+
       try {
         const data = await fetchDatasource(field)
+
         setOptions(prev => ({ ...prev, [field.id]: Array.isArray(data) ? data : [] }))
       } catch {
         setOptions(prev => ({ ...prev, [field.id]: [] }))
@@ -190,19 +209,23 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
       if (field.type !== 'dynamic-list' && field.type !== 'multi-select-dynamic') return
 
       const parentValue = values[field.dependsOn]
+
       if (!parentValue) {
         // Limpa o filho quando pai esvazia
         setOptions(prev => ({ ...prev, [field.id]: [] }))
         setValue(field.id, '')
-        return
+        
+return
       }
 
       if (!hasDataSource(field)) return
 
       setLoadingOptions(prev => ({ ...prev, [field.id]: true }))
+
       try {
         // O nome do query param (dependsOnParam) vem da config do campo, no servidor
         const data = await fetchDatasource(field, { dependsOnValue: parentValue })
+
         setOptions(prev => ({ ...prev, [field.id]: Array.isArray(data) ? data : [] }))
         setValue(field.id, '') // reseta seleção anterior
       } catch {
@@ -218,6 +241,7 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
   const handleCpfLookup = async field => {
     const cpf = values[field.id]
+
     if (!cpf || !hasDataSource(field)) return
 
     setLoadingOptions(prev => ({ ...prev, [field.id]: true }))
@@ -260,9 +284,11 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
     // Regex — vale para qualquer campo que tenha regex, obrigatório ou não
     const regexError = validateFieldRegex(field, val)
+
     if (regexError) {
       setFieldErrors(prev => ({ ...prev, [field.id]: regexError }))
-      return
+      
+return
     }
 
     // Sem erro — limpa
@@ -281,15 +307,18 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
           field.type === 'address-lookup'
             ? `Selecione um endereço da lista de sugestões em "${field.label}".`
             : `O campo "${field.label}" é obrigatório.`
+
         setError(msg)
         toast.error(msg, { position: 'bottom-center' })
-        return
+        
+return
       }
     }
 
     for (const field of fields) {
       if ((field.type === 'multi-select-dynamic' || field.type === 'multi-input') && field.extraFields?.length > 0) {
         const items = values[field.id] ?? []
+
         for (const item of items) {
           for (const ef of field.extraFields) {
             if (ef.required && (item[ef.key] === '' || item[ef.key] === undefined || item[ef.key] === null)) {
@@ -297,7 +326,8 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
               toast.error(`Preencha "${ef.label}" para todos os itens em "${field.label}".`, {
                 position: 'bottom-center'
               })
-              return
+              
+return
             }
           }
         }
@@ -307,10 +337,12 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
     for (const field of fields) {
       if (!isFieldVisible(field, values)) continue
       const regexError = validateFieldRegex(field, values[field.id])
+
       if (regexError) {
         setError(`"${field.label}": ${regexError}`)
         toast.error(`"${field.label}": ${regexError}`, { position: 'bottom-center' })
-        return
+        
+return
       }
     }
 
@@ -321,6 +353,7 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
       const remappedFields = Object.fromEntries(
         fields.map(f => {
           const key = fieldKeyOf(f)
+
           if (f.type === 'cpf-lookup') {
             return [
               key,
@@ -331,11 +364,14 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
               }
             ]
           }
-          return [key, values[f.id]]
+
+          
+return [key, values[f.id]]
         })
       )
 
       const payload = { fields: remappedFields }
+
       if (publicToken) payload.publicToken = publicToken
 
       const res = await fetch(`/api/forms/${form.id}/submit`, {
@@ -347,14 +383,17 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
         const detail = err.webhookMessage ? ` (${err.webhookMessage.slice(0, 80)})` : ''
+
         const msg =
           res.status >= 500
             ? `Não foi possível enviar o formulário.${detail}`
             : err.message || 'Erro ao enviar formulário.'
+
         throw new Error(msg)
       }
 
       setSubmitted(true)
+
       if (form.refreshOnSubmit && canRefill) {
         // Mostra a confirmação por alguns segundos e volta ao formulário em branco
         refillTimerRef.current = setTimeout(handleReset, REFILL_DELAY_MS)
@@ -371,10 +410,12 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
     if (!canRefill) return
     clearTimeout(refillTimerRef.current)
     const initial = {}
+
     fields.forEach(f => {
       if (f.type === 'checkbox') {
         initial[f.id] = false
       }
+
       if (f.type === 'date' && f.defaultCurrentDate) {
         initial[f.id] = new Date().toISOString().split('T')[0]
       }
@@ -392,20 +433,26 @@ const FormFillView = ({ form, publicToken = null, permanentLink = false, canMana
 
     for (const field of currentFields) {
       if (!isFieldVisible(field, values)) continue
+
       if (isFieldRequired(field, values) && isFieldEmpty(values[field.id], field, values)) {
         const msg =
           field.type === 'address-lookup'
             ? `Selecione um endereço da lista de sugestões em "${field.label}".`
             : `O campo "${field.label}" é obrigatório.`
+
         setError(msg)
         toast.error(msg, { position: 'bottom-center' })
-        return
+        
+return
       }
+
       const regexError = validateFieldRegex(field, values[field.id])
+
       if (regexError) {
         setError(`"${field.label}": ${regexError}`)
         toast.error(`"${field.label}": ${regexError}`, { position: 'bottom-center' })
-        return
+        
+return
       }
     }
 
@@ -635,7 +682,9 @@ const FieldInput = ({
       if (field.multiSelect) {
         const selected = Array.isArray(value) ? value : []
         const opts = (field.options ?? []).map(opt => (typeof opt === 'object' ? opt : { label: opt, value: opt }))
-        return (
+
+        
+return (
           <FormFieldWrap>
             <FormLabel required={field.required}>{field.label}</FormLabel>
             <StaticMultiSelect opts={opts} selected={selected} onChange={onChange} fieldError={fieldError} />
@@ -643,7 +692,9 @@ const FieldInput = ({
           </FormFieldWrap>
         )
       }
-      return (
+
+      
+return (
         <FormFieldWrap>
           <FormLabel required={field.required}>{field.label}</FormLabel>
           <StaticSingleSelect
@@ -681,8 +732,10 @@ const FieldInput = ({
             accept={field.accept}
             onChange={e => {
               const file = e.target.files?.[0]
+
               if (!file) return onChange(null)
               const reader = new FileReader()
+
               reader.onload = () => onChange({ name: file.name, type: file.type, size: file.size, data: reader.result })
               reader.readAsDataURL(file)
             }}
@@ -753,8 +806,10 @@ const StaticSingleSelect = ({ opts, value, onChange, onBlur }) => {
     const handle = e => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false)
     }
+
     document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
+    
+return () => document.removeEventListener('mousedown', handle)
   }, [])
 
   return (
@@ -810,8 +865,10 @@ const StaticMultiSelect = ({ opts, selected, onChange, fieldError }) => {
     const handle = e => {
       if (ref.current && !ref.current.contains(e.target)) setOpen(false)
     }
+
     document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
+    
+return () => document.removeEventListener('mousedown', handle)
   }, [])
 
   const toggle = val => {
@@ -923,8 +980,11 @@ const AddressLookupInput = ({ field, value, onChange }) => {
     const handle = e => {
       if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false)
     }
+
     document.addEventListener('mousedown', handle)
-    return () => {
+
+    
+return () => {
       document.removeEventListener('mousedown', handle)
       clearTimeout(debounceRef.current)
     }
@@ -933,28 +993,34 @@ const AddressLookupInput = ({ field, value, onChange }) => {
   const search = q => {
     clearTimeout(debounceRef.current)
     const requestId = ++requestRef.current
+
     setSearchError(null)
 
     if (!q || q.trim().length < 4) {
       setSuggestions([])
       setSearched(false)
       setLoading(false)
-      return
+      
+return
     }
 
     debounceRef.current = setTimeout(async () => {
       setLoading(true)
       const controller = new AbortController()
       const timeoutId = setTimeout(() => controller.abort(), 6000) // rede que não responde não pode travar o formulário
+
       try {
         const res = await fetch(
           `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(q.trim())}&format=json&addressdetails=1&limit=5&countrycodes=br`,
           { headers: { 'Accept-Language': 'pt-BR' }, signal: controller.signal }
         )
+
         if (!res.ok) throw new Error(`HTTP ${res.status}`)
         const data = await res.json()
+
         if (requestId !== requestRef.current) return // resposta de uma busca antiga
         const results = Array.isArray(data) ? data : []
+
         setSuggestions(results)
         setSearched(true)
         setOpen(true)
@@ -977,6 +1043,7 @@ const AddressLookupInput = ({ field, value, onChange }) => {
 
   const handleInput = e => {
     const text = e.target.value
+
     setQuery(text)
     // Editar o texto invalida a seleção anterior. O texto digitado vale como endereço livre enquanto a busca
     // não responde (ou não retorna sugestões); se ela trouxer sugestões, passa a exigir a escolha de uma
@@ -991,6 +1058,7 @@ const AddressLookupInput = ({ field, value, onChange }) => {
     setSearched(false)
     setSearchError(null)
     const { road, suburb, city, town, village, state, postcode } = item.address ?? {}
+
     onChange({
       display: item.display_name,
       street: road ?? '',
@@ -1055,11 +1123,14 @@ const DynamicListInput = ({ field, value, options, loading, onChange, onBlur }) 
     const handle = e => {
       if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false)
     }
+
     document.addEventListener('mousedown', handle)
-    return () => document.removeEventListener('mousedown', handle)
+    
+return () => document.removeEventListener('mousedown', handle)
   }, [])
 
   const q = search.trim().toLowerCase()
+
   const filtered = q
     ? opts.filter(
         o =>
@@ -1129,8 +1200,10 @@ const MultiInputField = ({ field, value, onChange }) => {
 
   const addItem = () => {
     const trimmed = text.trim()
+
     if (!trimmed) return
     const initExtras = Object.fromEntries(extraFields.map(ef => [ef.key, ef.type === 'checkbox' ? false : '']))
+
     onChange([...selected, { label: trimmed, ...initExtras }])
     setText('')
   }
@@ -1245,8 +1318,10 @@ const MultiSelectDynamicInput = ({ field, value, options, loading, onChange }) =
     const handleClickOutside = e => {
       if (containerRef.current && !containerRef.current.contains(e.target)) setOpen(false)
     }
+
     document.addEventListener('mousedown', handleClickOutside)
-    return () => document.removeEventListener('mousedown', handleClickOutside)
+    
+return () => document.removeEventListener('mousedown', handleClickOutside)
   }, [])
 
   const q = search.trim().toLowerCase()
@@ -1269,10 +1344,12 @@ const MultiSelectDynamicInput = ({ field, value, options, loading, onChange }) =
   const exactMatch =
     q.length > 0 &&
     opts.some(o => String(o.label ?? '').toLowerCase() === q || String(o.value ?? '').toLowerCase() === q)
+
   const showCustomAdd = q.length > 0 && !exactMatch
 
   const addItem = (val, label) => {
     const initExtras = Object.fromEntries(extraFields.map(ef => [ef.key, ef.type === 'checkbox' ? false : '']))
+
     onChange([...selected, { value: val, label: label ?? val, ...initExtras }])
     setSearch('')
     setOpen(false)
@@ -1282,6 +1359,7 @@ const MultiSelectDynamicInput = ({ field, value, options, loading, onChange }) =
 
   const updateExtra = (index, key, val) => {
     const next = selected.map((item, i) => (i === index ? { ...item, [key]: val } : item))
+
     onChange(next)
   }
 

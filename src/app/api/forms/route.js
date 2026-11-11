@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
@@ -20,8 +22,10 @@ export async function GET(req) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   try {
@@ -40,8 +44,10 @@ export async function GET(req) {
 
         if (scope.error) {
           const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
+
           response.headers.set('x-request-id', requestId)
-          return response
+          
+return response
         }
 
         workspaceId = scope.workspaceId
@@ -54,8 +60,10 @@ export async function GET(req) {
 
           if (scope.error) {
             const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
+
             response.headers.set('x-request-id', requestId)
-            return response
+            
+return response
           }
 
           workspaceId = scope.workspaceId
@@ -89,13 +97,17 @@ export async function GET(req) {
     })
 
     const response = NextResponse.json(forms)
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     logger.error('forms-list-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao listar formulários' }, { status: 500 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 }
 
@@ -106,18 +118,23 @@ export async function POST(req) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (!canManageForms(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   try {
     const body = await req.json()
+
     const {
       title,
       description,
@@ -133,16 +150,20 @@ export async function POST(req) {
 
     if (!title || !workspaceId || !fields || !webhookUrl) {
       const response = NextResponse.json({ message: 'Campos obrigatórios ausentes' }, { status: 400 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
 
     if (!workspace) {
       const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     // Impede subAdmin/convidado sem nível "create" de criar form dentro de um workspace privado
@@ -153,8 +174,10 @@ export async function POST(req) {
         workspaceId
       })
       const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     const form = await prisma.form.create({
@@ -174,6 +197,7 @@ export async function POST(req) {
 
     if (allowedRoles?.length) {
       const formsModule = await prisma.module.findUnique({ where: { key: 'forms' } })
+
       if (formsModule) {
         await prisma.rolePermission.createMany({
           data: allowedRoles.map(roleId => ({
@@ -209,12 +233,16 @@ export async function POST(req) {
     })
 
     const response = NextResponse.json(form, { status: 201 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   } catch (error) {
     logger.error('form-create-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao criar formulário' }, { status: 500 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 }

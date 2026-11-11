@@ -21,22 +21,28 @@ export async function POST(req) {
 
   if (!session) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const parsed = parseBody(inviteUserSchema, await req.json())
 
   if (!parsed.success) {
     const response = NextResponse.json({ message: parsed.message }, { status: 400 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   const { email, workspaceId, role, customRoleId } = parsed.data
@@ -44,6 +50,7 @@ export async function POST(req) {
   if (customRoleId) {
     const targetWorkspaceId = workspaceId || updateData.workspaceId || targetUser?.workspaceId
     const roleCheck = await prisma.customRole.findUnique({ where: { id: customRoleId } })
+
     if (!roleCheck || roleCheck.workspaceId !== targetWorkspaceId) {
       return jsonWithRequestId({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400, requestId })
     }
@@ -60,23 +67,29 @@ export async function POST(req) {
   if (needsWorkspace) {
     if (!workspaceId) {
       const response = NextResponse.json({ message: 'Espaço de trabalho é obrigatório' }, { status: 400 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
 
     if (!workspace) {
       const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
   }
 
   if (!assignable.includes(assignedRole)) {
     const response = NextResponse.json({ message: 'Você não tem permissão para atribuir este cargo' }, { status: 403 })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Check if user already exists
@@ -85,8 +98,10 @@ export async function POST(req) {
   if (existingUser) {
     if (existingUser.status === 'active') {
       const response = NextResponse.json({ message: 'Este e-mail já está cadastrado e ativo' }, { status: 409 })
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     // User exists but is pending — resend invite
@@ -121,8 +136,10 @@ export async function POST(req) {
         },
         { status: 201 }
       )
+
       response.headers.set('x-request-id', requestId)
-      return response
+      
+return response
     }
 
     logger.info('invite-resent-success', { requestId, userId: session.user.id, email })
@@ -136,8 +153,10 @@ export async function POST(req) {
       requestId
     })
     const response = NextResponse.json({ message: 'Convite reenviado com sucesso' })
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Create new user with pending status
@@ -182,8 +201,10 @@ export async function POST(req) {
       },
       { status: 201 }
     )
+
     response.headers.set('x-request-id', requestId)
-    return response
+    
+return response
   }
 
   // Emit notification
@@ -209,6 +230,8 @@ export async function POST(req) {
     requestId
   })
   const response = NextResponse.json({ message: 'Convite enviado com sucesso', user }, { status: 201 })
+
   response.headers.set('x-request-id', requestId)
-  return response
+  
+return response
 }

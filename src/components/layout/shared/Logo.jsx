@@ -1,7 +1,9 @@
 'use client'
 
 import { useEffect, useRef } from 'react'
+
 import styled from '@emotion/styled'
+
 import themeConfig from '@configs/themeConfig'
 import useVerticalNav from '@menu/hooks/useVerticalNav'
 import { useSettings } from '@core/hooks/useSettings'
@@ -30,6 +32,7 @@ const Logo = ({ color }) => {
 
   useEffect(() => {
     if (layout !== 'collapsed') return
+
     if (logoTextRef?.current) {
       if (!isBreakpointReached && layout === 'collapsed' && !isHovered) {
         logoTextRef.current.classList.add('hidden')

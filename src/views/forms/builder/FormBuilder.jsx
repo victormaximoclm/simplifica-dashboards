@@ -3,10 +3,13 @@
 // views/forms/builder/FormBuilder.jsx
 
 import { useState, useCallback } from 'react'
+
 import { useRouter } from 'next/navigation'
+
+import { toast } from 'react-toastify'
+
 import FieldTypeSelector from './FieldTypeSelector'
 import FieldEditor from './FieldEditor'
-import { toast } from 'react-toastify'
 
 import {
   btnPrimary,
@@ -107,6 +110,7 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
       ...(type === 'cpf-lookup' ? { dataSource: { provider: 'webhook', url: '' }, returnNameFieldId: '' } : {}),
       ...(type === 'address-lookup' ? {} : {})
     }
+
     setFields(prev => [...prev, newField])
     setSelectedFieldId(newField.id)
     setShowTypeSelector(false)
@@ -127,12 +131,15 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
   const moveField = useCallback((id, dir) => {
     setFields(prev => {
       const idx = prev.findIndex(f => f.id === id)
+
       if (idx < 0) return prev
       const next = [...prev]
       const swapIdx = dir === 'up' ? idx - 1 : idx + 1
+
       if (swapIdx < 0 || swapIdx >= next.length) return prev
       ;[next[idx], next[swapIdx]] = [next[swapIdx], next[idx]]
-      return next
+      
+return next
     })
   }, [])
 
@@ -153,22 +160,29 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
   const handleSave = async () => {
     if (!title.trim()) {
       setError('O título é obrigatório.')
-      return
+      
+return
     }
+
     if (!webhookUrl.trim()) {
       setError('A URL do webhook é obrigatória.')
-      return
+      
+return
     }
+
     if (!workspaceId) {
       setError('Selecione um workspace antes de criar o formulário.')
-      return
+      
+return
     }
 
     const keys = fields.map(f => f.fieldKey?.trim()).filter(Boolean)
     const duplicates = keys.filter((k, i) => keys.indexOf(k) !== i)
+
     if (duplicates.length > 0) {
       setError(`Chaves duplicadas no payload: ${[...new Set(duplicates)].join(', ')}`)
-      return
+      
+return
     }
 
     setSaving(true)
@@ -187,6 +201,7 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
         pagination,
         refreshOnSubmit
       }
+
       const url = isNew ? '/api/forms' : `/api/forms/${form.id}`
       const method = isNew ? 'POST' : 'PUT'
 
@@ -198,10 +213,12 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
 
       if (!res.ok) {
         const err = await res.json().catch(() => ({}))
+
         throw new Error(err.message || 'Erro ao salvar formulário')
       }
 
       const saved = await res.json()
+
       window.dispatchEvent(new Event('forms-changed'))
 
       if (isNew) {

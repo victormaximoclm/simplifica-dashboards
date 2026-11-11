@@ -1,6 +1,7 @@
 'use client'
 
 import { useState, useEffect } from 'react'
+
 import { useRouter } from 'next/navigation'
 
 import Button from '@mui/material/Button'
@@ -9,6 +10,7 @@ import DialogActions from '@mui/material/DialogActions'
 import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
+
 import ShareFormDialog from './builder/ShareFormDialog'
 
 import {
@@ -71,9 +73,11 @@ const FormsListView = ({ forms: initialForms, canManage, canShare, lang }) => {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+
         setDeleteError(data.message || 'Erro ao excluir formulário')
         setDeleting(false)
-        return
+        
+return
       }
 
       setForms(prev => prev.filter(f => f.id !== formToDelete.id))
@@ -179,6 +183,7 @@ const FormsListView = ({ forms: initialForms, canManage, canShare, lang }) => {
 
 const FormCard = ({ form, canManage, onFill, onEdit, onLinks, onDelete, onShare, canShare }) => {
   const [createdAt, setCreatedAt] = useState('')
+
   useEffect(() => {
     setCreatedAt(
       new Date(form.createdAt).toLocaleDateString('pt-BR', {

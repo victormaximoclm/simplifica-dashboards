@@ -2,8 +2,9 @@
 
 import { useEffect, useRef } from 'react'
 
-import { signOut } from 'next-auth/react'
 import { useRouter } from 'next/navigation'
+
+import { signOut } from 'next-auth/react'
 
 const MESSAGES = {
   removed: 'Sua conta foi removida. Faça login novamente ou contate o administrador.',

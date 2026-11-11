@@ -1,5 +1,7 @@
 'use client'
 
+import { useEffect, useState } from 'react'
+
 import Dialog from '@mui/material/Dialog'
 import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
@@ -9,7 +11,6 @@ import Autocomplete from '@mui/material/Autocomplete'
 import TextField from '@mui/material/TextField'
 import Chip from '@mui/material/Chip'
 
-import { useEffect, useState } from 'react'
 
 const ShareFormDialog = ({ open, form, onClose }) => {
   const [roles, setRoles] = useState([])
@@ -39,6 +40,7 @@ const ShareFormDialog = ({ open, form, onClose }) => {
 
       if (!res.ok) {
         const data = await res.json().catch(() => ({}))
+
         throw new Error(data.message || 'Erro ao salvar permissões')
       }
 

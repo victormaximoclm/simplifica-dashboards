@@ -31,6 +31,7 @@ export default function ClientErrorTracking() {
         })
       }
     }
+
     const onRejection = event => {
       if (event?.reason) {
         trackClientError({
@@ -44,11 +45,13 @@ export default function ClientErrorTracking() {
     }
 
     const nativeFetch = window.fetch.bind(window)
+
     window.fetch = async (...args) => {
       const response = await nativeFetch(...args)
 
       if (!response.ok) {
         const url = typeof args[0] === 'string' ? args[0] : args[0]?.url || 'unknown'
+
         trackClientError({
           source: 'frontend-api',
           level: response.status >= 500 ? 'error' : 'warn',

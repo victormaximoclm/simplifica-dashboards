@@ -24,7 +24,8 @@ const useLayoutInit = colorSchemeFallback => {
     if (themeConfig.forceDarkMode) {
       updateCookieColorPref('dark')
       setMode('dark')
-      return
+      
+return
     }
 
     const appMode = isDark ? 'dark' : 'light'

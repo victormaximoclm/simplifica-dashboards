@@ -1,4 +1,5 @@
 import { redirect } from 'next/navigation'
+
 import { getServerSession } from 'next-auth'
 
 import { authOptions } from '@/libs/auth'
@@ -40,6 +41,7 @@ const FormFillPage = async ({ params }) => {
   }
 
   let ctx = {}
+
   if (!isHighAdmin(role)) {
     if (role !== 'admin') ctx = await getUserFormContext(session.user.id)
     if (!canNonHighAdminAccessForm(role, form, ctx)) redirect(`/${lang}/forms`)

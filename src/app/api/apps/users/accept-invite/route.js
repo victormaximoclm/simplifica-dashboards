@@ -105,5 +105,6 @@ export async function POST(req) {
   })
 
   logger.info('invite-accept-success', { requestId, userId: user.id })
-  return withRate(jsonWithRequestId({ message: 'Conta criada com sucesso! Faça login.' }, { requestId }))
+  
+return withRate(jsonWithRequestId({ message: 'Conta criada com sucesso! Faça login.' }, { requestId }))
 }

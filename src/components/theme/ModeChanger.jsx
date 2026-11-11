@@ -21,10 +21,13 @@ const ModeChanger = ({ systemMode }) => {
   useEffect(() => {
     if (themeConfig.forceDarkMode) {
       setMode('dark')
+
       if (settings.mode !== 'dark') {
         updateSettings({ mode: 'dark' })
       }
-      return
+
+      
+return
     }
 
     if (settings.mode) {

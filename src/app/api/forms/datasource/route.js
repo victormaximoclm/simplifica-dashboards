@@ -1,7 +1,9 @@
 export const runtime = 'nodejs'
 
 import { NextResponse } from 'next/server'
+
 import { getServerSession } from 'next-auth'
+
 import { authOptions } from '@/libs/auth'
 import { getRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
@@ -22,21 +24,27 @@ const FIELD_METHODS = {
 
 const json = (requestId, body, status = 200) => {
   const response = NextResponse.json(body, { status })
+
   response.headers.set('x-request-id', requestId)
-  return response
+  
+return response
 }
 
 /** Mesmo acesso de quem pode preencher: link público ativo do form ou sessão com permissão de envio */
 async function canUseFormDatasource({ form, session, publicToken }) {
   if (publicToken) {
     const link = await prisma.formPublicLink.findUnique({ where: { token: publicToken } })
-    return Boolean(link && link.formId === form.id && form.allowPublicLink && isPublicLinkActive(link))
+
+    
+return Boolean(link && link.formId === form.id && form.allowPublicLink && isPublicLinkActive(link))
   }
 
   if (!session?.user) return false
 
   const ctx = await getUserFormContext(session.user.id)
-  return canSubmitForm(session, form, ctx)
+
+  
+return canSubmitForm(session, form, ctx)
 }
 
 // GET /api/forms/datasource?formId=&fieldId=&publicToken=&dependsOnValue=&searchValue=
@@ -46,9 +54,11 @@ export async function GET(req) {
 
   try {
     const rate = await datasourceLimiter.check(req)
+
     if (!rate.success) {
       logger.warn('datasource-rate-limit', { requestId })
-      return json(requestId, { message: 'Muitas requisições' }, 429)
+      
+return json(requestId, { message: 'Muitas requisições' }, 429)
     }
 
     const { searchParams } = new URL(req.url)
@@ -70,7 +80,8 @@ export async function GET(req) {
 
     if (!form || !(await canUseFormDatasource({ form, session, publicToken }))) {
       logger.warn('datasource-forbidden', { requestId, formId, isPublic: Boolean(publicToken) })
-      return json(requestId, { message: 'Acesso negado' }, 403)
+      
+return json(requestId, { message: 'Acesso negado' }, 403)
     }
 
     const fields = Array.isArray(form.fields) ? form.fields : []
@@ -98,6 +109,7 @@ export async function GET(req) {
     return json(requestId, result)
   } catch (error) {
     logger.error('datasource-error', { requestId, error: error.message })
-    return json(requestId, { message: error.message || 'Erro ao buscar dados' }, 500)
+    
+return json(requestId, { message: error.message || 'Erro ao buscar dados' }, 500)
   }
 }

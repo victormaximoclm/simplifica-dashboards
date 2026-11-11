@@ -77,5 +77,6 @@ export async function POST(req) {
   }
 
   logger.info('setup-success', { requestId, userId: user.id })
-  return withRate(jsonWithRequestId({ message: 'Super Admin criado com sucesso!', userId: user.id }, { status: 201, requestId }))
+  
+return withRate(jsonWithRequestId({ message: 'Super Admin criado com sucesso!', userId: user.id }, { status: 201, requestId }))
 }

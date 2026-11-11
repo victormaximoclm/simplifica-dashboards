@@ -17,7 +17,8 @@ export function canShareForms(adminPermissions = []) {
 export function canFillAllFormsInWorkspace(role, form) {
   if (isHighAdmin(role)) return true
   if (role === 'admin') return form ? !isFormHighAdminOnly(form) : true
-  return false
+  
+return false
 }
 
 /** Apenas admin do workspace e highAdmin podem gerar novos links públicos */
@@ -30,7 +31,8 @@ export async function canGeneratePublicLinksInFill(role, form, ctx = {}) {
   if (!form) return false
   if (isFormHighAdminOnly(form)) return false
   if (role === 'admin') return true
-  return canAccessForm(form, ctx)
+  
+return canAccessForm(form, ctx)
 }
 
 /** Quem pode enviar (submit) um formulário autenticado */

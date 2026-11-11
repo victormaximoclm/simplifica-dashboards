@@ -81,6 +81,7 @@ export async function GET(req) {
 
   const items = rows.map(r => {
     let resourceLabel = null
+
     if (r.entityType === 'dashboard' && r.entityId) resourceLabel = dashboardById.get(r.entityId) || null
     if (r.entityType === 'user' && r.entityId) resourceLabel = userById.get(r.entityId) || null
     if (r.entityType === 'workspace' && r.entityId) resourceLabel = workspaceById.get(r.entityId) || null

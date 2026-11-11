@@ -27,6 +27,7 @@ export async function resolveAccessToken({ session, provider, publicToken, works
     })
 
     const token = wsIntegration?.configJson?.token
+
     if (token) return token
 
     throw new Error(`Integração '${provider}' não configurada no workspace`)
@@ -36,6 +37,7 @@ export async function resolveAccessToken({ session, provider, publicToken, works
     const wsIntegration = await prisma.workspaceIntegration.findFirst({
       where: { workspaceId, provider, enabled: true }
     })
+
     if (wsIntegration?.configJson?.token) return wsIntegration.configJson.token
   }
 
@@ -48,6 +50,7 @@ export function normalizeDatasourceConfig(config) {
   if (normalized.url && !normalized.webhookUrl) {
     normalized.webhookUrl = normalized.url
   }
+
   if (normalized.webhookUrl && !normalized.url) {
     normalized.url = normalized.webhookUrl
   }
