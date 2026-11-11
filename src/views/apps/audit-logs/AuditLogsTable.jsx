@@ -23,7 +23,7 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
-export default function AuditLogsTable({ title, subheader, endpoint }) {
+export default function AuditLogsTable({ title, subheader, endpoint, searchLabel = 'Buscar ação/ID' }) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [rows, setRows] = useState([])
@@ -101,7 +101,7 @@ export default function AuditLogsTable({ title, subheader, endpoint }) {
       <CardContent>
         <Box display='flex' gap={2} alignItems='center' mb={3} flexWrap='wrap'>
           <TextField
-            label='Buscar ação/ID'
+            label={searchLabel}
             value={q}
             onChange={e => {
               setPage(1)
