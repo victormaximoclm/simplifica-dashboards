@@ -2,6 +2,8 @@
 
 import { useCallback, useEffect, useRef, useState } from 'react'
 
+import { useParams, useRouter } from 'next/navigation'
+
 import Breadcrumbs from '@mui/material/Breadcrumbs'
 import CircularProgress from '@mui/material/CircularProgress'
 import Pagination from '@mui/material/Pagination'
@@ -16,8 +18,11 @@ import HtmlDocumentEditorDialog from './HtmlDocumentEditorDialog'
 import HtmlTemplatesDialog from './HtmlTemplatesDialog'
 import MoveDialog from './MoveDialog'
 import NameDialog from './NameDialog'
+import NewSiteDialog from './NewSiteDialog'
 import PreviewDialog from './PreviewDialog'
 import UploadDialog from './UploadDialog'
+import { DOCUMENT_SITE_TEXT } from '@/libs/documentFileTypes'
+import { getLocalizedUrl } from '@/utils/i18n'
 import {
   btnPrimary,
   formAlertErrorCls,
@@ -73,8 +78,12 @@ function downloadFile(file) {
   link.remove()
 }
 
-const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiveWorkspace }) => {
-  const [folderId, setFolderId] = useState(null)
+const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiveWorkspace, initialFolderId = null }) => {
+  const { lang } = useParams()
+  const router = useRouter()
+
+  // `initialFolderId` vem de ?folder=<id> (o botão "voltar" do Site); id inválido cai na raiz pelo 404 do carregamento
+  const [folderId, setFolderId] = useState(initialFolderId)
   const [page, setPage] = useState(1)
   const [search, setSearch] = useState('')
   const [query, setQuery] = useState('')
@@ -90,6 +99,7 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
   const [uploadOpen, setUploadOpen] = useState(false)
   const [htmlEditor, setHtmlEditor] = useState(null)
   const [templatesOpen, setTemplatesOpen] = useState(false)
+  const [newSiteOpen, setNewSiteOpen] = useState(false)
   const { data: session } = useSession()
   const authorName = session?.user?.name || session?.user?.email
   const requestSeq = useRef(0)
@@ -218,9 +228,13 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
   const ancestors = listing?.ancestors ?? []
   const workspaceId = listing?.workspace?.id ?? null
 
-  // Todo arquivo abre na pré-visualização; o download continua disponível no diálogo e no menu
+  const openSite = site => router.push(getLocalizedUrl(`/documents/site/${site.id}`, lang))
+
+  // Pasta navega, Site abre na própria página e todo arquivo abre na pré-visualização; o download continua
+  // disponível no diálogo e no menu
   const openItem = item => {
     if (item.kind === 'folder') navigateTo(item.id)
+    else if (item.isSite) openSite(item)
     else setPreviewFile(item)
   }
 
@@ -230,6 +244,8 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
 
     if (item.kind === 'folder') {
       options.push(option('Abrir', 'tabler-folder-open', () => navigateTo(item.id)))
+    } else if (item.isSite) {
+      options.push(option(DOCUMENT_SITE_TEXT.openAction, 'tabler-world', () => openSite(item)))
     } else {
       options.push(option('Visualizar', 'tabler-eye', () => setPreviewFile(item)))
       options.push(option('Baixar', 'tabler-download', () => downloadFile(item)))
@@ -275,6 +291,10 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
               <button type='button' onClick={() => setHtmlEditor({ mode: 'create' })} className={btnPrimary}>
                 <i className='tabler-file-text text-base' />
                 Novo documento
+              </button>
+              <button type='button' onClick={() => setNewSiteOpen(true)} className={btnPrimary}>
+                <i className='tabler-world text-base' />
+                {DOCUMENT_SITE_TEXT.newLabel}
               </button>
               <button type='button' onClick={() => setTemplatesOpen(true)} className={btnPrimary}>
                 <i className='tabler-template text-base' />
@@ -404,6 +424,17 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
         parentId={folderId}
         onClose={() => setNameDialog(null)}
         onSaved={handleSaved}
+      />
+      <NewSiteDialog
+        open={newSiteOpen && allowCreate}
+        workspaceId={workspaceId}
+        parentId={folderId}
+        onClose={() => setNewSiteOpen(false)}
+        onCreated={result => {
+          toast.success(DOCUMENT_SITE_TEXT.createdToast)
+          setNewSiteOpen(false)
+          router.push(getLocalizedUrl(`/documents/site/${result.data.id}`, lang))
+        }}
       />
       <MoveDialog item={moveItem} workspaceId={workspaceId} onClose={() => setMoveItem(null)} onMoved={handleSaved} />
       <DeleteDialog item={deleteItem} onClose={() => setDeleteItem(null)} onDeleted={handleSaved} />

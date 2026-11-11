@@ -7,7 +7,7 @@ import TableHead from '@mui/material/TableHead'
 import TableRow from '@mui/material/TableRow'
 
 import DocumentItemMenu from './DocumentItemMenu'
-import { formatFileSize, getDocumentFileType } from '@/libs/documentFileTypes'
+import { formatFileSize, getDocumentItemType } from '@/libs/documentFileTypes'
 import { formCardCls, formCardIconBgCls, formMutedCls } from '@/views/forms/formStyles'
 
 // Cor/tamanho explícitos: os utilitários do Tailwind são !important neste projeto (globals.css), então
@@ -17,14 +17,19 @@ const itemNameCls = 'text-[var(--mui-palette-text-primary)]'
 export function getItemIcon(item) {
   if (item.kind === 'folder') return 'tabler-folder'
 
-  return getDocumentFileType(item.name)?.icon ?? 'tabler-file'
+  return getDocumentItemType(item)?.icon ?? 'tabler-file'
 }
 
 function getItemTypeLabel(item) {
   if (item.kind === 'folder') return 'Pasta'
 
-  return getDocumentFileType(item.name)?.label ?? 'Arquivo'
+  return getDocumentItemType(item)?.label ?? 'Arquivo'
 }
+
+// O Site não tem arquivo: não exibe tamanho
+const getItemSize = item => (item.kind === 'file' && !item.isSite ? formatFileSize(item.size) : '—')
+
+const getItemSubtitle = item => (item.kind === 'folder' || item.isSite ? `${getItemTypeLabel(item)} · ` : `${formatFileSize(item.size)} · `)
 
 const formatDate = value => new Date(value).toLocaleDateString('pt-BR')
 
@@ -100,7 +105,7 @@ export const DocumentItemsTable = ({ items, onOpen, onOpenLocation, getOptions }
               <ItemLocation item={item} onOpenLocation={onOpenLocation} className='mt-0.5 ps-8' />
             </TableCell>
             <TableCell sx={COLUMNS.type}>{getItemTypeLabel(item)}</TableCell>
-            <TableCell sx={COLUMNS.size}>{item.kind === 'file' ? formatFileSize(item.size) : '—'}</TableCell>
+            <TableCell sx={COLUMNS.size}>{getItemSize(item)}</TableCell>
             <TableCell sx={COLUMNS.updatedAt}>{formatDate(item.updatedAt)}</TableCell>
             <TableCell sx={COLUMNS.createdBy} title={item.createdBy?.name || undefined}>
               {item.createdBy?.name || '—'}
@@ -135,7 +140,7 @@ export const DocumentItemsGrid = ({ items, onOpen, onOpenLocation, getOptions })
             <div className='flex-1 min-w-0'>
               <h6 className={`truncate text-base font-semibold ${itemNameCls}`}>{item.name}</h6>
               <p className={`text-xs ${formMutedCls} mt-0.5 truncate`}>
-                {item.kind === 'file' ? `${formatFileSize(item.size)} · ` : 'Pasta · '}
+                {getItemSubtitle(item)}
                 {formatDate(item.updatedAt)}
               </p>
             </div>

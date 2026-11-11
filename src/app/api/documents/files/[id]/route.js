@@ -9,7 +9,7 @@ import { prisma } from '@/libs/prisma'
 import * as storage from '@/libs/storage'
 import { parseBody, renameSchema } from '@/libs/validations'
 import { canDeleteDocuments, canEditDocuments } from '@/libs/documentPermissions'
-import { getFileExtension } from '@/libs/documentFileTypes'
+import { getFileExtension, isSiteMime } from '@/libs/documentFileTypes'
 import {
   DocumentConflictError,
   assertNameAvailable,
@@ -65,17 +65,21 @@ async function handlePatch(req, { params }) {
   }
 
   const existing = access.item
-  const originalExtension = getFileExtension(existing.name)
   let { name } = parsed.data
 
-  // A extensão define o tipo servido no download; sem extensão, a original é mantida
-  if (!getFileExtension(name)) {
-    name = `${name}.${originalExtension}`
-  } else if (getFileExtension(name) !== originalExtension) {
-    return jsonWithRequestId(
-      { message: `A extensão do arquivo não pode ser alterada (.${originalExtension})` },
-      { status: 400, requestId }
-    )
+  // Site: o tipo vem do mimeType e o nome é livre (ponto no nome não é extensão). Nos demais, a extensão define o
+  // tipo servido no download; sem extensão, a original é mantida
+  if (!isSiteMime(existing.mimeType)) {
+    const originalExtension = getFileExtension(existing.name)
+
+    if (!getFileExtension(name)) {
+      name = `${name}.${originalExtension}`
+    } else if (getFileExtension(name) !== originalExtension) {
+      return jsonWithRequestId(
+        { message: `A extensão do arquivo não pode ser alterada (.${originalExtension})` },
+        { status: 400, requestId }
+      )
+    }
   }
 
   if (name.length > 255) {
@@ -161,10 +165,13 @@ async function handleDelete(req, { params }) {
     return jsonWithRequestId({ message: 'Erro ao excluir arquivo' }, { status: 500, requestId })
   }
 
-  try {
-    await storage.delete(existing.storageKey)
-  } catch (error) {
-    logger.error('document-file-delete-blob-error', { requestId, fileId: id, error: error.message })
+  // Itens sem blob (Site) não têm o que apagar no storage; as páginas saem em cascata junto com o DocumentFile
+  if (existing.storageKey) {
+    try {
+      await storage.delete(existing.storageKey)
+    } catch (error) {
+      logger.error('document-file-delete-blob-error', { requestId, fileId: id, error: error.message })
+    }
   }
 
   logger.info('document-file-delete-success', { requestId, userId: session.user.id, fileId: id })

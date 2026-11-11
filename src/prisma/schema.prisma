@@ -162,6 +162,7 @@ model User {
   documentFolders        DocumentFolder[]      @relation("DocumentFolderCreator")
   documentFiles          DocumentFile[]        @relation("DocumentFileCreator")
   documentHtmlTemplates  DocumentHtmlTemplate[] @relation("DocumentHtmlTemplateCreator")
+  documentSitePages      DocumentSitePage[]    @relation("DocumentSitePageUpdater")
 }
 
 model UserIntegration {
@@ -371,6 +372,7 @@ model DocumentFolder {
 /**
  * Arquivo do módulo de Documentos. O conteúdo fica no storage (src/libs/storage.js) sob `storageKey`,
  * gerado no servidor — nunca derivado do nome enviado pelo usuário.
+ * `storageKey` é nulo nos itens sem blob (o Site: o conteúdo fica nas páginas, no banco; size = 0).
  */
 model DocumentFile {
   id          String          @id @default(cuid())
@@ -381,14 +383,47 @@ model DocumentFile {
   workspace   Workspace       @relation(fields: [workspaceId], references: [id], onDelete: Cascade)
   mimeType    String
   size        Int
-  storageKey  String          @unique
+  storageKey  String?         @unique
   createdById String?
   createdBy   User?           @relation("DocumentFileCreator", fields: [createdById], references: [id], onDelete: SetNull)
   htmlContent DocumentHtmlContent?
+  site        DocumentSite?
   createdAt   DateTime        @default(now())
   updatedAt   DateTime        @updatedAt
 
   @@index([workspaceId, folderId])
+}
+
+/**
+ * Site do módulo de Documentos: um DocumentFile (mimeType de site) que, ao abrir, mostra páginas e subpáginas.
+ * A página inicial é a primeira página raiz por `position`.
+ */
+model DocumentSite {
+  fileId    String             @id
+  file      DocumentFile       @relation(fields: [fileId], references: [id], onDelete: Cascade)
+  pages     DocumentSitePage[]
+  createdAt DateTime           @default(now())
+  updatedAt DateTime           @updatedAt
+}
+
+// Página (ou subpágina) de um Site. `content` é a lista de blocos (validada em src/libs/documentSite.js)
+model DocumentSitePage {
+  id          String             @id @default(cuid())
+  siteId      String
+  site        DocumentSite       @relation(fields: [siteId], references: [fileId], onDelete: Cascade)
+  parentId    String?
+  parent      DocumentSitePage?  @relation("DocumentSitePageTree", fields: [parentId], references: [id], onDelete: Cascade)
+  children    DocumentSitePage[] @relation("DocumentSitePageTree")
+  title       String
+  position    Int                @default(0)
+  content     Json               @default("[]")
+  version     Int                @default(1)
+  updatedById String?
+  updatedBy   User?              @relation("DocumentSitePageUpdater", fields: [updatedById], references: [id], onDelete: SetNull)
+  createdAt   DateTime           @default(now())
+  updatedAt   DateTime           @updatedAt
+
+  @@index([siteId, parentId, position])
 }
 
 // Conteúdo editável (JSON do editor) dos documentos HTML criados no módulo; o .html renderizado fica no storage

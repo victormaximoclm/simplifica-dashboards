@@ -8,8 +8,9 @@ import { canCreateDocuments, canDeleteDocuments, canEditDocuments } from '@/libs
 import { getMaxFileSizeMb } from '@/libs/documentAccess'
 import DocumentsView from '@/views/documents/DocumentsView'
 
-const DocumentsPage = async ({ params }) => {
+const DocumentsPage = async ({ params, searchParams }) => {
   const { lang } = await params
+  const { folder } = await searchParams
   const session = await getServerSession(authOptions)
 
   if (!session) {
@@ -18,6 +19,7 @@ const DocumentsPage = async ({ params }) => {
 
   return (
     <DocumentsView
+      initialFolderId={typeof folder === 'string' && folder ? folder : null}
       canCreate={canCreateDocuments(session.user)}
       canEdit={canEditDocuments(session.user)}
       canDelete={canDeleteDocuments(session.user)}

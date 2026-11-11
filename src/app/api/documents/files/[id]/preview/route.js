@@ -6,6 +6,7 @@ import { authOptions } from '@/libs/auth'
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { isPreviewableMime } from '@/libs/documentFileTypes'
 import {
+  DocumentNoContentError,
   getAuthorizedDocumentItem,
   recordDocumentFileAccess,
   streamDocumentFile,
@@ -39,6 +40,8 @@ async function handleGet(req, { params }) {
   try {
     response = await streamDocumentFile({ file, disposition: 'inline', requestId })
   } catch (error) {
+    if (error instanceof DocumentNoContentError) throw error
+
     logger.error('document-file-preview-error', { requestId, fileId: id, error: error.message })
 
     return jsonWithRequestId({ message: 'Arquivo não encontrado no armazenamento' }, { status: 404, requestId })

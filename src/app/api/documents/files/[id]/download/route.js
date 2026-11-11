@@ -5,6 +5,7 @@ import { getServerSession } from 'next-auth'
 import { authOptions } from '@/libs/auth'
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import {
+  DocumentNoContentError,
   getAuthorizedDocumentItem,
   recordDocumentFileAccess,
   streamDocumentFile,
@@ -30,6 +31,9 @@ async function handleGet(req, { params }) {
   try {
     response = await streamDocumentFile({ file, disposition: 'attachment', requestId })
   } catch (error) {
+    // Item sem blob (Site): 415 pelo withDocumentErrorHandling, não "não encontrado no armazenamento"
+    if (error instanceof DocumentNoContentError) throw error
+
     logger.error('document-file-download-error', { requestId, fileId: id, error: error.message })
 
     return jsonWithRequestId({ message: 'Arquivo não encontrado no armazenamento' }, { status: 404, requestId })

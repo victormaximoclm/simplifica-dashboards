@@ -84,6 +84,13 @@ export const moveSchema = v.object({
   targetFolderId: v.optional(v.nullable(v.string()), null)
 })
 
+// Site do módulo de Documentos: só o nome na criação (a primeira página é criada pelo servidor)
+export const createSiteSchema = v.object({
+  workspaceId: v.pipe(v.string('Workspace é obrigatório'), v.minLength(1, 'Workspace é obrigatório')),
+  folderId: v.optional(v.nullable(v.string()), null),
+  name: documentNameSchema
+})
+
 /** Campos de texto do multipart de upload (formData.get devolve null quando o campo não vem) */
 export const uploadFieldsSchema = v.object({
   workspaceId: v.pipe(v.string('Workspace é obrigatório'), v.minLength(1, 'Workspace é obrigatório')),

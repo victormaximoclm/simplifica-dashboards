@@ -615,7 +615,9 @@ async function runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn })
 
     const keys = (
       await prisma.documentFile.findMany({ where: { folderId: { in: [x, y, z] } }, select: { storageKey: true } })
-    ).map(f => f.storageKey)
+    )
+      .map(f => f.storageKey)
+      .filter(Boolean)
 
     const before = keys.map(blobExists)
     const res = await api(s.superAdmin, 'DELETE', `/api/documents/folders/${x}`)
@@ -1661,6 +1663,396 @@ async function runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn })
       ok: small.body?.pagination?.pageSize === 10 && large.body?.pagination?.pageSize === 100,
       detail: `${small.body?.pagination?.pageSize}/${large.body?.pagination?.pageSize}`
     }
+  })
+
+  // 14. Site ───────────────────────────────
+  const SITE_MIME = 'application/vnd.simplifica.site'
+
+  const mkSite = (session, workspaceId, folderId, name) =>
+    api(session, 'POST', '/api/documents/sites', { json: { workspaceId, folderId, name } })
+
+  const addPage = (siteId, parentId, title, position, content = []) =>
+    prisma.documentSitePage.create({ data: { siteId, parentId, title, position, content } })
+
+  const siteRows = async fileIds => ({
+    files: await prisma.documentFile.count({ where: { id: { in: fileIds } } }),
+    sites: await prisma.documentSite.count({ where: { fileId: { in: fileIds } } }),
+    pages: await prisma.documentSitePage.count({ where: { siteId: { in: fileIds } } })
+  })
+
+  const textBlock = (id, ...marksAndText) => ({
+    id,
+    type: 'text',
+    doc: { type: 'doc', content: [{ type: 'paragraph', content: marksAndText }] }
+  })
+
+  section('Site: criação e controle de acesso')
+
+  let siteA = null
+
+  await test('superAdmin cria Site → 201, sem blob, size 0, sem expor storageKey, com a primeira página', async () => {
+    const res = await mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'Site A')
+
+    if (res.status !== 201) return { ok: false, detail: describe(res) }
+
+    siteA = res.body.data
+
+    const row = await prisma.documentFile.findUnique({ where: { id: siteA.id }, include: { site: { include: { pages: true } } } })
+    const problems = []
+
+    if (siteA.mimeType !== SITE_MIME || siteA.isSite !== true) problems.push(`tipo ${siteA.mimeType}/${siteA.isSite}`)
+    if (siteA.size !== 0 || siteA.previewable !== false) problems.push(`size ${siteA.size}, previewable ${siteA.previewable}`)
+    if (JSON.stringify(res.body).includes('storageKey')) problems.push('resposta expõe storageKey')
+    if (row?.storageKey !== null) problems.push(`storageKey no banco: ${row?.storageKey}`)
+    if (row?.site?.pages.length !== 1 || row.site.pages[0].title !== 'Início' || row.site.pages[0].id !== res.body.pageId)
+      problems.push('primeira página ausente ou diferente')
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('subAdmin cria Site em workspace acessível → 201', async () => {
+    const res = await mkSite(s.subAdmin, alfa.id, sandboxAlfa, 'Site do subAdmin')
+
+    return status(res, 201)
+  })
+
+  for (const [label, session, ws] of [
+    ['adminAlfa', s.adminAlfa, alfa],
+    ['userAlfa', s.userAlfa, alfa],
+    ['convidado', s.convidado, privado]
+  ]) {
+    await test(`${label} tenta criar Site → 403`, async () => status(await mkSite(session, ws.id, null, 'Não pode'), 403))
+  }
+
+  await test('criar Site sem sessão → 401 (ou redirect para /login)', async () => {
+    const res = await mkSite(null, alfa.id, sandboxAlfa, 'Sem sessão')
+
+    return { ok: isUnauthenticated(res), detail: describe(res) }
+  })
+
+  await test('subAdmin sem acesso ao workspace privado tenta criar Site → 403/404', async () => {
+    const res = await mkSite(s.subAdmin, privado.id, sandboxes.privado.id, 'Fora do escopo')
+
+    return { ok: [403, 404].includes(res.status), detail: describe(res) }
+  })
+
+  await test('pasta de outro workspace → 404', async () => {
+    const res = await mkSite(s.superAdmin, alfa.id, sandboxes.beta.id, 'Pasta alheia')
+
+    return status(res, 404)
+  })
+
+  await test('nome inválido ("a/b" e vazio) → 400', async () => {
+    const [slash, empty] = await Promise.all([
+      mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'a/b'),
+      mkSite(s.superAdmin, alfa.id, sandboxAlfa, '   ')
+    ])
+
+    return { ok: slash.status === 400 && empty.status === 400, detail: `${slash.status}/${empty.status}` }
+  })
+
+  await test('nome repetido no mesmo local (sem diferenciar maiúsculas) → 409', async () => {
+    const res = await mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'SITE a')
+
+    return status(res, 409)
+  })
+
+  await test('nome igual ao de um arquivo da mesma pasta → 409', async () => {
+    // Arquivo próprio do teste: os alvos estáveis são renomeados e movidos por testes anteriores
+    const up = await upload(s.superAdmin, alfa.id, sandboxAlfa, [
+      { name: 'colisao.pdf', type: 'application/pdf', buffer: makePdf('Colisão') }
+    ])
+
+    if (up.status !== 201) return { ok: false, detail: `upload ${describe(up)}` }
+
+    return status(await mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'colisao.pdf'), 409)
+  })
+
+  section('Site: leitura, árvore de páginas e isolamento')
+
+  // Árvore: Início (0) · Mapeamentos (1) › Entrada de Materiais (0) › Checklist (0) · Gestão Operacional (2)
+  let mapeamentos = null
+  let sanitizedPage = null
+
+  await test('prepara a árvore de páginas (3 níveis) e uma página com conteúdo hostil', async () => {
+    mapeamentos = await addPage(siteA.id, null, 'Mapeamentos', 1)
+
+    const entrada = await addPage(siteA.id, mapeamentos.id, 'Entrada de Materiais', 0)
+
+    await addPage(siteA.id, entrada.id, 'Checklist', 0)
+    await addPage(siteA.id, null, 'Gestão Operacional', 2)
+
+    sanitizedPage = await addPage(siteA.id, null, 'Conteúdo hostil', 3, [
+      textBlock(
+        'ok-1',
+        { type: 'text', text: 'bom', marks: [{ type: 'link', attrs: { href: 'https://ok.example/a' } }] },
+        { type: 'text', text: 'mau', marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }] }
+      ),
+      textBlock('id inválido!', { type: 'text', text: 'segundo' }),
+      { id: 'arq', type: 'file', fileId: 'qualquer' },
+      { id: 'html', type: 'html', html: '<script>alert(1)</script>' },
+      'lixo',
+      null
+    ])
+
+    return !!sanitizedPage
+  })
+
+  await test('GET do Site: árvore sem conteúdo, ordenada, com página inicial e permissões', async () => {
+    const res = await api(s.superAdmin, 'GET', `/api/documents/sites/${siteA.id}`)
+    const data = res.body?.data
+    const titles = (data?.pages ?? []).map(page => page.title)
+    const home = (data?.pages ?? []).find(page => page.title === 'Início')
+    const problems = []
+
+    if (res.status !== 200) return { ok: false, detail: describe(res) }
+    const expectedTitles = ['Início', 'Mapeamentos', 'Entrada de Materiais', 'Checklist', 'Gestão Operacional', 'Conteúdo hostil']
+
+    if (titles.length !== 6 || expectedTitles.some(title => !titles.includes(title)))
+      problems.push(`páginas: ${titles.join(', ')}`)
+    if (data.homePageId !== home?.id) problems.push('homePageId não é a primeira página raiz')
+    if (data.pages.some(page => 'content' in page)) problems.push('a árvore traz conteúdo')
+    if (JSON.stringify(res.body).includes('storageKey')) problems.push('expõe storageKey')
+    if (!data.permissions?.canEdit || !Array.isArray(data.location)) problems.push('permissões/local ausentes')
+
+    const roots = data.pages.filter(page => !page.parentId).map(page => page.title)
+
+    if (roots.join('|') !== 'Início|Mapeamentos|Gestão Operacional|Conteúdo hostil') problems.push(`raízes: ${roots.join(', ')}`)
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  for (const [label, session] of [
+    ['adminAlfa', s.adminAlfa],
+    ['userAlfa', s.userAlfa]
+  ]) {
+    await test(`${label} (mesmo workspace) lê o Site e vê permissões só de leitura`, async () => {
+      const res = await api(session, 'GET', `/api/documents/sites/${siteA.id}`)
+      const permissions = res.body?.data?.permissions
+
+      return {
+        ok: res.status === 200 && permissions?.canCreate === false && permissions?.canEdit === false && permissions?.canDelete === false,
+        detail: describe(res)
+      }
+    })
+  }
+
+  await test('userBeta (outro workspace) não lê o Site nem as páginas → 403', async () => {
+    const [site, page] = await Promise.all([
+      api(s.userBeta, 'GET', `/api/documents/sites/${siteA.id}`),
+      api(s.userBeta, 'GET', `/api/documents/sites/${siteA.id}/pages/${mapeamentos.id}`)
+    ])
+
+    return { ok: site.status === 403 && page.status === 403, detail: `${site.status}/${page.status}` }
+  })
+
+  await test('convidado de outro workspace não lê o Site → 403', async () => {
+    return status(await api(s.convidado, 'GET', `/api/documents/sites/${siteA.id}`), 403)
+  })
+
+  await test('ler Site e página sem sessão → 401 (ou redirect para /login)', async () => {
+    const [site, page] = await Promise.all([
+      api(null, 'GET', `/api/documents/sites/${siteA.id}`),
+      api(null, 'GET', `/api/documents/sites/${siteA.id}/pages/${mapeamentos.id}`)
+    ])
+
+    return { ok: isUnauthenticated(site) && isUnauthenticated(page), detail: `${site.status}/${page.status}` }
+  })
+
+  await test('id de um arquivo que não é Site em /sites/:id → 404', async () => {
+    return status(await api(s.superAdmin, 'GET', `/api/documents/sites/${targets.alfa.file.id}`), 404)
+  })
+
+  await test('página: conteúdo, versão e título', async () => {
+    const res = await api(s.userAlfa, 'GET', `/api/documents/sites/${siteA.id}/pages/${mapeamentos.id}`)
+    const data = res.body?.data
+
+    return {
+      ok: res.status === 200 && data?.title === 'Mapeamentos' && data?.version === 1 && Array.isArray(data?.content) && data?.siteId === siteA.id,
+      detail: describe(res)
+    }
+  })
+
+  await test('página: o servidor limpa o conteúdo (link javascript:, tipos desconhecidos, ids inválidos)', async () => {
+    const res = await api(s.userAlfa, 'GET', `/api/documents/sites/${siteA.id}/pages/${sanitizedPage.id}`)
+    const content = res.body?.data?.content ?? []
+    const json = JSON.stringify(content)
+    const problems = []
+
+    if (res.status !== 200) return { ok: false, detail: describe(res) }
+    if (json.includes('javascript:') || json.includes('script') || json.includes('lixo')) problems.push('conteúdo perigoso passou')
+    if (!json.includes('https://ok.example/a')) problems.push('link válido foi removido')
+    if (content.length !== 2) problems.push(`${content.length} blocos (esperado 2)`)
+    if (content.some(block => !/^[A-Za-z0-9_-]{1,64}$/.test(block.id))) problems.push('id de bloco inválido')
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('página de OUTRO site e página inexistente → 404', async () => {
+    const other = (await mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'Site B')).body
+    const otherPageId = other?.pageId
+
+    const [foreign, missing] = await Promise.all([
+      api(s.superAdmin, 'GET', `/api/documents/sites/${siteA.id}/pages/${otherPageId}`),
+      api(s.superAdmin, 'GET', `/api/documents/sites/${siteA.id}/pages/inexistente`)
+    ])
+
+    return { ok: !!otherPageId && foreign.status === 404 && missing.status === 404, detail: `${foreign.status}/${missing.status}` }
+  })
+
+  await test('abrir o Site registra DOCUMENT_FILE_VIEW; a criação registra DOCUMENT_SITE_CREATE', async () => {
+    const [view, created] = await Promise.all([
+      prisma.auditLog.findFirst({ where: { action: 'DOCUMENT_FILE_VIEW', entityId: siteA.id } }),
+      prisma.auditLog.findFirst({ where: { action: 'DOCUMENT_SITE_CREATE', entityId: siteA.id } })
+    ])
+
+    return {
+      ok: !!view && created?.entityType === 'document_file' && created?.metadata?.name === 'Site A' && created?.tenantId === alfa.id,
+      detail: `view=${!!view} create=${JSON.stringify(created?.metadata)}`
+    }
+  })
+
+  section('Site: operações do Drive (listar, buscar, renomear, mover, preview)')
+
+  await test('listagem traz o Site como item sem tamanho e sem preview; a busca o encontra pelo nome', async () => {
+    const [list, search] = await Promise.all([
+      api(s.userAlfa, 'GET', `/api/documents?workspaceId=${alfa.id}&folderId=${sandboxAlfa}`),
+      api(s.userAlfa, 'GET', `/api/documents?workspaceId=${alfa.id}&q=${encodeURIComponent('Site A')}`)
+    ])
+
+    const item = (list.body?.data ?? []).find(entry => entry.id === siteA.id)
+    const hit = (search.body?.data ?? []).find(entry => entry.id === siteA.id)
+
+    return {
+      ok: item?.isSite === true && item.mimeType === SITE_MIME && item.size === 0 && item.previewable === false && !!hit,
+      detail: `${describe(list)} | busca=${!!hit}`
+    }
+  })
+
+  await test('/preview, /download e /preview-data do Site → 415 (nunca 404 nem 500)', async () => {
+    const codes = []
+
+    for (const route of ['preview', 'download', 'preview-data'])
+      codes.push((await api(s.superAdmin, 'GET', `/api/documents/files/${siteA.id}/${route}`)).status)
+
+    return { ok: codes.every(code => code === 415), detail: codes.join('/') }
+  })
+
+  await test('renomear sem ponto ("Site A2") mantém o nome exato, sem extensão nem ponto final', async () => {
+    const res = await api(s.superAdmin, 'PATCH', `/api/documents/files/${siteA.id}`, { json: { name: 'Site A2' } })
+
+    return { ok: res.status === 200 && res.body?.name === 'Site A2' && res.body?.isSite === true, detail: describe(res) }
+  })
+
+  await test('renomear com ponto ("Plano.v2") e com falsa extensão ("Plano.docx"): continua Site, sem preview', async () => {
+    const dotted = await api(s.superAdmin, 'PATCH', `/api/documents/files/${siteA.id}`, { json: { name: 'Plano.v2' } })
+    const fake = await api(s.superAdmin, 'PATCH', `/api/documents/files/${siteA.id}`, { json: { name: 'Plano.docx' } })
+    const previewData = await api(s.superAdmin, 'GET', `/api/documents/files/${siteA.id}/preview-data`)
+    const list = await api(s.userAlfa, 'GET', `/api/documents?workspaceId=${alfa.id}&folderId=${sandboxAlfa}`)
+    const item = (list.body?.data ?? []).find(entry => entry.id === siteA.id)
+    const problems = []
+
+    if (dotted.status !== 200 || dotted.body?.name !== 'Plano.v2') problems.push(`ponto: ${describe(dotted)}`)
+    if (fake.status !== 200 || fake.body?.name !== 'Plano.docx' || fake.body?.isSite !== true) problems.push(`docx: ${describe(fake)}`)
+    if (previewData.status !== 415) problems.push(`preview-data com nome .docx → ${previewData.status}`)
+    if (item?.isSite !== true) problems.push('deixou de ser Site na listagem')
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('renomear para nome já usado por outro arquivo → 409; adminAlfa não renomeia → 403', async () => {
+    const [conflict, forbidden] = await Promise.all([
+      api(s.superAdmin, 'PATCH', `/api/documents/files/${siteA.id}`, { json: { name: 'Site B' } }),
+      api(s.adminAlfa, 'PATCH', `/api/documents/files/${siteA.id}`, { json: { name: 'Qualquer' } })
+    ])
+
+    return { ok: conflict.status === 409 && forbidden.status === 403, detail: `${conflict.status}/${forbidden.status}` }
+  })
+
+  await test('mover o Site para outra pasta: as páginas continuam e o local muda', async () => {
+    const before = await prisma.documentSitePage.count({ where: { siteId: siteA.id } })
+
+    const res = await api(s.superAdmin, 'POST', `/api/documents/files/${siteA.id}/move`, {
+      json: { targetFolderId: targets.alfa.folder.id }
+    })
+
+    const after = await prisma.documentSitePage.count({ where: { siteId: siteA.id } })
+    const read = await api(s.userAlfa, 'GET', `/api/documents/sites/${siteA.id}`)
+
+    return {
+      ok:
+        res.status === 200 &&
+        res.body?.folderId === targets.alfa.folder.id &&
+        before === after &&
+        read.body?.data?.folderId === targets.alfa.folder.id &&
+        read.body?.data?.location?.at(-1)?.id === targets.alfa.folder.id,
+      detail: describe(res)
+    }
+  })
+
+  section('Site: exclusão (sem tocar no storage) e cascata')
+
+  await test('excluir o Site apaga DocumentFile, DocumentSite e as páginas; nenhum blob é tocado', async () => {
+    const blobsBefore = countBlobs(alfa.id)
+    const site = (await mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'Site para excluir')).body
+    const siteId = site.data.id
+
+    await addPage(siteId, null, 'Raiz 2', 1)
+    await addPage(siteId, (await addPage(siteId, null, 'Raiz 3', 2)).id, 'Filha', 0)
+
+    const created = await siteRows([siteId])
+    const res = await api(s.superAdmin, 'DELETE', `/api/documents/files/${siteId}`)
+    const after = await siteRows([siteId])
+    const blobsAfter = countBlobs(alfa.id)
+    const problems = []
+
+    if (created.sites !== 1 || created.pages !== 4) problems.push(`antes: ${JSON.stringify(created)}`)
+    if (res.status !== 200) problems.push(`resposta ${describe(res)}`)
+    if (after.files || after.sites || after.pages) problems.push(`linhas restantes: ${JSON.stringify(after)}`)
+    if (blobsBefore !== null && blobsBefore !== blobsAfter) problems.push(`blobs ${blobsBefore} → ${blobsAfter}`)
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('adminAlfa e userAlfa não excluem o Site → 403', async () => {
+    const [admin, user] = await Promise.all([
+      api(s.adminAlfa, 'DELETE', `/api/documents/files/${siteA.id}`),
+      api(s.userAlfa, 'DELETE', `/api/documents/files/${siteA.id}`)
+    ])
+
+    return { ok: admin.status === 403 && user.status === 403, detail: `${admin.status}/${user.status}` }
+  })
+
+  await test('excluir uma pasta com Sites e arquivo: cascata nas páginas, blob do arquivo removido, sem órfãos', async () => {
+    const x = (await createFolder(s.superAdmin, { workspaceId: alfa.id, parentId: sandboxAlfa, name: 'Com sites' })).body
+    const y = (await createFolder(s.superAdmin, { workspaceId: alfa.id, parentId: x.id, name: 'Interna' })).body
+    const one = (await mkSite(s.superAdmin, alfa.id, x.id, 'Site 1')).body
+    const two = (await mkSite(s.superAdmin, alfa.id, y.id, 'Site 2')).body
+
+    const pdf = (
+      await upload(s.superAdmin, alfa.id, y.id, [{ name: 'doc.pdf', type: 'application/pdf', buffer: makePdf('Doc') }])
+    ).body.data[0]
+
+    await addPage(one.data.id, null, 'Extra 1', 1)
+    await addPage(two.data.id, null, 'Extra 2', 1)
+
+    const pdfKey = (await prisma.documentFile.findUnique({ where: { id: pdf.id }, select: { storageKey: true } })).storageKey
+    const ids = [one.data.id, two.data.id, pdf.id]
+    const siteIds = [one.data.id, two.data.id]
+    const blobBefore = blobExists(pdfKey)
+    const res = await api(s.superAdmin, 'DELETE', `/api/documents/folders/${x.id}`)
+    const rows = await siteRows(ids)
+    const siteRowsLeft = await siteRows(siteIds)
+    const folders = await prisma.documentFolder.count({ where: { id: { in: [x.id, y.id] } } })
+    const blobAfter = blobExists(pdfKey)
+    const problems = []
+
+    if (res.status !== 200 || res.body?.deleted?.folders !== 2 || res.body?.deleted?.files !== 3) problems.push(`resposta ${describe(res)}`)
+    if (rows.files || siteRowsLeft.sites || siteRowsLeft.pages) problems.push(`órfãos: ${JSON.stringify({ rows, siteRowsLeft })}`)
+    if (folders) problems.push(`${folders} pasta(s) restante(s)`)
+    if (storageMode !== 'skip' && (blobBefore !== true || blobAfter !== false)) problems.push(`blob do PDF: antes ${blobBefore}, depois ${blobAfter}`)
+
+    return { ok: !problems.length, detail: problems.join('; ') }
   })
 }
 

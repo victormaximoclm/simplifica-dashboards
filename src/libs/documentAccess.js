@@ -15,6 +15,7 @@ import {
   DOCUMENT_DEFAULT_MAX_FILE_SIZE_MB,
   HTML_DOCUMENT_MIME,
   getDocumentFileType,
+  isSiteMime,
   getFileExtension,
   isPreviewableMime,
   isUploadableFileType
@@ -43,9 +44,18 @@ export function getMaxFileSizeBytes() {
   return getMaxFileSizeMb() * 1024 * 1024
 }
 
+/** Item sem blob no storage (storageKey nulo, como o Site): não há conteúdo para ler, baixar ou pré-visualizar */
+export class DocumentNoContentError extends Error {
+  constructor(message = 'Este item não tem conteúdo de arquivo') {
+    super(message)
+    this.name = 'DocumentNoContentError'
+  }
+}
+
 /**
  * Envolve um handler de rota do módulo: exceções não tratadas (banco/storage fora dos try/catch locais)
  * viram 500 com logger.error e x-request-id, em vez do erro genérico do Next.
+ * `DocumentNoContentError` vira 415 (uma rota de conteúdo que esqueça de checar o tipo não responde 500).
  */
 export function withDocumentErrorHandling(event, handler) {
   return async (req, context) => {
@@ -53,6 +63,10 @@ export function withDocumentErrorHandling(event, handler) {
       return await handler(req, context)
     } catch (error) {
       const requestId = getRequestId(req)
+
+      if (error instanceof DocumentNoContentError) {
+        return jsonWithRequestId({ message: error.message }, { status: 415, requestId })
+      }
 
       logger.error(event, { requestId, error: error instanceof Error ? error.message : String(error) })
 
@@ -417,8 +431,10 @@ export function serializeFile(file) {
     mimeType: file.mimeType,
     size: file.size,
 
-    // Todo tipo permitido tem pré-visualização: inline (PDF/imagens, rota /preview) ou estruturada (/preview-data)
-    previewable: true,
+    // Todo tipo de arquivo permitido tem pré-visualização: inline (PDF/imagens, rota /preview) ou estruturada
+    // (/preview-data). O Site não é arquivo: abre em página própria (isSite), sem preview nem download
+    isSite: isSiteMime(file.mimeType),
+    previewable: !isSiteMime(file.mimeType),
     inlinePreview: isPreviewableMime(file.mimeType),
 
     // Documento criado no editor: pode ser reaberto para edição do conteúdo
@@ -446,6 +462,8 @@ function buildContentDisposition(type, fileName) {
 
 /** Conteúdo completo do arquivo em memória (pré-visualização); lança ENOENT se o blob não existir */
 export async function readDocumentBuffer(file) {
+  if (!file.storageKey) throw new DocumentNoContentError()
+
   const { stream } = await storage.get(file.storageKey)
   const chunks = []
 
@@ -456,6 +474,8 @@ export async function readDocumentBuffer(file) {
 
 /** Resposta em stream do conteúdo do arquivo; lança ENOENT se o blob não existir no storage */
 export async function streamDocumentFile({ file, disposition, requestId }) {
+  if (!file.storageKey) throw new DocumentNoContentError()
+
   const { stream, size } = await storage.get(file.storageKey)
 
   return new Response(Readable.toWeb(stream), {

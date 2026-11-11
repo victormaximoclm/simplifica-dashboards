@@ -157,7 +157,12 @@ async function handleDelete(req, { params }) {
       await tx.documentFile.deleteMany({ where: { folderId: { in: ids } } })
       await tx.documentFolder.deleteMany({ where: { id: { in: ids } } })
 
-      return { folders: ids.length, files: files.length, storageKeys: files.map(file => file.storageKey) }
+      // Itens sem blob (Site) têm storageKey nulo e não entram na limpeza do storage
+      return {
+        folders: ids.length,
+        files: files.length,
+        storageKeys: files.map(file => file.storageKey).filter(Boolean)
+      }
     })
   } catch (error) {
     logger.error('document-folder-delete-error', { requestId, folderId: id, error: error.message })

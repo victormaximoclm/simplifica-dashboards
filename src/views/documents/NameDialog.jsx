@@ -10,6 +10,8 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogTitle from '@mui/material/DialogTitle'
 import TextField from '@mui/material/TextField'
 
+import { DOCUMENT_SITE_TEXT } from '@/libs/documentFileTypes'
+
 function validateName(value) {
   const name = value.trim()
 
@@ -85,7 +87,8 @@ const NameDialog = ({ state, workspaceId, parentId, onClose, onSaved }) => {
     }
   }
 
-  const title = isRename ? `Renomear ${item?.kind === 'folder' ? 'pasta' : 'arquivo'}` : 'Nova pasta'
+  const renameTarget = item?.kind === 'folder' ? 'pasta' : item?.isSite ? DOCUMENT_SITE_TEXT.label : 'arquivo'
+  const title = isRename ? `Renomear ${renameTarget}` : 'Nova pasta'
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth='xs' fullWidth>
@@ -104,7 +107,7 @@ const NameDialog = ({ state, workspaceId, parentId, onClose, onSaved }) => {
             value={name}
             onChange={e => setName(e.target.value)}
             inputProps={{ maxLength: 255 }}
-            helperText={isRename && item?.kind === 'file' ? 'A extensão do arquivo é mantida.' : ' '}
+            helperText={isRename && item?.kind === 'file' && !item?.isSite ? 'A extensão do arquivo é mantida.' : ' '}
             sx={{ mt: 1 }}
           />
         </DialogContent>

@@ -303,6 +303,91 @@ async function ensureHtmlDocuments(session, workspaces) {
   if (created) console.log(`  ${created} documento(s) HTML [MOCK] criado(s).`)
 }
 
+// ── Site ────────────────────────────────────
+
+const MOCK_SITE_NAME = '[MOCK] Site de consultoria'
+
+const para = (text, marks) => ({ type: 'paragraph', content: [{ type: 'text', text, ...(marks ? { marks } : {}) }] })
+const heading = (level, text) => ({ type: 'heading', attrs: { level }, content: [{ type: 'text', text }] })
+
+const bullets = items => ({
+  type: 'bulletList',
+  content: items.map(text => ({ type: 'listItem', content: [para(text)] }))
+})
+
+const textBlock = (id, ...nodes) => ({ id, type: 'text', doc: { type: 'doc', content: nodes } })
+
+// O Site é criado pela API real (mesmo caminho da UI); as páginas, por enquanto, direto pelo Prisma (a API de edição
+// de páginas vem em outra etapa). Árvore de 3 níveis, como no site de referência: Mapeamentos > Entrada de Materiais.
+async function ensureMockSite(session, workspaces) {
+  const workspace = workspaces.alfa
+
+  const exists = await prisma.documentFile.findFirst({
+    where: { workspaceId: workspace.id, folderId: null, name: MOCK_SITE_NAME },
+    select: { id: true }
+  })
+
+  if (exists) return
+
+  const res = await api(session, 'POST', '/api/documents/sites', {
+    json: { workspaceId: workspace.id, folderId: null, name: MOCK_SITE_NAME }
+  })
+
+  const { data, pageId } = expectStatus(res, 201, 'criar o Site [MOCK]')
+
+  await prisma.documentSitePage.update({
+    where: { id: pageId },
+    data: {
+      content: [
+        textBlock(
+          'boas-vindas',
+          heading(1, 'Bem-vindo'),
+          para('Este é um site de exemplo do ambiente de desenvolvimento, organizado em seções e subpáginas.'),
+          bullets(['Mapeamentos', 'Gestão Operacional'])
+        )
+      ]
+    }
+  })
+
+  const addPage = (title, position, parentId, content) =>
+    prisma.documentSitePage.create({ data: { siteId: data.id, parentId, title, position, content } })
+
+  const mapeamentos = await addPage('Mapeamentos', 1, null, [
+    textBlock('mapeamentos', para('Reúne os mapeamentos de processos da operação.'))
+  ])
+
+  const entrada = await addPage('Entrada de Materiais', 0, mapeamentos.id, [
+    textBlock(
+      'entrada',
+      heading(1, 'Fluxo de entrada'),
+      {
+        type: 'paragraph',
+        content: [
+          { type: 'text', text: 'Do recebimento à conferência. Veja também a ' },
+          {
+            type: 'text',
+            text: 'documentação de referência',
+            marks: [{ type: 'link', attrs: { href: 'https://example.com/referencia' } }]
+          },
+          { type: 'text', text: '.' }
+        ]
+      }
+    )
+  ])
+
+  await addPage('Checklist de recebimento', 0, entrada.id, [
+    textBlock('checklist', bullets(['Conferir nota fiscal', 'Inspecionar volumes', 'Registrar divergências']))
+  ])
+
+  const gestao = await addPage('Gestão Operacional', 2, null, [
+    textBlock('gestao', para('Rotinas e indicadores da gestão operacional.'))
+  ])
+
+  await addPage('Indicadores', 0, gestao.id, [textBlock('indicadores', para('Indicadores acompanhados mensalmente.'))])
+
+  console.log(`  Site [MOCK] criado em ${workspace.name} (5 páginas, 3 níveis).`)
+}
+
 // ── Limpeza ─────────────────────────────────
 
 async function deleteDocumentsViaApi(session, workspaces) {
@@ -442,6 +527,7 @@ async function main() {
 
   await ensureHtmlTemplates(session, workspaces)
   await ensureHtmlDocuments(session, workspaces)
+  await ensureMockSite(session, workspaces)
 
   // Dentro do serviço `tools` a app é "app:3000"; no navegador do host é localhost
   const browserUrl = BASE_URL.replace('//app:', '//localhost:')

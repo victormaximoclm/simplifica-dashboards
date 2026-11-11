@@ -7,6 +7,7 @@ import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { isPreviewableMime } from '@/libs/documentFileTypes'
 import { buildDocumentPreview, hasStructuredPreview, isPreviewError } from '@/libs/documentPreview'
 import {
+  DocumentNoContentError,
   getAuthorizedDocumentItem,
   readDocumentBuffer,
   recordDocumentFileAccess,
@@ -40,6 +41,8 @@ async function handleGet(req, { params }) {
   try {
     buffer = await readDocumentBuffer(file)
   } catch (error) {
+    if (error instanceof DocumentNoContentError) throw error
+
     logger.error('document-file-preview-data-read-error', { requestId, fileId: id, error: error.message })
 
     return jsonWithRequestId({ message: 'Arquivo não encontrado no armazenamento' }, { status: 404, requestId })

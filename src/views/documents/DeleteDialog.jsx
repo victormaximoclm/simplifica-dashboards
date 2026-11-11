@@ -10,6 +10,8 @@ import DialogContent from '@mui/material/DialogContent'
 import DialogContentText from '@mui/material/DialogContentText'
 import DialogTitle from '@mui/material/DialogTitle'
 
+import { DOCUMENT_SITE_TEXT } from '@/libs/documentFileTypes'
+
 const plural = (count, singular, pluralLabel) => `${count} ${count === 1 ? singular : pluralLabel}`
 
 const DeleteDialog = ({ item, onClose, onDeleted }) => {
@@ -20,6 +22,7 @@ const DeleteDialog = ({ item, onClose, onDeleted }) => {
 
   const open = !!item
   const isFolder = item?.kind === 'folder'
+  const isSite = !!item?.isSite
 
   useEffect(() => {
     setCounts(null)
@@ -79,13 +82,14 @@ const DeleteDialog = ({ item, onClose, onDeleted }) => {
     <Dialog open={open} onClose={handleClose} maxWidth='sm' fullWidth>
       <DialogTitle sx={{ color: 'error.main', display: 'flex', alignItems: 'center', gap: 2 }}>
         <i className='tabler-alert-triangle' style={{ fontSize: '1.5rem' }} />
-        {isFolder ? 'Excluir pasta' : 'Excluir arquivo'}
+        {isFolder ? 'Excluir pasta' : isSite ? DOCUMENT_SITE_TEXT.deleteTitle : 'Excluir arquivo'}
       </DialogTitle>
       <DialogContent>
         <DialogContentText sx={{ mb: 2 }}>
-          Tem certeza que deseja excluir {isFolder ? 'a pasta' : 'o arquivo'} <strong>&quot;{item?.name}&quot;</strong>?
-          Esta ação não pode ser desfeita.
+          Tem certeza que deseja excluir {isFolder ? 'a pasta' : isSite ? DOCUMENT_SITE_TEXT.deleteTarget : 'o arquivo'}{' '}
+          <strong>&quot;{item?.name}&quot;</strong>? Esta ação não pode ser desfeita.
         </DialogContentText>
+        {isSite && <DialogContentText sx={{ color: 'warning.main', mb: 2 }}>{DOCUMENT_SITE_TEXT.deleteWarning}</DialogContentText>}
         {isFolder && loadingCounts && (
           <div className='flex items-center gap-2'>
             <CircularProgress size={16} />
