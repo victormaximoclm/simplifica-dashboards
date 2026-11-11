@@ -1,5 +1,8 @@
 'use client'
 
+// React Imports
+import { useState } from 'react'
+
 // Next Imports
 import Link from 'next/link'
 import { useParams } from 'next/navigation'
@@ -50,8 +53,6 @@ const MaskImg = styled('img')({
   insetBlockEnd: 0,
   zIndex: -1
 })
-
-import { useState } from 'react'
 
 const ForgotPassword = ({ mode }) => {
   // Vars

@@ -27,24 +27,24 @@ async function main() {
   let created = 0
   let updated = 0
 
-  for (const module of modules) {
+  for (const moduleData of modules) {
     const existing = await prisma.module.findUnique({
       where: {
-        key: module.key
+        key: moduleData.key
       }
     })
 
     if (existing) {
-      console.log(`  Já existe: ${module.name}`)
+      console.log(`  Já existe: ${moduleData.name}`)
       updated++
       continue
     }
 
     await prisma.module.create({
-      data: module
+      data: moduleData
     })
 
-    console.log(`  Criado: ${module.name}`)
+    console.log(`  Criado: ${moduleData.name}`)
     created++
   }
 
