@@ -12,3 +12,4 @@ Dockerfile
 .vscode
 .idea
 coverage
+storage

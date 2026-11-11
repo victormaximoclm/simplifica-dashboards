@@ -5,6 +5,36 @@ services:
     ports:
       - '5433:5432'
 
+  # Ferramentas de desenvolvimento (scripts de teste do módulo de Documentos) sem precisar de Node no host.
+  # Só sobe sob demanda: docker compose -f docker-compose.yml -f docker-compose.dev.yml run --rm tools pnpm documents:mock
+  tools:
+    image: node:20-bookworm-slim
+    profiles: ['tools']
+    working_dir: /work
+    env_file:
+      - .env
+    environment:
+      NODE_ENV: development
+      DATABASE_URL: postgresql://${DB_USER:-simplifica}:${DB_PASSWORD:-simplifica123}@postgres:5432/${DB_NAME:-simplifica}?schema=public
+      DOCS_DEV_BASE_URL: http://app:3000
+      DOCS_DEV_STORAGE_MODE: local
+      STORAGE_DIR: /app/storage
+      COREPACK_ENABLE_DOWNLOAD_PROMPT: '0'
+      # Store do pnpm dentro do volume de node_modules (sem isso ele cria .pnpm-store/ no repositório)
+      npm_config_store_dir: /work/node_modules/.pnpm-store
+    volumes:
+      - .:/work
+      - tools_node_modules:/work/node_modules
+      - documents:/app/storage:ro
+    entrypoint:
+      - sh
+      - -c
+      - corepack enable && corepack prepare pnpm@9.15.9 --activate && ([ -f node_modules/.modules.yaml ] || pnpm install --frozen-lockfile) && exec "$$@"
+      - --
+    depends_on:
+      - postgres
+      - app
+
   mailpit:
     image: axllent/mailpit:latest
     container_name: simplifica-mailpit
@@ -15,3 +45,6 @@ services:
     environment:
       MP_SMTP_AUTH_ACCEPT_ANY: 1
       MP_SMTP_AUTH_ALLOW_INSECURE: 1
+
+volumes:
+  tools_node_modules:

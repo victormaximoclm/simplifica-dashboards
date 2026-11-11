@@ -48,3 +48,6 @@ pgdata/
 *.swp
 *.swo
 src/assets/iconify-icons/generated-icons.css
+
+# document storage (local)
+/storage/

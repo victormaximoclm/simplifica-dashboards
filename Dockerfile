@@ -71,6 +71,10 @@ COPY --from=builder /app/node_modules/bcryptjs ./node_modules/bcryptjs
 COPY docker-entrypoint.sh ./docker-entrypoint.sh
 RUN dos2unix ./docker-entrypoint.sh && chmod +x ./docker-entrypoint.sh
 
+# Storage local do módulo de Documentos (montado como volume no docker-compose)
+ENV STORAGE_DIR=/app/storage
+RUN mkdir -p /app/storage
+
 # Set ownership for the nextjs user
 RUN chown -R nextjs:nodejs /app
 

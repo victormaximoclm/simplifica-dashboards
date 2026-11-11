@@ -44,6 +44,7 @@ O Simpla Insights centraliza painéis externos e fluxos de coleta de dados para 
 | **Workspaces** | Multi-tenant: usuários, dashboards e formulários por equipe |
 | **Dashboards** | Cadastro de iframes (Power BI etc.) com proxy de embed autenticado |
 | **Formulários** | Builder visual, links públicos com expiração, envio para webhook |
+| **Documentos** | Pastas e arquivos por workspace (upload, renomear, mover, excluir, download e preview), busca em subpastas e documentos HTML escritos no editor com o template Simplifica ou com templates HTML próprios do workspace; edição só para Super Admin / Sub Admin |
 | **Integrações** | ClickUp (OAuth por workspace), datasources via webhook/n8n |
 | **E-mail** | Convites, reset de senha e notificações via SMTP |
 | **Auditoria** | Dois painéis: acesso (logins) e ações críticas (admin) |
@@ -168,6 +169,8 @@ Referência completa em [`.env.example`](.env.example). Resumo das principais:
 | `API_URL` | URL que o servidor usa para chamar a própria API |
 | `REDIS_URL` | Rate limit distribuído |
 | `SMTP_*` | Envio de e-mails |
+| `STORAGE_DIR` | Diretório dos arquivos do módulo Documentos (Docker: `/app/storage`, volume `documents`; local: `./storage`) |
+| `DOCUMENTS_MAX_FILE_SIZE_MB` | Tamanho máximo por arquivo em Documentos (padrão `25`, teto `50`). O teto vem de `proxyClientMaxBodySize` (`55mb`) no `next.config.mjs`, que vale para **todas** as rotas — aumentá-lo aumenta o corpo aceito em toda a API |
 | `N8N_API_KEY` | (Opcional) Bearer para webhooks n8n em formulários |
 | `CLICKUP_REDIRECT_URI` | (Opcional) Callback OAuth ClickUp |
 | `GOOGLE_CLIENT_ID` / `GOOGLE_CLIENT_SECRET` | (Opcional) Login Google |

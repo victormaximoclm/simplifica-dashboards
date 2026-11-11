@@ -15,6 +15,13 @@ const nextConfig = {
   basePath: process.env.BASEPATH || undefined,
   output: 'standalone',
 
+  experimental: {
+    // Com middleware ativo, o Next bufferiza o corpo das requisições e TRUNCA em silêncio acima deste limite
+    // (padrão 10MB). Vale para TODAS as rotas. Cobre o upload de Documentos (DOCUMENTS_MAX_FILE_SIZE_MB, teto 50)
+    // mais a folga do multipart; manter igual a DOCUMENTS_MAX_REQUEST_BYTES em src/libs/documentAccess.js.
+    proxyClientMaxBodySize: '55mb'
+  },
+
   images: {
     remotePatterns: [],
     formats: ['image/avif', 'image/webp']
@@ -22,8 +29,19 @@ const nextConfig = {
 
   headers: async () => [
     {
-      source: '/(.*)',
+      source: '/',
       headers: securityHeaders
+    },
+    {
+      source: '/:path((?!api/documents/files/).*)*',
+      headers: securityHeaders
+    },
+
+    // Arquivos de Documentos definem a própria CSP (streamDocumentFile): o header daqui sobrescreveria o `sandbox`
+    // dos documentos HTML
+    {
+      source: '/api/documents/files/:path*',
+      headers: securityHeaders.filter(header => header.key !== 'Content-Security-Policy')
     }
   ],
 

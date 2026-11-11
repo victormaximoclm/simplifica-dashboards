@@ -49,6 +49,9 @@ services:
       NEXT_PUBLIC_API_URL: ${NEXT_PUBLIC_API_URL:-http://localhost:3000/api}
       REDIS_URL: ${REDIS_URL:-redis://redis:6379}
       SEED_ON_START: ${SEED_ON_START:-false}
+      STORAGE_DIR: /app/storage
+    volumes:
+      - documents:/app/storage
     depends_on:
       redis:
         condition: service_started
@@ -57,3 +60,4 @@ services:
 
 volumes:
   pgdata:
+  documents:
