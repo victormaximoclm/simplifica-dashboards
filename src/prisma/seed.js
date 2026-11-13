@@ -197,13 +197,13 @@ async function main() {
 
   // Cargos globais
   const roleRecepcao = await prisma.customRole.upsert({
-    where: { name: 'Recepção' },
+    where: { workspaceId_name: { workspaceId: wsPotiguar.id, name: 'Recepção' } },
     update: {},
     create: { name: 'Recepção', workspaceId: wsPotiguar.id }
   })
 
   const roleFaturamento = await prisma.customRole.upsert({
-    where: { name: 'Faturamento' },
+    where: { workspaceId_name: { workspaceId: wsUnimed.id, name: 'Faturamento' } },
     update: {},
     create: { name: 'Faturamento', workspaceId: wsUnimed.id }
   })

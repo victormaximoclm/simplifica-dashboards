@@ -12,6 +12,7 @@ import { sendInviteEmail } from '@/libs/mail'
 import { isHighAdmin, getAssignableRoles } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
+import { rolesBelongToWorkspace } from '@/libs/customRoleScope'
 import { inviteUserSchema, parseBody } from '@/libs/validations'
 
 // POST /api/apps/users/invite - Invite user by email (high admins only)
@@ -47,15 +48,6 @@ return response
 
   const { email, workspaceId, role, customRoleId } = parsed.data
 
-  if (customRoleId) {
-    const targetWorkspaceId = workspaceId || updateData.workspaceId || targetUser?.workspaceId
-    const roleCheck = await prisma.customRole.findUnique({ where: { id: customRoleId } })
-
-    if (!roleCheck || roleCheck.workspaceId !== targetWorkspaceId) {
-      return jsonWithRequestId({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400, requestId })
-    }
-  }
-
   // Validate role assignment permissions
   const assignedRole = role || 'user'
   const assignable = getAssignableRoles(session.user.role)
@@ -90,6 +82,15 @@ return response
     response.headers.set('x-request-id', requestId)
     
 return response
+  }
+
+  // O cargo precisa pertencer ao workspace do convite (subAdmin não tem workspace, logo não tem cargo)
+  if (customRoleId && !(await rolesBelongToWorkspace([customRoleId], needsWorkspace ? workspaceId : null))) {
+    const response = NextResponse.json({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400 })
+
+    response.headers.set('x-request-id', requestId)
+
+    return response
   }
 
   // Check if user already exists

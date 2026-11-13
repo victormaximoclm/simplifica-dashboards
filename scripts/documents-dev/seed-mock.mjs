@@ -58,8 +58,8 @@ async function ensureBaseData() {
   }
 
   const customRole = await prisma.customRole.upsert({
-    where: { name: MOCK_CUSTOM_ROLE_NAME },
-    update: { workspaceId: workspaces.beta.id },
+    where: { workspaceId_name: { workspaceId: workspaces.beta.id, name: MOCK_CUSTOM_ROLE_NAME } },
+    update: {},
     create: { name: MOCK_CUSTOM_ROLE_NAME, workspaceId: workspaces.beta.id }
   })
 

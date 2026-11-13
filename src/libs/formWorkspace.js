@@ -25,7 +25,7 @@ return first?.id ?? null
   return null
 }
 
-/** CustomRole é global no schema — lista todas as funções disponíveis */
+/** Lista os cargos do workspace informado (cargos pertencem a um único workspace) */
 export async function listCustomRolesForForms(workspaceId) {
   return prisma.customRole.findMany({
     where: workspaceId ? { workspaceId } : undefined,

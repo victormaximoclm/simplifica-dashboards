@@ -9,6 +9,7 @@ import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin, getAssignableRoles } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
+import { rolesBelongToWorkspace } from '@/libs/customRoleScope'
 
 // PUT /api/apps/users/[id] - Update user (high admins only)
 export async function PUT(req, { params }) {
@@ -35,15 +36,6 @@ return response
   const { id } = await params
   const body = await req.json()
   const { role, workspaceId, status, customRoleId } = body
-
-  if (customRoleId) {
-    const targetWorkspaceId = workspaceId || updateData.workspaceId || targetUser?.workspaceId
-    const roleCheck = await prisma.customRole.findUnique({ where: { id: customRoleId } })
-
-    if (!roleCheck || roleCheck.workspaceId !== targetWorkspaceId) {
-      return jsonWithRequestId({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400, requestId })
-    }
-  }
 
   const targetUser = await prisma.user.findUnique({
     where: { id },
@@ -135,8 +127,24 @@ return response
     }
   }
 
-  if (customRoleId !== undefined) {
-    updateData.customRoleId = customRoleId || null
+  const effectiveWorkspaceId = 'workspaceId' in updateData ? updateData.workspaceId : targetUser.workspaceId
+
+  if (customRoleId) {
+    // O cargo precisa pertencer ao workspace que o usuário terá após a atualização
+    if (!(await rolesBelongToWorkspace([customRoleId], effectiveWorkspaceId))) {
+      const response = NextResponse.json({ message: 'Cargo não pertence ao workspace do usuário' }, { status: 400 })
+
+      response.headers.set('x-request-id', requestId)
+
+      return response
+    }
+
+    updateData.customRoleId = customRoleId
+  } else if (customRoleId !== undefined) {
+    updateData.customRoleId = null
+  } else if ('workspaceId' in updateData && updateData.workspaceId !== targetUser.workspaceId) {
+    // Mudou de workspace sem informar cargo: o cargo antigo é de outro workspace e não vale no novo
+    updateData.customRoleId = null
   }
 
   if (Object.keys(updateData).length === 0) {

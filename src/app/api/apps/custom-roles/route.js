@@ -7,6 +7,8 @@ import { authOptions } from '@/libs/auth'
 import { createAuditLog } from '@/libs/auditService'
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
+import { loadWorkspaceForAccess } from '@/libs/workspaceAccess'
+import { canAccessWorkspace, canManageWorkspaceContent } from '@/utils/roleHelpers'
 import { createCustomRoleSchema, parseBody } from '@/libs/validations'
 
 // GET /api/apps/custom-roles - List all custom roles (workspace)
@@ -20,6 +22,13 @@ export async function GET(req) {
   const workspaceId = searchParams.get('workspaceId') || session.user.workspaceId
 
   if (!workspaceId) return jsonWithRequestId({ message: 'Workspace é obrigatório' }, { status: 400, requestId })
+
+  const workspace = await loadWorkspaceForAccess(workspaceId)
+
+  if (!workspace) return jsonWithRequestId({ message: 'Workspace não encontrado' }, { status: 404, requestId })
+
+  if (!canAccessWorkspace(session.user, workspace))
+    return jsonWithRequestId({ message: 'Acesso negado a este workspace' }, { status: 403, requestId })
 
   const roles = await prisma.customRole.findMany({
     where: { workspaceId },
@@ -62,6 +71,13 @@ export async function POST(req) {
   if (!parsed.success) return jsonWithRequestId({ message: parsed.message }, { status: 400, requestId })
 
   const { name, workspaceId } = parsed.data
+
+  const workspace = await loadWorkspaceForAccess(workspaceId)
+
+  if (!workspace) return jsonWithRequestId({ message: 'Workspace não encontrado' }, { status: 404, requestId })
+
+  if (!canManageWorkspaceContent(session.user, workspace))
+    return jsonWithRequestId({ message: 'Acesso negado a este workspace' }, { status: 403, requestId })
 
   const existing = await prisma.customRole.findFirst({
     where: { workspaceId, name: name.trim() }

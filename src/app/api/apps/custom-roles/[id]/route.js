@@ -8,6 +8,11 @@ import { createAuditLog } from '@/libs/auditService'
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { createCustomRoleSchema, parseBody } from '@/libs/validations'
+import { canManageWorkspaceContentById } from '@/libs/workspaceAccess'
+
+// Cargo sem workspace (legado) só pode ser gerenciado por superAdmin
+const canManageRoleWorkspace = async (session, workspaceId) =>
+  workspaceId ? canManageWorkspaceContentById(session, workspaceId) : session.user.role === 'superAdmin'
 
 // PUT /api/apps/custom-roles/[id] - Update custom role (superAdmin/subAdmin)
 export async function PUT(req, { params }) {
@@ -36,6 +41,10 @@ export async function PUT(req, { params }) {
 
   if (!existing) {
     return jsonWithRequestId({ message: 'Cargo não encontrado' }, { status: 404, requestId })
+  }
+
+  if (!(await canManageRoleWorkspace(session, existing.workspaceId))) {
+    return jsonWithRequestId({ message: 'Acesso negado a este workspace' }, { status: 403, requestId })
   }
 
   // Check for duplicate name
@@ -93,6 +102,10 @@ export async function DELETE(req, { params }) {
 
   if (!existing) {
     return jsonWithRequestId({ message: 'Cargo não encontrado' }, { status: 404, requestId })
+  }
+
+  if (!(await canManageRoleWorkspace(session, existing.workspaceId))) {
+    return jsonWithRequestId({ message: 'Acesso negado a este workspace' }, { status: 403, requestId })
   }
 
   if (existing._count.users > 0) {

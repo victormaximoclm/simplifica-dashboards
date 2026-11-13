@@ -10,6 +10,7 @@ import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin, canCreateWorkspaceContent } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
+import { rolesBelongToWorkspace } from '@/libs/customRoleScope'
 import { createDashboardSchema, parseBody } from '@/libs/validations'
 import { resolveFormWorkspaceId } from '@/libs/formWorkspace'
 import { resolveModuleWorkspaceScope, workspaceAccessInclude } from '@/libs/workspaceAccess'
@@ -258,6 +259,14 @@ return response
     response.headers.set('x-request-id', requestId)
     
 return response
+  }
+
+  if (!(await rolesBelongToWorkspace(allowedRoleIds, workspaceId))) {
+    const response = NextResponse.json({ message: 'Há cargos que não pertencem a este workspace' }, { status: 400 })
+
+    response.headers.set('x-request-id', requestId)
+
+    return response
   }
 
   const dashboard = await prisma.dashboard.create({

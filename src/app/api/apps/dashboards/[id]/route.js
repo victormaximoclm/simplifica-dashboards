@@ -10,6 +10,7 @@ import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin, canManageWorkspaceContent } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
+import { pruneForeignRolePermissions, rolesBelongToWorkspace } from '@/libs/customRoleScope'
 import { workspaceAccessInclude } from '@/libs/workspaceAccess'
 
 function sanitizeDashboardTitle(value) {
@@ -168,6 +169,27 @@ return response
     }
 
     updateData.workspaceId = workspaceId
+  }
+
+  const targetWorkspaceId = updateData.workspaceId ?? existing.workspaceId
+
+  if (Array.isArray(allowedRoleIds) && !(await rolesBelongToWorkspace(allowedRoleIds, targetWorkspaceId))) {
+    const response = NextResponse.json({ message: 'Há cargos que não pertencem a este workspace' }, { status: 400 })
+
+    response.headers.set('x-request-id', requestId)
+
+    return response
+  }
+
+  // Dashboard mudou de workspace: descarta permissões de cargos do workspace antigo
+  if (targetWorkspaceId !== existing.workspaceId) {
+    const dashboardModule = await prisma.module.findUnique({ where: { key: 'dashboards' } })
+
+    await pruneForeignRolePermissions({
+      moduleId: dashboardModule?.id,
+      resourceId: id,
+      workspaceId: targetWorkspaceId
+    })
   }
 
   // Update allowed roles if provided
