@@ -54,3 +54,6 @@ src/assets/iconify-icons/generated-icons.css
 
 # notas de seguranca internas (nao commitar)
 docs/SECURITY_NOTES.local.md
+
+# Instruções locais de execução
+docs/RODAR_LOCAL.local.md

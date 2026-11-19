@@ -18,17 +18,19 @@ import HtmlDocumentEditorDialog from './HtmlDocumentEditorDialog'
 import HtmlTemplatesDialog from './HtmlTemplatesDialog'
 import MoveDialog from './MoveDialog'
 import NameDialog from './NameDialog'
+import NewItemMenu from './NewItemMenu'
 import NewSiteDialog from './NewSiteDialog'
 import PreviewDialog from './PreviewDialog'
 import UploadDialog from './UploadDialog'
 import { DOCUMENT_SITE_TEXT } from '@/libs/documentFileTypes'
 import { getLocalizedUrl } from '@/utils/i18n'
 import {
-  btnPrimary,
+  btnOutlined,
   formAlertErrorCls,
+  formEmptyTitleCls,
   formIconMutedCls,
   formInputCls,
-  formMutedCls,
+  formPageMutedCls,
   formPageCls,
   formSubtitleCls,
   formTitleCls
@@ -283,38 +285,35 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
             </p>
           </div>
           {allowCreate && (
-            <div className='flex flex-col sm:flex-row gap-2 shrink-0'>
-              <button type='button' onClick={() => setNameDialog({ mode: 'create' })} className={btnPrimary}>
-                <i className='tabler-folder-plus text-base' />
-                Nova pasta
-              </button>
-              <button type='button' onClick={() => setHtmlEditor({ mode: 'create' })} className={btnPrimary}>
-                <i className='tabler-file-text text-base' />
-                Novo documento
-              </button>
-              <button type='button' onClick={() => setNewSiteOpen(true)} className={btnPrimary}>
-                <i className='tabler-world text-base' />
-                {DOCUMENT_SITE_TEXT.newLabel}
-              </button>
-              <button type='button' onClick={() => setTemplatesOpen(true)} className={btnPrimary}>
-                <i className='tabler-template text-base' />
-                Templates
-              </button>
-              <button type='button' onClick={() => setUploadOpen(true)} className={btnPrimary}>
+            <div className='flex flex-wrap items-center gap-2 shrink-0'>
+              <NewItemMenu
+                options={[
+                  { text: 'Pasta', icon: 'tabler-folder-plus', onClick: () => setNameDialog({ mode: 'create' }) },
+                  { text: 'Documento', icon: 'tabler-file-text', onClick: () => setHtmlEditor({ mode: 'create' }) },
+                  { text: 'Site', icon: 'tabler-world', onClick: () => setNewSiteOpen(true) }
+                ]}
+              />
+              <button type='button' onClick={() => setUploadOpen(true)} className={btnOutlined}>
                 <i className='tabler-upload text-base' />
                 Enviar arquivo
+              </button>
+              <button type='button' onClick={() => setTemplatesOpen(true)} className={btnOutlined}>
+                <i className='tabler-template text-base' />
+                Templates
               </button>
             </div>
           )}
         </div>
 
+        {/* Na raiz o título já diz "Documentos": o caminho só aparece dentro de uma pasta */}
+        {ancestors.length > 0 && (
         <Breadcrumbs separator={<i className='tabler-chevron-right text-sm' />} className='mb-4 min-w-0'>
           {[{ id: null, name: 'Documentos' }, ...ancestors].map((crumb, index, all) =>
             index === all.length - 1 ? (
               <span
                 key={crumb.id ?? 'root'}
                 title={crumb.name}
-                className='block max-w-[240px] truncate font-medium text-[var(--mui-palette-text-primary)]'
+                className='block max-w-[240px] truncate font-medium text-[var(--page-fg)]'
               >
                 {crumb.name}
               </span>
@@ -331,6 +330,7 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
             )
           )}
         </Breadcrumbs>
+        )}
 
         <div className='flex flex-col sm:flex-row sm:items-center gap-3 mb-4'>
           <div className='relative flex-1'>
@@ -345,6 +345,7 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
             />
           </div>
           <ToggleButtonGroup
+            sx={{ '& .MuiToggleButton-root': { color: 'var(--page-fg-soft) !important', borderColor: 'var(--page-border)' }, '& .Mui-selected': { color: 'var(--mui-palette-primary-main) !important' } }}
             exclusive
             size='small'
             value={viewMode}
@@ -368,11 +369,11 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
           </div>
         ) : !loadError && items.length === 0 ? (
           <div className='flex flex-col items-center justify-center min-h-[40vh] gap-4'>
-            <i className={`${query ? 'tabler-search-off' : 'tabler-folder-open'} text-6xl ${formIconMutedCls}`} />
-            <h4 className={`text-xl font-medium ${formTitleCls}`}>
+            <i className={`${query ? 'tabler-search-off' : 'tabler-folder-open'} text-6xl text-[var(--page-fg-soft)]`} />
+            <h4 className={formEmptyTitleCls}>
               {query ? 'Nenhum resultado' : folderId ? 'Esta pasta está vazia' : 'Nenhum documento ainda'}
             </h4>
-            <p className={`${formMutedCls} text-center max-w-md`}>
+            <p className={`${formPageMutedCls} text-center max-w-md`}>
               {query
                 ? folderId
                   ? `Nada encontrado para "${query}" nesta pasta nem nas subpastas.`

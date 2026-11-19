@@ -317,46 +317,78 @@ const bullets = items => ({
 
 const textBlock = (id, ...nodes) => ({ id, type: 'text', doc: { type: 'doc', content: nodes } })
 
-// O Site é criado pela API real (mesmo caminho da UI); as páginas, por enquanto, direto pelo Prisma (a API de edição
-// de páginas vem em outra etapa). Árvore de 3 níveis, como no site de referência: Mapeamentos > Entrada de Materiais.
+// O Site e as páginas são criados pela API real (mesmo caminho da UI). É idempotente: cria o que falta e só
+// reescreve o conteúdo de páginas que ninguém salvou ainda (versão 1); o que o usuário editou fica como está.
+// Árvore de 3 níveis, como no site de referência: Mapeamentos > Entrada de Materiais > Checklist.
 async function ensureMockSite(session, workspaces) {
   const workspace = workspaces.alfa
+  const base = { workspaceId: workspace.id }
 
-  const exists = await prisma.documentFile.findFirst({
-    where: { workspaceId: workspace.id, folderId: null, name: MOCK_SITE_NAME },
+  let site = await prisma.documentFile.findFirst({
+    where: { ...base, folderId: null, name: MOCK_SITE_NAME },
     select: { id: true }
   })
 
-  if (exists) return
+  if (!site) {
+    const created = expectStatus(
+      await api(session, 'POST', '/api/documents/sites', { json: { ...base, folderId: null, name: MOCK_SITE_NAME } }),
+      201,
+      'criar o Site [MOCK]'
+    )
 
-  const res = await api(session, 'POST', '/api/documents/sites', {
-    json: { workspaceId: workspace.id, folderId: null, name: MOCK_SITE_NAME }
+    site = { id: created.data.id }
+    console.log(`  Site [MOCK] criado em ${workspace.name}.`)
+  }
+
+  // Arquivos reais do mock (PDF e imagem) para os blocos de arquivo e de imagem
+  const pdf = await prisma.documentFile.findFirst({
+    where: { ...base, name: 'Contrato de Prestação de Serviços.pdf' },
+    select: { id: true }
   })
 
-  const { data, pageId } = expectStatus(res, 201, 'criar o Site [MOCK]')
+  const image = await prisma.documentFile.findFirst({
+    where: { ...base, mimeType: { in: ['image/png', 'image/jpeg', 'image/webp'] } },
+    select: { id: true }
+  })
 
-  await prisma.documentSitePage.update({
-    where: { id: pageId },
-    data: {
-      content: [
-        textBlock(
-          'boas-vindas',
-          heading(1, 'Bem-vindo'),
-          para('Este é um site de exemplo do ambiente de desenvolvimento, organizado em seções e subpáginas.'),
-          bullets(['Mapeamentos', 'Gestão Operacional'])
-        )
-      ]
+  const route = `/api/documents/sites/${site.id}`
+
+  const ensurePage = async (title, parentId, blocks) => {
+    const tree = expectStatus(await api(session, 'GET', route), 200, 'ler o Site [MOCK]').data.pages
+    let page = tree.find(entry => entry.title === title && (entry.parentId ?? null) === parentId)
+
+    if (!page) {
+      page = expectStatus(await api(session, 'POST', `${route}/pages`, { json: { title, parentId } }), 201, `criar a página "${title}"`).data
     }
-  })
 
-  const addPage = (title, position, parentId, content) =>
-    prisma.documentSitePage.create({ data: { siteId: data.id, parentId, title, position, content } })
+    const current = expectStatus(await api(session, 'GET', `${route}/pages/${page.id}`), 200, `ler a página "${title}"`).data
 
-  const mapeamentos = await addPage('Mapeamentos', 1, null, [
+    if (current.version === 1) {
+      expectStatus(
+        await api(session, 'PATCH', `${route}/pages/${page.id}`, { json: { content: blocks, baseVersion: 1 } }),
+        200,
+        `gravar a página "${title}"`
+      )
+    }
+
+    return page
+  }
+
+  await ensurePage('Início', null, [
+    textBlock(
+      'boas-vindas',
+      heading(1, 'Bem-vindo'),
+      para('Este é um site de exemplo do ambiente de desenvolvimento, organizado em seções e subpáginas.'),
+      bullets(['Mapeamentos', 'Gestão Operacional'])
+    ),
+    { id: 'ref', type: 'link', url: 'https://example.com/referencia', label: 'Material de referência', description: 'Abre em outra aba' }
+  ])
+
+  const mapeamentos = await ensurePage('Mapeamentos', null, [
     textBlock('mapeamentos', para('Reúne os mapeamentos de processos da operação.'))
   ])
 
-  const entrada = await addPage('Entrada de Materiais', 0, mapeamentos.id, [
+  const entrada = await ensurePage('Entrada de Materiais', mapeamentos.id, [
     textBlock(
       'entrada',
       heading(1, 'Fluxo de entrada'),
@@ -372,20 +404,20 @@ async function ensureMockSite(session, workspaces) {
           { type: 'text', text: '.' }
         ]
       }
-    )
+    ),
+    ...(image ? [{ id: 'img', type: 'image', fileId: image.id, alt: 'Imagem de exemplo', caption: 'Imagem do módulo de Documentos', width: 'md' }] : []),
+    ...(pdf ? [{ id: 'pdf', type: 'file', fileId: pdf.id, label: 'Contrato de prestação de serviços', description: 'Visualize ou baixe' }] : [])
   ])
 
-  await addPage('Checklist de recebimento', 0, entrada.id, [
+  await ensurePage('Checklist de recebimento', entrada.id, [
     textBlock('checklist', bullets(['Conferir nota fiscal', 'Inspecionar volumes', 'Registrar divergências']))
   ])
 
-  const gestao = await addPage('Gestão Operacional', 2, null, [
+  const gestao = await ensurePage('Gestão Operacional', null, [
     textBlock('gestao', para('Rotinas e indicadores da gestão operacional.'))
   ])
 
-  await addPage('Indicadores', 0, gestao.id, [textBlock('indicadores', para('Indicadores acompanhados mensalmente.'))])
-
-  console.log(`  Site [MOCK] criado em ${workspace.name} (5 páginas, 3 níveis).`)
+  await ensurePage('Indicadores', gestao.id, [textBlock('indicadores', para('Indicadores acompanhados mensalmente.'))])
 }
 
 // ── Limpeza ─────────────────────────────────

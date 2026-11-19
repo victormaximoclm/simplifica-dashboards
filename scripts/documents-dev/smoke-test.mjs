@@ -1880,10 +1880,15 @@ async function runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn })
     const problems = []
 
     if (res.status !== 200) return { ok: false, detail: describe(res) }
-    if (json.includes('javascript:') || json.includes('script') || json.includes('lixo')) problems.push('conteúdo perigoso passou')
+    if (json.includes('javascript:') || json.includes('<script') || json.includes('lixo')) problems.push('conteúdo perigoso passou')
     if (!json.includes('https://ok.example/a')) problems.push('link válido foi removido')
-    if (content.length !== 2) problems.push(`${content.length} blocos (esperado 2)`)
+
+    // Ficam o bloco de texto válido, o de texto com id inválido (id gerado) e o de arquivo; o tipo "html", a string
+    // e o null saem. O bloco de arquivo com id inexistente resolve como indisponível, sem nenhum metadado
+    if (content.length !== 3) problems.push(`${content.length} blocos (esperado 3)`)
     if (content.some(block => !/^[A-Za-z0-9_-]{1,64}$/.test(block.id))) problems.push('id de bloco inválido')
+    if (JSON.stringify(res.body?.files?.qualquer) !== JSON.stringify({ id: 'qualquer', available: false }))
+      problems.push(`files: ${JSON.stringify(res.body?.files)}`)
 
     return { ok: !problems.length, detail: problems.join('; ') }
   })
@@ -1988,6 +1993,373 @@ async function runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn })
         read.body?.data?.location?.at(-1)?.id === targets.alfa.folder.id,
       detail: describe(res)
     }
+  })
+
+  section('Site: páginas, conteúdo, referências e concorrência')
+
+  const pagesRoute = siteId => `/api/documents/sites/${siteId}/pages`
+  const mkPage = (session, siteId, body) => api(session, 'POST', pagesRoute(siteId), { json: body })
+  const patchPage = (session, siteId, pageId, body) => api(session, 'PATCH', `${pagesRoute(siteId)}/${pageId}`, { json: body })
+  const movePage = (session, siteId, pageId, body) => api(session, 'POST', `${pagesRoute(siteId)}/${pageId}/move`, { json: body })
+  const siteTree = async siteId => (await api(s.superAdmin, 'GET', `/api/documents/sites/${siteId}`)).body?.data
+  const readPage = (session, siteId, pageId) => api(session, 'GET', `${pagesRoute(siteId)}/${pageId}`)
+  const titles = pages => pages.map(page => page.title).join('|')
+
+  const textOf = (id, text) => ({
+    id,
+    type: 'text',
+    doc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] }
+  })
+
+  const pgRes = (await mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'Site de páginas')).body
+  const pgId = pgRes.data.id
+  const homeId = pgRes.pageId
+  const otherRes = (await mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'Outro site de páginas')).body
+  const otherPageId = otherRes.pageId
+
+  for (const [label, session] of [
+    ['adminAlfa', s.adminAlfa],
+    ['userAlfa', s.userAlfa],
+    ['convidado', s.convidado],
+    ['userBeta (outro workspace)', s.userBeta]
+  ]) {
+    await test(`${label}: criar, editar, mover e excluir páginas → 403`, async () => {
+      const responses = [
+        await mkPage(session, pgId, { title: 'x' }),
+        await patchPage(session, pgId, homeId, { title: 'x' }),
+        await movePage(session, pgId, homeId, { parentId: null, index: 0 }),
+        await api(session, 'DELETE', `${pagesRoute(pgId)}/${homeId}`)
+      ]
+
+      return { ok: responses.every(res => res.status === 403), detail: responses.map(res => res.status).join('/') }
+    })
+  }
+
+  await test('sem sessão: criar, editar, mover e excluir páginas → 401 (ou redirect para /login)', async () => {
+    const responses = [
+      await mkPage(null, pgId, { title: 'x' }),
+      await patchPage(null, pgId, homeId, { title: 'x' }),
+      await movePage(null, pgId, homeId, { parentId: null, index: 0 }),
+      await api(null, 'DELETE', `${pagesRoute(pgId)}/${homeId}`)
+    ]
+
+    return { ok: responses.every(isUnauthenticated), detail: responses.map(res => res.status).join('/') }
+  })
+
+  let secA = null
+  let subA1 = null
+  let subA1a = null
+
+  await test('criar página raiz, subpágina e terceiro nível (superAdmin e subAdmin) → 201 com posição no fim', async () => {
+    const root = await mkPage(s.superAdmin, pgId, { title: 'Seção A' })
+    const sub = await mkPage(s.subAdmin, pgId, { title: 'Sub A1', parentId: root.body?.data?.id })
+    const leaf = await mkPage(s.superAdmin, pgId, { title: 'Sub A1a', parentId: sub.body?.data?.id })
+
+    secA = root.body?.data
+    subA1 = sub.body?.data
+    subA1a = leaf.body?.data
+
+    const problems = []
+
+    if (root.status !== 201 || secA?.position !== 1 || secA?.parentId !== null || secA?.version !== 1) problems.push(`raiz ${describe(root)}`)
+    if (sub.status !== 201 || subA1?.parentId !== secA?.id) problems.push(`sub ${describe(sub)}`)
+    if (leaf.status !== 201 || leaf.body?.data?.content?.length !== 0) problems.push(`terceiro nível ${describe(leaf)}`)
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('quarto nível → 400; pai inexistente ou de outro site → 404; título vazio ou longo → 400', async () => {
+    const [deep, missing, foreign, empty, long] = await Promise.all([
+      mkPage(s.superAdmin, pgId, { title: 'Nível 4', parentId: subA1a.id }),
+      mkPage(s.superAdmin, pgId, { title: 'x', parentId: 'inexistente' }),
+      mkPage(s.superAdmin, pgId, { title: 'x', parentId: otherPageId }),
+      mkPage(s.superAdmin, pgId, { title: '   ' }),
+      mkPage(s.superAdmin, pgId, { title: 'a'.repeat(121) })
+    ])
+
+    const codes = [deep, missing, foreign, empty, long].map(res => res.status)
+
+    return { ok: codes.join('/') === '400/404/404/400/400', detail: codes.join('/') }
+  })
+
+  await test('limite de 100 páginas: a 100ª entra, a 101ª → 409', async () => {
+    const limitSite = (await mkSite(s.superAdmin, alfa.id, sandboxAlfa, 'Site no limite')).body.data.id
+
+    await prisma.documentSitePage.createMany({
+      data: Array.from({ length: 98 }, (_, index) => ({ siteId: limitSite, title: `P${index}`, position: index + 1, content: [] }))
+    })
+
+    const hundredth = await mkPage(s.superAdmin, limitSite, { title: 'Centésima' })
+    const over = await mkPage(s.superAdmin, limitSite, { title: 'Excedente' })
+
+    return { ok: hundredth.status === 201 && over.status === 409, detail: `${hundredth.status}/${over.status}` }
+  })
+
+  await test('renomear: título muda, versão do conteúdo não; vazio e corpo sem campos → 400; auditoria registra', async () => {
+    const renamed = await patchPage(s.superAdmin, pgId, secA.id, { title: 'Seção A2' })
+    const [empty, nothing] = await Promise.all([patchPage(s.superAdmin, pgId, secA.id, { title: '' }), patchPage(s.superAdmin, pgId, secA.id, {})])
+    const audit = await prisma.auditLog.findFirst({ where: { action: 'DOCUMENT_SITE_PAGE_RENAME', entityId: pgId } })
+    const problems = []
+
+    if (renamed.status !== 200 || renamed.body?.data?.title !== 'Seção A2' || renamed.body?.data?.version !== 1)
+      problems.push(`rename ${describe(renamed)}`)
+    if (empty.status !== 400 || nothing.status !== 400) problems.push(`vazio/sem campos ${empty.status}/${nothing.status}`)
+    if (audit?.after?.title !== 'Seção A2' || audit?.metadata?.name !== 'Site de páginas') problems.push('auditoria RENAME')
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('página de OUTRO site em PATCH, DELETE e move → 404 (nunca altera o outro site)', async () => {
+    const responses = [
+      await patchPage(s.superAdmin, pgId, otherPageId, { title: 'invasão' }),
+      await api(s.superAdmin, 'DELETE', `${pagesRoute(pgId)}/${otherPageId}`),
+      await movePage(s.superAdmin, pgId, otherPageId, { parentId: null, index: 0 })
+    ]
+
+    const untouched = await prisma.documentSitePage.findUnique({ where: { id: otherPageId } })
+
+    return {
+      ok: responses.every(res => res.status === 404) && untouched?.title === 'Início',
+      detail: responses.map(res => res.status).join('/')
+    }
+  })
+
+  // Arquivos de teste para os blocos
+  const png = (await upload(s.superAdmin, alfa.id, sandboxAlfa, [{ name: 'img-site.png', type: 'image/png', buffer: makePng() }])).body.data[0]
+  const pdf = (await upload(s.superAdmin, alfa.id, sandboxAlfa, [{ name: 'doc-site.pdf', type: 'application/pdf', buffer: makePdf('Doc do site') }])).body.data[0]
+
+  const goodBlocks = () => [
+    textOf('t1', 'Olá'),
+    { id: 'i1', type: 'image', fileId: png.id, alt: 'Logo', caption: 'Legenda', width: 'full' },
+    { id: 'f1', type: 'file', fileId: pdf.id, label: 'Manual', description: 'PDF do manual' },
+    { id: 'l1', type: 'link', url: 'https://example.com/ref', label: 'Referência', description: '' }
+  ]
+
+  let version = 1
+
+  await test('salvar conteúdo (texto, imagem, arquivo, link) → 200, versão 2, referências resolvidas, "Modificado em" avança', async () => {
+    const before = (await prisma.documentFile.findUnique({ where: { id: pgId } })).updatedAt
+    const res = await patchPage(s.superAdmin, pgId, secA.id, { content: goodBlocks(), baseVersion: 1 })
+    const after = (await prisma.documentFile.findUnique({ where: { id: pgId } })).updatedAt
+    const problems = []
+
+    if (res.status !== 200) return { ok: false, detail: describe(res) }
+
+    version = res.body.data.version
+
+    if (version !== 2 || res.body.data.content.length !== 4) problems.push(`versão ${version}, ${res.body.data.content.length} blocos`)
+    if (!res.body.files?.[png.id]?.available || !res.body.files?.[pdf.id]?.available) problems.push('referências não resolvidas')
+    if (JSON.stringify(res.body).includes('storageKey')) problems.push('expõe storageKey')
+    if (after <= before) problems.push('Modificado em não avançou')
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('versão antiga → 409 com a versão atual; sem baseVersion → 400', async () => {
+    const [stale, missing] = await Promise.all([
+      patchPage(s.superAdmin, pgId, secA.id, { content: goodBlocks(), baseVersion: 1 }),
+      patchPage(s.superAdmin, pgId, secA.id, { content: goodBlocks() })
+    ])
+
+    return {
+      ok: stale.status === 409 && stale.body?.currentVersion === version && missing.status === 400,
+      detail: `${describe(stale)} | ${missing.status}`
+    }
+  })
+
+  await test('duas gravações simultâneas com a mesma versão: exatamente uma 200 e uma 409', async () => {
+    const [first, second] = await Promise.all([
+      patchPage(s.superAdmin, pgId, secA.id, { content: [textOf('c1', 'um')], baseVersion: version }),
+      patchPage(s.subAdmin, pgId, secA.id, { content: [textOf('c2', 'dois')], baseVersion: version })
+    ])
+
+    const codes = [first.status, second.status].sort()
+
+    if (codes.join('/') === '200/409') version += 1
+
+    return { ok: codes.join('/') === '200/409', detail: codes.join('/') }
+  })
+
+  await test('renomear não invalida a gravação em andamento (só o conteúdo tem versão)', async () => {
+    await patchPage(s.superAdmin, pgId, secA.id, { title: 'Seção A3' })
+
+    const res = await patchPage(s.superAdmin, pgId, secA.id, { content: goodBlocks(), baseVersion: version })
+
+    if (res.status === 200) version = res.body.data.version
+
+    return { ok: res.status === 200 && res.body.data.title === 'Seção A3', detail: describe(res) }
+  })
+
+  await test('conteúdo inválido → 400: não é lista, 201 blocos, ids repetidos ou inválidos, tipo e link inválidos', async () => {
+    const attempts = {
+      'não é lista': { content: 'texto' },
+      '201 blocos': { content: Array.from({ length: 201 }, (_, index) => textOf(`b${index}`, 'x')) },
+      'ids repetidos': { content: [textOf('dup', 'a'), textOf('dup', 'b')] },
+      'id inválido': { content: [textOf('id inválido!', 'a')] },
+      'tipo desconhecido': { content: [{ id: 'h1', type: 'html', html: '<b>x</b>' }] },
+      'link javascript:': { content: [{ id: 'l2', type: 'link', url: 'javascript:alert(1)' }] },
+      'link sem endereço': { content: [{ id: 'l3', type: 'link', url: '' }] }
+    }
+
+    const failures = []
+
+    for (const [label, body] of Object.entries(attempts)) {
+      const res = await patchPage(s.superAdmin, pgId, secA.id, { ...body, baseVersion: version })
+
+      if (res.status !== 400) failures.push(`${label}: ${res.status}`)
+    }
+
+    return { ok: !failures.length, detail: failures.join('; ') }
+  })
+
+  await test('conteúdo acima de 512 KB (bytes UTF-8) → 413', async () => {
+    const res = await patchPage(s.superAdmin, pgId, secA.id, {
+      content: [textOf('grande', 'é'.repeat(300 * 1024))],
+      baseVersion: version
+    })
+
+    return status(res, 413)
+  })
+
+  await test('referências inválidas → 400: outro workspace, PDF em bloco de imagem, um Site, id inexistente', async () => {
+    const attempts = {
+      'arquivo de outro workspace': [{ id: 'f9', type: 'file', fileId: targets.beta.file.id }],
+      'PDF em bloco de imagem': [{ id: 'i9', type: 'image', fileId: pdf.id }],
+      'Site como arquivo': [{ id: 'f8', type: 'file', fileId: pgId }],
+      'id inexistente': [{ id: 'f7', type: 'file', fileId: 'inexistente123' }]
+    }
+
+    const failures = []
+
+    for (const [label, content] of Object.entries(attempts)) {
+      const res = await patchPage(s.superAdmin, pgId, secA.id, { content, baseVersion: version })
+
+      if (res.status !== 400) failures.push(`${label}: ${res.status}`)
+    }
+
+    return { ok: !failures.length, detail: failures.join('; ') }
+  })
+
+  await test('texto com marca de link javascript: é gravado sem o link perigoso', async () => {
+    const block = {
+      id: 'x1',
+      type: 'text',
+      doc: {
+        type: 'doc',
+        content: [
+          { type: 'paragraph', content: [{ type: 'text', text: 'clique', marks: [{ type: 'link', attrs: { href: 'javascript:alert(1)' } }] }] }
+        ]
+      }
+    }
+
+    const res = await patchPage(s.superAdmin, pgId, secA.id, { content: [block], baseVersion: version })
+
+    if (res.status === 200) version = res.body.data.version
+
+    return { ok: res.status === 200 && !JSON.stringify(res.body.data.content).includes('javascript:'), detail: describe(res) }
+  })
+
+  await test('restaurar os blocos com arquivos; leitura por admin e user traz os metadados (sem storageKey)', async () => {
+    const saved = await patchPage(s.superAdmin, pgId, secA.id, { content: goodBlocks(), baseVersion: version })
+
+    if (saved.status === 200) version = saved.body.data.version
+
+    const [admin, user] = await Promise.all([readPage(s.adminAlfa, pgId, secA.id), readPage(s.userAlfa, pgId, secA.id)])
+    const ok = [admin, user].every(res => res.status === 200 && res.body.files?.[png.id]?.available && res.body.files?.[png.id]?.name === 'img-site.png')
+
+    return { ok: saved.status === 200 && ok && !JSON.stringify(admin.body).includes('storageKey'), detail: describe(saved) }
+  })
+
+  await test('arquivo movido continua resolvendo; arquivo excluído vira { id, available: false } sem metadado', async () => {
+    const moved = await api(s.superAdmin, 'POST', `/api/documents/files/${pdf.id}/move`, { json: { targetFolderId: targets.alfa.folder.id } })
+    const afterMove = await readPage(s.userAlfa, pgId, secA.id)
+    const removed = await api(s.superAdmin, 'DELETE', `/api/documents/files/${png.id}`)
+    const afterDelete = await readPage(s.userAlfa, pgId, secA.id)
+    const problems = []
+
+    if (moved.status !== 200 || !afterMove.body?.files?.[pdf.id]?.available) problems.push('arquivo movido não resolve')
+    if (removed.status !== 200) problems.push(`excluir imagem ${removed.status}`)
+    if (JSON.stringify(afterDelete.body?.files?.[png.id]) !== JSON.stringify({ id: png.id, available: false }))
+      problems.push(`excluído: ${JSON.stringify(afterDelete.body?.files?.[png.id])}`)
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('auditoria: criar, renomear e salvar conteúdo (uma entrada por usuário a cada 15 min)', async () => {
+    const [created, updates] = await Promise.all([
+      prisma.auditLog.count({ where: { action: 'DOCUMENT_SITE_PAGE_CREATE', entityId: pgId } }),
+      prisma.auditLog.count({ where: { action: 'DOCUMENT_SITE_PAGE_UPDATE', entityId: pgId, userId: (await prisma.user.findUnique({ where: { email: MOCK_USERS.superAdmin.email } })).id } })
+    ])
+
+    return { ok: created >= 3 && updates === 1, detail: `criações=${created} salvamentos(superAdmin)=${updates}` }
+  })
+
+  await test('mover: reordenar, renumerar 0..n-1, subir e descer', async () => {
+    const r3 = (await mkPage(s.superAdmin, pgId, { title: 'R3' })).body.data
+    const r4 = (await mkPage(s.superAdmin, pgId, { title: 'R4' })).body.data
+
+    const toFront = await movePage(s.superAdmin, pgId, r4.id, { parentId: null, index: 1 })
+    const roots = (await siteTree(pgId)).pages.filter(page => !page.parentId).sort((a, b) => a.position - b.position)
+    const problems = []
+
+    if (toFront.status !== 200) problems.push(`mover ${describe(toFront)}`)
+    if (titles(roots) !== 'Início|R4|Seção A3|R3') problems.push(`ordem ${titles(roots)}`)
+    if (roots.map(page => page.position).join(',') !== '0,1,2,3') problems.push(`posições ${roots.map(page => page.position)}`)
+
+    const down = await movePage(s.superAdmin, pgId, r4.id, { parentId: null, index: 2 })
+    const after = (await siteTree(pgId)).pages.filter(page => !page.parentId).sort((a, b) => a.position - b.position)
+
+    if (down.status !== 200 || titles(after) !== 'Início|Seção A3|R4|R3') problems.push(`descer ${titles(after)}`)
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('mover: ciclo, nível além de 3, destino de outro site ou inexistente → 400', async () => {
+    const r3 = (await siteTree(pgId)).pages.find(page => page.title === 'R3')
+
+    const [cycle, deep, foreign, missing, self] = await Promise.all([
+      movePage(s.superAdmin, pgId, secA.id, { parentId: subA1a.id }),
+      movePage(s.superAdmin, pgId, secA.id, { parentId: r3.id }),
+      movePage(s.superAdmin, pgId, secA.id, { parentId: otherPageId }),
+      movePage(s.superAdmin, pgId, secA.id, { parentId: 'inexistente' }),
+      movePage(s.superAdmin, pgId, secA.id, { parentId: secA.id })
+    ])
+
+    const codes = [cycle, deep, foreign, missing, self].map(res => res.status)
+
+    return { ok: codes.every(code => code === 400), detail: codes.join('/') }
+  })
+
+  await test('mover um bloco de páginas para a raiz e depois excluir com subpáginas (cascata)', async () => {
+    const leafToRoot = await movePage(s.superAdmin, pgId, subA1a.id, { parentId: null, index: 99 })
+    const child = (await mkPage(s.superAdmin, pgId, { title: 'Folha', parentId: subA1.id })).body.data
+    const removed = await api(s.superAdmin, 'DELETE', `${pagesRoute(pgId)}/${subA1.id}`)
+    const rows = await prisma.documentSitePage.count({ where: { id: { in: [subA1.id, child.id] } } })
+    const gone = await readPage(s.superAdmin, pgId, child.id)
+    const problems = []
+
+    if (leafToRoot.status !== 200) problems.push(`mover ${describe(leafToRoot)}`)
+    if (removed.status !== 200 || removed.body?.deleted !== 2) problems.push(`excluir ${describe(removed)}`)
+    if (rows) problems.push(`${rows} linha(s) restante(s)`)
+    if (gone.status !== 404) problems.push(`página excluída lê ${gone.status}`)
+
+    return { ok: !problems.length, detail: problems.join('; ') }
+  })
+
+  await test('a página inicial não pode ser excluída → 400; outra raiz pode virar a inicial', async () => {
+    const home = await api(s.superAdmin, 'DELETE', `${pagesRoute(pgId)}/${homeId}`)
+    const moved = await movePage(s.superAdmin, pgId, secA.id, { parentId: null, index: 0 })
+    const data = await siteTree(pgId)
+    const problems = []
+
+    if (home.status !== 400) problems.push(`excluir inicial ${home.status}`)
+    if (moved.status !== 200 || data.homePageId !== secA.id) problems.push(`nova inicial: ${data.homePageId}`)
+
+    const oldHome = await api(s.superAdmin, 'DELETE', `${pagesRoute(pgId)}/${homeId}`)
+
+    if (oldHome.status !== 200) problems.push(`excluir antiga inicial ${oldHome.status}`)
+
+    return { ok: !problems.length, detail: problems.join('; ') }
   })
 
   section('Site: exclusão (sem tocar no storage) e cascata')

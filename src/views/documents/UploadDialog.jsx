@@ -48,15 +48,43 @@ function uploadWithProgress({ file, workspaceId, folderId, onProgress }) {
         data = {}
       }
 
-      resolve({ ok: xhr.status >= 200 && xhr.status < 300, data })
+      resolve({ ok: xhr.status >= 200 && xhr.status < 300, status: xhr.status, data })
     }
 
-    xhr.onerror = () => resolve({ ok: false, data: { message: 'Erro de conexão' } })
+    xhr.onerror = () => resolve({ ok: false, status: 0, data: { message: 'Erro de conexão' } })
     xhr.send(formData)
   })
 }
 
-const UploadDialog = ({ open, workspaceId, folderId, maxFileSizeMb, onClose, onUploaded }) => {
+// Bloco de imagem do Site: só o que a pré-visualização inline do módulo exibe
+const IMAGE_EXTENSIONS = ['png', 'jpg', 'jpeg', 'webp']
+
+const IMAGE_ACCEPT = {
+  'image/png': ['.png'],
+  'image/jpeg': ['.jpg', '.jpeg'],
+  'image/webp': ['.webp']
+}
+
+/**
+ * Opções (todas opcionais; sem elas o diálogo é o de sempre):
+ * - imagesOnly: aceita só PNG, JPG e WebP
+ * - single: um arquivo por vez (o novo substitui o da fila)
+ * - title: título do diálogo
+ * - conflictHint: texto acrescentado ao erro de nome repetido (409)
+ * `onUploaded` recebe a lista dos arquivos criados (quem não precisa dela pode ignorar).
+ */
+const UploadDialog = ({
+  open,
+  workspaceId,
+  folderId,
+  maxFileSizeMb,
+  onClose,
+  onUploaded,
+  imagesOnly = false,
+  single = false,
+  title = 'Enviar arquivos',
+  conflictHint = ''
+}) => {
   const [queue, setQueue] = useState([])
   const [uploading, setUploading] = useState(false)
 
@@ -67,7 +95,14 @@ const UploadDialog = ({ open, workspaceId, folderId, maxFileSizeMb, onClose, onU
   }, [open])
 
   const validateFile = file => {
-    if (!getDocumentFileType(file.name)) return 'Tipo de arquivo não permitido'
+    const type = getDocumentFileType(file.name)
+
+    if (!type) return 'Tipo de arquivo não permitido'
+
+    if (imagesOnly && !IMAGE_EXTENSIONS.includes(file.name.split('.').pop().toLowerCase())) {
+      return 'Envie uma imagem PNG, JPG ou WebP'
+    }
+
     if (file.size > maxBytes) return `Excede o limite de ${maxFileSizeMb} MB`
 
     return ''
@@ -86,12 +121,12 @@ const UploadDialog = ({ open, workspaceId, folderId, maxFileSizeMb, onClose, onU
       }
     })
 
-    setQueue(prev => [...prev, ...items])
+    setQueue(prev => (single ? items.slice(0, 1) : [...prev, ...items]))
   }
 
   const { getRootProps, getInputProps, isDragActive } = useDropzone({
-    accept: getDropzoneAccept(),
-    multiple: true,
+    accept: imagesOnly ? IMAGE_ACCEPT : getDropzoneAccept(),
+    multiple: !single,
     disabled: uploading,
 
     // Validação própria (mensagens em pt-BR): aceitos e rejeitados entram na fila
@@ -110,6 +145,7 @@ const UploadDialog = ({ open, workspaceId, folderId, maxFileSizeMb, onClose, onU
 
     let successCount = 0
     let errorCount = 0
+    const created = []
 
     // Um arquivo por requisição: progresso individual e corpo sempre abaixo do limite do servidor
     for (const item of pendingItems) {
@@ -124,10 +160,14 @@ const UploadDialog = ({ open, workspaceId, folderId, maxFileSizeMb, onClose, onU
 
       if (result.ok) {
         successCount++
+        created.push(...(result.data?.data ?? []))
         updateItem(item.id, { status: 'done', progress: 100 })
       } else {
         errorCount++
-        updateItem(item.id, { status: 'error', error: result.data?.message || 'Erro ao enviar' })
+
+        const hint = result.status === 409 && conflictHint ? ` ${conflictHint}` : ''
+
+        updateItem(item.id, { status: 'error', error: `${result.data?.message || 'Erro ao enviar'}${hint}` })
       }
     }
 
@@ -135,7 +175,7 @@ const UploadDialog = ({ open, workspaceId, folderId, maxFileSizeMb, onClose, onU
 
     if (successCount) {
       toast.success(successCount === 1 ? 'Arquivo enviado!' : `${successCount} arquivos enviados!`)
-      onUploaded()
+      onUploaded(created)
     }
 
     if (errorCount) {
@@ -154,7 +194,7 @@ const UploadDialog = ({ open, workspaceId, folderId, maxFileSizeMb, onClose, onU
 
   return (
     <Dialog open={open} onClose={handleClose} maxWidth='sm' fullWidth>
-      <DialogTitle>Enviar arquivos</DialogTitle>
+      <DialogTitle>{title}</DialogTitle>
       <DialogContent>
         <AppReactDropzone>
           <div {...getRootProps({ className: 'dropzone !min-bs-[180px]' })}>
@@ -162,10 +202,17 @@ const UploadDialog = ({ open, workspaceId, folderId, maxFileSizeMb, onClose, onU
             <div className='flex flex-col items-center gap-2 text-center'>
               <i className='tabler-cloud-upload text-4xl text-[var(--mui-palette-primary-main)]' />
               <p className='font-medium'>
-                {isDragActive ? 'Solte os arquivos aqui' : 'Arraste arquivos ou clique para selecionar'}
+                {isDragActive
+                  ? single
+                    ? 'Solte o arquivo aqui'
+                    : 'Solte os arquivos aqui'
+                  : single
+                    ? 'Arraste um arquivo ou clique para selecionar'
+                    : 'Arraste arquivos ou clique para selecionar'}
               </p>
               <p className={`text-xs ${formMutedCls}`}>
-                Até {maxFileSizeMb} MB por arquivo · {DOCUMENT_ALLOWED_EXTENSIONS.map(ext => `.${ext}`).join(', ')}
+                Até {maxFileSizeMb} MB por arquivo ·{' '}
+                {(imagesOnly ? IMAGE_EXTENSIONS : DOCUMENT_ALLOWED_EXTENSIONS).map(ext => `.${ext}`).join(', ')}
               </p>
             </div>
           </div>
