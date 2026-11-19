@@ -18,7 +18,7 @@ export default async function PublicFormPage({ params }) {
 
   if (inactiveReason === 'revoked') {
     return (
-      <div className='flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center'>
+      <div className='flex flex-col items-center justify-center min-h-dvh gap-4 p-6 text-center'>
         <i className='tabler-link-off text-5xl text-gray-400' />
         <h1 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>Link desativado</h1>
         <p className='text-sm text-gray-500'>Este link foi desativado e não aceita respostas.</p>
@@ -28,7 +28,7 @@ export default async function PublicFormPage({ params }) {
 
   if (inactiveReason === 'used') {
     return (
-      <div className='flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center'>
+      <div className='flex flex-col items-center justify-center min-h-dvh gap-4 p-6 text-center'>
         <i className='tabler-link-off text-5xl text-gray-400' />
         <h1 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>Link já utilizado</h1>
         <p className='text-sm text-gray-500'>
@@ -40,7 +40,7 @@ export default async function PublicFormPage({ params }) {
 
   if (inactiveReason === 'expired') {
     return (
-      <div className='flex flex-col items-center justify-center min-h-screen gap-4 p-6 text-center'>
+      <div className='flex flex-col items-center justify-center min-h-dvh gap-4 p-6 text-center'>
         <i className='tabler-clock-off text-5xl text-gray-400' />
         <h1 className='text-xl font-semibold text-gray-900 dark:text-gray-100'>Link expirado</h1>
         <p className='text-sm text-gray-500'>
@@ -51,7 +51,7 @@ export default async function PublicFormPage({ params }) {
   }
 
   return (
-    <div className='min-h-screen bg-gray-50 dark:bg-gray-900 py-10'>
+    <div className='min-h-dvh bg-backgroundDefault py-10'>
       <FormFillView
         form={toClientForm({
           id: link.form.id,

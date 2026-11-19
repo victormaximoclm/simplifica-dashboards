@@ -15,7 +15,7 @@ const PublicFormPage = async ({ params }) => {
 
   if (!publicLink) {
     return (
-      <main className='min-h-screen flex items-center justify-center p-6'>
+      <main className='min-h-dvh flex items-center justify-center p-6'>
         <p className='text-red-500 text-center'>Link inválido</p>
       </main>
     )
@@ -25,7 +25,7 @@ const PublicFormPage = async ({ params }) => {
 
   if (inactiveReason === 'revoked') {
     return (
-      <main className='min-h-screen flex items-center justify-center p-6'>
+      <main className='min-h-dvh flex items-center justify-center p-6'>
         <p className='text-red-500 text-center'>Link desativado. Não é possível enviar respostas.</p>
       </main>
     )
@@ -33,7 +33,7 @@ const PublicFormPage = async ({ params }) => {
 
   if (inactiveReason === 'used') {
     return (
-      <main className='min-h-screen flex items-center justify-center p-6'>
+      <main className='min-h-dvh flex items-center justify-center p-6'>
         <p className='text-red-500 text-center'>Link já utilizado. Não é possível enviar outra resposta.</p>
       </main>
     )
@@ -41,7 +41,7 @@ const PublicFormPage = async ({ params }) => {
 
   if (inactiveReason === 'expired') {
     return (
-      <main className='min-h-screen flex items-center justify-center p-6'>
+      <main className='min-h-dvh flex items-center justify-center p-6'>
         <p className='text-red-500 text-center'>Link expirado. Não é possível enviar respostas.</p>
       </main>
     )
@@ -50,7 +50,7 @@ const PublicFormPage = async ({ params }) => {
   const { form } = publicLink
 
   return (
-    <main className='min-h-screen bg-gray-50 dark:bg-gray-950 py-8'>
+    <main className='min-h-dvh bg-gray-50 dark:bg-gray-950 py-8'>
       <FormFillView
         form={toClientForm({
           id: form.id,

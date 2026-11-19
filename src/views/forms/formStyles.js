@@ -1,57 +1,120 @@
 /**
- * Estilos do módulo de formulários (somente este módulo).
- * Paleta MUI: textos brancos, botões primary + contrastText, inputs em background-paper.
+ * Estilos do módulo de formulários (formulários, documentos e visualizador de PDF).
+ * Cores sempre pelos tokens do tema (text-primary, background-paper), para funcionar no modo claro e no escuro.
+ *
+ * Os utilitários do Tailwind são !important neste projeto: não empilhe dois tamanhos ou duas cores de texto na mesma
+ * classe (vence o que vier por último no CSS, não no className). Para cada papel há um token completo.
  */
 
 const cursor = 'cursor-pointer'
 
-const textWhite = 'text-[var(--mui-palette-common-white)]'
-const textWhiteSoft = 'text-[var(--mui-palette-text-secondary)]'
+const textMain = 'text-[var(--mui-palette-text-primary)]'
+const textSoft = 'text-[var(--mui-palette-text-secondary)]'
 const inputPaper = 'bg-[var(--mui-palette-background-paper)]'
 const borderDivider = 'border-[var(--mui-palette-divider)]'
 
-/** Base visual de todos os botões do módulo */
-const btnFormBase = [
-  'inline-flex items-center justify-center font-medium transition-colors rounded-lg',
+/** Anel de foco visível só para teclado */
+const focusRing =
+  'focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-[var(--mui-palette-primary-main)]'
+
+/** Layout comum a todos os botões; a cor vem de cada variante */
+const btnLayout = [
+  'inline-flex items-center justify-center font-medium transition-colors rounded-lg select-none',
   cursor,
+  focusRing,
+  'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none'
+].join(' ')
+
+/** Ação principal: sólido, no máximo um por área da tela */
+const btnSolid = [
+  btnLayout,
   'text-[var(--mui-palette-primary-contrastText)]',
   'bg-[var(--mui-palette-primary-main)]',
   'hover:bg-[var(--mui-palette-primary-dark)]',
-  'disabled:opacity-50 disabled:cursor-not-allowed disabled:pointer-events-none',
   'shadow-[var(--mui-customShadows-primary-sm)]'
 ].join(' ')
 
-export const btnPrimary = [btnFormBase, 'gap-2 px-4 py-2 text-sm'].join(' ')
+/** Ação de apoio: contorno neutro */
+const btnOutline = [
+  btnLayout,
+  textMain,
+  'border border-[var(--mui-palette-divider)]',
+  'bg-transparent hover:bg-[var(--mui-palette-action-hover)] hover:border-[var(--mui-palette-text-disabled)]'
+].join(' ')
 
-export const btnPrimarySm = [btnFormBase, 'gap-1.5 px-4 py-1.5 text-xs shrink-0'].join(' ')
+/** Ação de destaque leve: fundo tonal na cor primária */
+const btnTonal = [
+  btnLayout,
+  'text-[var(--mui-palette-primary-main)]',
+  'bg-[var(--mui-palette-primary-lightOpacity)]',
+  'hover:bg-[var(--mui-palette-primary-lighterOpacity)]'
+].join(' ')
 
-/** Alias — mesmo padrão laranja + texto branco */
-export const btnPrimarySoft = btnPrimarySm
-export const btnSecondary = btnPrimarySm
-export const btnDangerSoft = btnPrimarySm
+/** Ação destrutiva: tonal em vermelho */
+const btnDanger = [
+  btnLayout,
+  'text-[var(--mui-palette-error-main)]',
+  'bg-[var(--mui-palette-error-lightOpacity)]',
+  'hover:bg-[var(--mui-palette-error-lighterOpacity)]',
+  'focus-visible:outline-[var(--mui-palette-error-main)]'
+].join(' ')
 
-export const btnIcon = [btnFormBase, 'w-8 h-8 shrink-0'].join(' ')
+export const btnPrimary = [btnSolid, 'gap-2 px-4 py-2 text-sm'].join(' ')
 
-export const btnDashed = [btnFormBase, 'gap-2 w-full py-3 text-sm'].join(' ')
+export const btnPrimarySm = [btnSolid, 'gap-1.5 px-4 py-1.5 text-xs shrink-0'].join(' ')
+
+/** Ação de apoio, mesmo tamanho do botão primário */
+export const btnOutlined = [
+  btnLayout,
+  'gap-2 px-4 py-2 text-sm bg-transparent border',
+  'text-[var(--page-fg)] border-[var(--page-border)] hover:bg-[var(--page-hover)]'
+].join(' ')
+
+/** Variantes compactas dos cartões e listas */
+export const btnPrimarySoft = [btnTonal, 'gap-1.5 px-3 py-1.5 text-xs shrink-0'].join(' ')
+export const btnSecondary = [btnOutline, 'gap-1.5 px-3 py-1.5 text-xs shrink-0'].join(' ')
+export const btnDangerSoft = [btnDanger, 'gap-1.5 px-3 py-1.5 text-xs shrink-0'].join(' ')
+
+/** Botão só de ícone (voltar, fechar): neutro, com área de toque de 36px */
+export const btnIcon = [btnOutline, 'w-9 h-9 shrink-0'].join(' ')
+
+/** Adicionar item (campo, regra, opção): tracejado, não compete com o botão principal */
+export const btnDashed = [
+  btnLayout,
+  'gap-2 w-full py-3 text-sm border border-dashed bg-transparent',
+  'text-[var(--mui-palette-primary-main)]',
+  'border-[var(--mui-palette-primary-main)]',
+  'hover:bg-[var(--mui-palette-primary-lighterOpacity)]'
+].join(' ')
+
 
 export const inputFocus =
   'focus:outline-none focus:border-[var(--mui-palette-primary-main)] focus:ring-1 focus:ring-[var(--mui-palette-primary-main)]'
 
-export const formTitleCls = `text-2xl font-semibold ${textWhite}`
+export const formTitleCls = 'text-xl sm:text-2xl font-semibold text-[var(--page-fg)]'
 
-export const formHeadingCls = `text-xl sm:text-2xl font-semibold ${textWhite}`
+/** Título de cartão ou de item de lista */
+export const formCardTitleCls = `text-base font-semibold ${textMain}`
 
-export const formSubtitleCls = `text-sm ${textWhiteSoft}`
+/** Título de tela vazia */
+export const formEmptyTitleCls = 'text-xl font-medium text-[var(--page-fg)]'
 
-export const formMutedCls = `text-sm ${textWhiteSoft}`
+export const formHeadingCls = `text-xl sm:text-2xl font-semibold ${textMain}`
 
-export const formCaptionCls = `text-xs ${textWhiteSoft}`
+export const formSubtitleCls = 'text-sm text-[var(--page-fg-soft)]'
+
+/** Texto de apoio direto sobre a página (estados vazios) */
+export const formPageMutedCls = 'text-sm text-[var(--page-fg-soft)]'
+
+export const formMutedCls = `text-sm ${textSoft}`
+
+export const formCaptionCls = `text-xs ${textSoft}`
 
 export const formIconMutedCls = `text-[var(--mui-palette-text-disabled)]`
 
-export const formLabelCls = `block text-sm font-medium ${textWhite} mb-1.5`
+export const formLabelCls = `block text-sm font-medium ${textMain} mb-1.5`
 
-export const formCheckboxLabelCls = `text-sm ${textWhite}`
+export const formCheckboxLabelCls = `text-sm ${textMain}`
 
 export const formRequiredCls = 'text-[var(--mui-palette-error-main)] ml-1'
 
@@ -61,7 +124,7 @@ export const formInputCls = [
   'w-full px-3 py-2 rounded-lg border text-sm transition',
   inputPaper,
   borderDivider,
-  textWhite,
+  textMain,
   'placeholder:text-[var(--mui-palette-text-disabled)]',
   inputFocus
 ].join(' ')
@@ -96,7 +159,7 @@ export const formDropdownCls = [formDropdownPanelCls, 'max-h-52 overflow-y-auto'
 const dropdownRowBase = [
   'block w-full text-left px-3.5 py-2 text-sm !cursor-pointer transition-colors',
   '!bg-transparent !border-0 !rounded-none !shadow-none',
-  textWhite,
+  textMain,
   'hover:!bg-[var(--mui-palette-primary-lightOpacity)]'
 ].join(' ')
 
@@ -116,7 +179,7 @@ export const formSelectTriggerCls = [
   'w-full flex items-center justify-between gap-2 px-3 py-2 rounded-lg border text-sm text-left transition',
   inputPaper,
   borderDivider,
-  textWhite,
+  textMain,
   cursor,
   'disabled:opacity-50 disabled:cursor-not-allowed',
   inputFocus
@@ -124,7 +187,7 @@ export const formSelectTriggerCls = [
 
 export const formDropdownOptionCls = [
   'flex items-center justify-between gap-2 px-3.5 py-2 text-sm transition-colors',
-  textWhite,
+  textMain,
   cursor
 ].join(' ')
 
@@ -134,12 +197,12 @@ export const formDropdownOptionActiveCls = 'bg-[var(--mui-palette-primary-lightO
 export const formDropdownOptionSelectedCls =
   'bg-[var(--mui-palette-action-hover)] !text-[var(--mui-palette-primary-main)] font-medium'
 
-export const formDropdownEmptyCls = `px-3.5 py-2 text-sm ${textWhiteSoft}`
+export const formDropdownEmptyCls = `px-3.5 py-2 text-sm ${textSoft}`
 
 export const formChipCls = [
   'inline-flex items-center gap-1.5 pl-2.5 pr-1 py-1 rounded-full text-xs font-medium',
   'bg-[var(--mui-palette-primary-lightOpacity)]',
-  textWhite,
+  textMain,
   'border border-[var(--mui-palette-primary-main)]'
 ].join(' ')
 
@@ -148,7 +211,7 @@ export const formChipCustomCls = formChipCls
 export const formChipBadgeCls = [
   'px-2 py-0.5 rounded-full text-xs',
   'bg-[var(--mui-palette-primary-lightOpacity)]',
-  textWhite,
+  textMain,
   'border border-[var(--mui-palette-primary-main)]'
 ].join(' ')
 
@@ -179,20 +242,20 @@ export const formListItemCls = [
   inputPaper
 ].join(' ')
 
-export const formSectionTitleCls = `text-sm font-semibold ${textWhite}`
+export const formSectionTitleCls = `text-sm font-semibold ${textMain}`
 
 export const formChipRemoveBtnCls = [
   'w-5 h-5 flex items-center justify-center rounded-full !cursor-pointer',
-  textWhite,
+  textMain,
   'hover:bg-[var(--mui-palette-primary-lighterOpacity)]'
 ].join(' ')
 
 /** CustomTextField — labels e valores brancos; fundo paper no campo */
 export const formTextFieldSx = {
   '& .MuiInputLabel-root': {
-    color: 'var(--mui-palette-common-white)',
+    color: 'var(--mui-palette-text-primary)',
     '&.Mui-focused:not(.Mui-error)': {
-      color: 'var(--mui-palette-common-white) !important'
+      color: 'var(--mui-palette-text-primary) !important'
     },
     '&.Mui-error': {
       color: 'var(--mui-palette-error-main)'
@@ -206,7 +269,7 @@ export const formTextFieldSx = {
     borderColor: 'var(--mui-palette-divider)'
   },
   '& .MuiInputBase-input': {
-    color: 'var(--mui-palette-common-white)'
+    color: 'var(--mui-palette-text-primary)'
   },
   '& .MuiInputBase-input::placeholder': {
     color: 'var(--mui-palette-text-disabled)',
@@ -224,11 +287,11 @@ export const formBuilderAsideCls = [inputPaper, 'border-[var(--mui-palette-divid
 
 export const formBuilderMainCls = inputPaper
 
-export const formBuilderFieldLabelCls = `text-xs font-medium ${textWhite} uppercase tracking-wide`
+export const formBuilderFieldLabelCls = `text-xs font-medium ${textMain}`
 
-export const formBuilderPanelTitleCls = `font-semibold text-sm ${textWhite}`
+export const formBuilderPanelTitleCls = `font-semibold text-sm ${textMain}`
 
-export const formBuilderSectionTitleCls = `text-xs font-semibold uppercase tracking-widest ${textWhiteSoft}`
+export const formBuilderSectionTitleCls = `text-xs font-semiboldst ${textSoft}`
 
 export const formBuilderFieldRowCls = [
   'flex items-center gap-3 px-4 py-3 rounded-xl border transition !cursor-pointer',
@@ -244,9 +307,9 @@ export const formBuilderFieldRowSelectedCls = [
   'bg-[var(--mui-palette-primary-lightOpacity)]'
 ].join(' ')
 
-export const formBuilderFieldRowTitleCls = `text-sm font-medium ${textWhite} truncate`
+export const formBuilderFieldRowTitleCls = `text-sm font-medium ${textMain} truncate`
 
-export const formBuilderFieldRowMetaCls = `text-xs ${textWhiteSoft}`
+export const formBuilderFieldRowMetaCls = `text-xs ${textSoft}`
 
 export const formBuilderEmptyCls = [
   'flex flex-col items-center justify-center py-16 gap-3 border-2 border-dashed rounded-2xl',
@@ -257,7 +320,7 @@ export const formBuilderEmptyCls = [
 export const formBuilderTitleInputCls = [
   'text-lg font-semibold border-none outline-none w-full min-w-0',
   inputPaper,
-  textWhite,
+  textMain,
   'placeholder:text-[var(--mui-palette-text-disabled)]'
 ].join(' ')
 
@@ -278,7 +341,7 @@ export const formBuilderTypeBtnCls = [
   'hover:bg-[var(--mui-palette-primary-lighterOpacity)]'
 ].join(' ')
 
-export const formBuilderTypeBtnLabelCls = `text-sm font-medium ${textWhite}`
+export const formBuilderTypeBtnLabelCls = `text-sm font-medium ${textMain}`
 
 export const formBuilderTypeBtnIconWrapCls = [
   'w-8 h-8 rounded-lg flex items-center justify-center',
@@ -287,7 +350,7 @@ export const formBuilderTypeBtnIconWrapCls = [
 
 export const formBuilderIconBtnCls = [
   'w-7 h-7 flex items-center justify-center rounded-lg transition !cursor-pointer',
-  textWhiteSoft,
+  textSoft,
   'hover:bg-[var(--mui-palette-primary-lighterOpacity)]',
-  'hover:text-[var(--mui-palette-common-white)]'
+  'hover:text-[var(--mui-palette-text-primary)]'
 ].join(' ')

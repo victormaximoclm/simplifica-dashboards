@@ -15,15 +15,17 @@ import ShareFormDialog from './builder/ShareFormDialog'
 
 import {
   btnPrimary,
-  btnPrimarySoft,
+  btnPrimarySm,
   btnSecondary,
   btnDangerSoft,
   formCardCls,
   formCardIconBgCls,
+  formCardTitleCls,
+  formEmptyTitleCls,
   formChipBadgeCls,
   formDividerCls,
-  formIconMutedCls,
   formMutedCls,
+  formPageMutedCls,
   formPageCls,
   formSubtitleCls,
   formSuccessTextCls,
@@ -93,9 +95,9 @@ return
   if (!forms?.length) {
     return (
       <div className='flex flex-col items-center justify-center min-h-[60vh] gap-4'>
-        <i className={`tabler-forms text-6xl ${formIconMutedCls}`} />
-        <h4 className={`text-xl font-medium ${formTitleCls}`}>Nenhum formulário disponível</h4>
-        <p className={`${formMutedCls} text-center max-w-md`}>Nenhum formulário encontrado para o seu perfil.</p>
+        <i className={`tabler-forms text-6xl text-[var(--page-fg-soft)]`} />
+        <h4 className={formEmptyTitleCls}>Nenhum formulário disponível</h4>
+        <p className={`${formPageMutedCls} text-center max-w-md`}>Nenhum formulário encontrado para o seu perfil.</p>
         {canManage && (
           <button type='button' onClick={() => router.push(`/${lang}/forms/new/edit`)} className={btnPrimary}>
             Criar formulário
@@ -203,7 +205,7 @@ const FormCard = ({ form, canManage, onFill, onEdit, onLinks, onDelete, onShare,
           <i className='tabler-forms text-xl text-[var(--mui-palette-primary-main)]' />
         </div>
         <div className='flex-1 min-w-0'>
-          <h6 className={`font-semibold truncate ${formTitleCls} text-base`}>{form.title}</h6>
+          <h6 className={`truncate ${formCardTitleCls}`}>{form.title}</h6>
           {form.description && <p className={`text-xs ${formMutedCls} mt-0.5 line-clamp-2`}>{form.description}</p>}
         </div>
       </div>
@@ -232,12 +234,12 @@ const FormCard = ({ form, canManage, onFill, onEdit, onLinks, onDelete, onShare,
       )}
 
       <div className={`flex flex-wrap items-center gap-2 pt-2 border-t ${formDividerCls}`}>
-        <button type='button' onClick={onFill} className={btnPrimarySoft}>
+        <button type='button' onClick={onFill} className={btnPrimarySm}>
           Preencher
         </button>
         {canManage && (
           <>
-            <button type='button' onClick={onEdit} className={btnPrimarySoft}>
+            <button type='button' onClick={onEdit} className={btnSecondary}>
               Editar
             </button>
             <button type='button' onClick={onDelete} className={btnDangerSoft}>

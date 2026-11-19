@@ -9,6 +9,7 @@ import FormSelect from './FormSelect'
 import {
   btnPrimary,
   btnSecondary,
+  btnDangerSoft,
   btnIcon,
   formCaptionCls,
   formErrorInlineCls,
@@ -209,7 +210,7 @@ return (
                         {copied === link.id ? 'Copiado!' : 'Copiar'}
                       </button>
                       {canRevokeLink && (
-                        <button onClick={() => revokeLink(link.id)} className={btnSecondary}>
+                        <button onClick={() => revokeLink(link.id)} className={btnDangerSoft}>
                           Desativar
                         </button>
                       )}

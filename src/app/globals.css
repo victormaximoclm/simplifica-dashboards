@@ -218,3 +218,21 @@ code {
   background-color: rgb(var(--mui-palette-info-mainChannel) / 0.08);
   border: 0;
 }
+
+/*
+  Texto que fica direto sobre o fundo da página (títulos, subtítulos, estados vazios). No modo claro o fundo é
+  claro e os cartões são azul-marinho, então estes tokens escurecem só aqui; dentro dos cartões vale text-primary.
+*/
+:root {
+  --page-fg: rgb(37 41 60 / 0.92);
+  --page-fg-soft: rgb(37 41 60 / 0.68);
+  --page-border: rgb(37 41 60 / 0.24);
+  --page-hover: rgb(37 41 60 / 0.06);
+}
+
+[data-dark] {
+  --page-fg: rgb(255 255 255 / 0.9);
+  --page-fg-soft: rgb(255 255 255 / 0.7);
+  --page-border: rgb(255 255 255 / 0.24);
+  --page-hover: rgb(255 255 255 / 0.08);
+}

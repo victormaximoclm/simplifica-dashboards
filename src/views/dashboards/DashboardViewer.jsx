@@ -122,8 +122,8 @@ const DashboardViewer = () => {
 
   return (
     <Card>
-      <CardContent>
-        <Box display='flex' alignItems='center' justifyContent='space-between' mb={3}>
+      <CardContent sx={{ p: { xs: 3, md: 6 } }}>
+        <Box display='flex' alignItems='center' justifyContent='space-between' mb={{ xs: 2, md: 3 }}>
           <Box>
             <Typography variant='h5' fontWeight={600}>
               {dashboard.title}
@@ -136,7 +136,9 @@ const DashboardViewer = () => {
             position: 'relative',
             overflow: 'hidden',
             width: '100%',
-            paddingTop: '56.25%', // 16:9 aspect ratio
+            // Ocupa a altura útil da tela (com piso), em vez de 16:9: no celular 16:9 deixaria o relatório com ~220px
+            height: { xs: 'calc(100dvh - 210px)', md: 'calc(100dvh - 190px)' },
+            minHeight: { xs: 420, md: 520 },
             borderRadius: 1,
             border: '1px solid',
             borderColor: 'divider'

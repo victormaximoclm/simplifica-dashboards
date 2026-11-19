@@ -236,7 +236,7 @@ return
   }
 
   return (
-    <div className='flex flex-col h-[calc(100vh-64px)]'>
+    <div className='flex flex-col h-[calc(100dvh-64px)]'>
       {/* Topbar */}
       <div
         className={`flex flex-col sm:flex-row sm:items-center justify-between gap-3 px-4 sm:px-6 py-3 shrink-0 ${formBuilderShellCls}`}

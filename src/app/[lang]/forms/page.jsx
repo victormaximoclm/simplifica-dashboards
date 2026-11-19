@@ -11,7 +11,7 @@ import FormsListView from '@/views/forms/FormsListView'
 import { buildFormListWhereForRole, getUserFormContext, userHasFormViewerAccess } from '@/libs/formAccess'
 import { resolveFormWorkspaceId } from '@/libs/formWorkspace'
 import { canManageForms, canShareForms } from '@/libs/formPermissions'
-import { formIconMutedCls, formMutedCls, formTitleCls } from '@/views/forms/formStyles'
+import { formEmptyTitleCls, formPageMutedCls } from '@/views/forms/formStyles'
 
 const FormsPage = async ({ params }) => {
   const { lang } = await params
@@ -92,9 +92,9 @@ const EMPTY_MESSAGES = {
 
 const EmptyState = ({ canManage, reason = 'default' }) => (
   <main className='flex flex-col items-center justify-center min-h-[60vh] gap-4'>
-    <i className={`tabler-forms text-6xl ${formIconMutedCls}`} />
-    <h4 className={`text-xl font-medium ${formTitleCls}`}>Nenhum formulário disponível</h4>
-    <p className={`${formMutedCls} text-center max-w-md`}>
+    <i className={`tabler-forms text-6xl text-[var(--page-fg-soft)]`} />
+    <h4 className={formEmptyTitleCls}>Nenhum formulário disponível</h4>
+    <p className={`${formPageMutedCls} text-center max-w-md`}>
       {canManage ? 'Nenhum formulário criado neste workspace.' : (EMPTY_MESSAGES[reason] ?? EMPTY_MESSAGES.default)}
     </p>
   </main>

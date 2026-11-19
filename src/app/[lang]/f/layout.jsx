@@ -13,7 +13,7 @@ const PublicFormLayout = async props => {
 
   return (
     <Providers direction={direction}>
-      <div className='min-h-screen bg-backgroundDefault'>{children}</div>
+      <div className='min-h-dvh bg-backgroundDefault'>{children}</div>
     </Providers>
   )
 }

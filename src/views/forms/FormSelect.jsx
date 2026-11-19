@@ -138,7 +138,7 @@ const FormSelect = ({
                   setActiveIndex(0)
                 }}
                 placeholder='Buscar...'
-                className='w-full px-2.5 py-1.5 rounded-md text-sm bg-transparent border border-[var(--mui-palette-divider)] text-[var(--mui-palette-common-white)] focus:outline-none focus:border-[var(--mui-palette-primary-main)]'
+                className='w-full px-2.5 py-1.5 rounded-md text-sm bg-transparent border border-[var(--mui-palette-divider)] text-[var(--mui-palette-text-primary)] focus:outline-none focus:border-[var(--mui-palette-primary-main)]'
               />
             </div>
           )}
