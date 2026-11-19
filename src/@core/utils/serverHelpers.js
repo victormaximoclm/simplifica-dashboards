@@ -14,7 +14,14 @@ export const getSettingsFromCookie = async () => {
   const cookieStore = await cookies()
   const cookieName = themeConfig.settingsCookieName
 
-  return JSON.parse(cookieStore.get(cookieName)?.value || '{}')
+  try {
+    const parsed = JSON.parse(cookieStore.get(cookieName)?.value || '{}')
+
+    return parsed && typeof parsed === 'object' ? parsed : {}
+  } catch {
+    // Cookie corrompido: volta aos padrões em vez de derrubar a página
+    return {}
+  }
 }
 
 export const getMode = async () => {

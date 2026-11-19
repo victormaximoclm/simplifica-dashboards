@@ -11,6 +11,9 @@ import { useObjectCookie } from '@core/hooks/useObjectCookie'
 // Initial Settings Context
 export const SettingsContext = createContext(null)
 
+// Cookie antigo ou parcial (sem skin, layout etc.) derrubava a árvore; completa o que faltar com os padrões
+const withDefaults = (cookie, defaults) => ({ ...defaults, ...(cookie && typeof cookie === 'object' ? cookie : {}) })
+
 // Settings Provider
 export const SettingsProvider = props => {
   // Initial Settings
@@ -33,12 +36,12 @@ export const SettingsProvider = props => {
   // Cookies
   const [settingsCookie, updateSettingsCookie] = useObjectCookie(
     themeConfig.settingsCookieName,
-    JSON.stringify(props.settingsCookie) !== '{}' ? props.settingsCookie : updatedInitialSettings
+    withDefaults(props.settingsCookie, updatedInitialSettings)
   )
 
   // State
   const [_settingsState, _updateSettingsState] = useState(
-    JSON.stringify(settingsCookie) !== '{}' ? settingsCookie : updatedInitialSettings
+    withDefaults(settingsCookie, updatedInitialSettings)
   )
 
   const updateSettings = (settings, options) => {
