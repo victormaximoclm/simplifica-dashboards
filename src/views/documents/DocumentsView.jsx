@@ -13,6 +13,7 @@ import { useSession } from 'next-auth/react'
 import { toast } from 'react-toastify'
 
 import { DocumentItemsGrid, DocumentItemsTable } from './DocumentItems'
+import AccessDialog from './AccessDialog'
 import DeleteDialog from './DeleteDialog'
 import HtmlDocumentEditorDialog from './HtmlDocumentEditorDialog'
 import HtmlTemplatesDialog from './HtmlTemplatesDialog'
@@ -26,6 +27,7 @@ import { DOCUMENT_SITE_TEXT } from '@/libs/documentFileTypes'
 import { getLocalizedUrl } from '@/utils/i18n'
 import {
   btnOutlined,
+  btnPrimary,
   formAlertErrorCls,
   formEmptyTitleCls,
   formIconMutedCls,
@@ -97,6 +99,9 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
   const [nameDialog, setNameDialog] = useState(null)
   const [moveItem, setMoveItem] = useState(null)
   const [deleteItem, setDeleteItem] = useState(null)
+  const [accessItem, setAccessItem] = useState(null)
+  const [selected, setSelected] = useState({}) // itens marcados para liberar acesso em lote
+  const [bulkAccessOpen, setBulkAccessOpen] = useState(false)
   const [previewFile, setPreviewFile] = useState(null)
   const [uploadOpen, setUploadOpen] = useState(false)
   const [htmlEditor, setHtmlEditor] = useState(null)
@@ -210,6 +215,7 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
     setNameDialog(null)
     setMoveItem(null)
     setDeleteItem(null)
+    setAccessItem(null)
     setHtmlEditor(null)
     reload()
   }
@@ -226,6 +232,34 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
   const allowDelete = canDelete && !!permissions.canDelete
 
   const items = listing?.data ?? []
+
+  // A seleção vale só para a lista que está na tela: some ao trocar de pasta, página, busca ou recarregar
+  useEffect(() => {
+    setSelected({})
+  }, [folderId, page, query, reloadKey, listing?.workspace?.id])
+
+  const itemKey = item => `${item.kind}:${item.id}`
+  const selectedItems = Object.values(selected)
+
+  const selection = allowEdit
+    ? {
+        isSelected: item => !!selected[itemKey(item)],
+        onToggle: item =>
+          setSelected(prev => {
+            const next = { ...prev }
+
+            if (next[itemKey(item)]) delete next[itemKey(item)]
+            else next[itemKey(item)] = item
+
+            return next
+          }),
+        onToggleAll: list =>
+          setSelected(prev =>
+            list.every(item => prev[itemKey(item)]) ? {} : Object.fromEntries(list.map(item => [itemKey(item), item]))
+          )
+      }
+    : null
+
   const pagination = listing?.pagination
   const ancestors = listing?.ancestors ?? []
   const workspaceId = listing?.workspace?.id ?? null
@@ -250,7 +284,7 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
       options.push(option(DOCUMENT_SITE_TEXT.openAction, 'tabler-world', () => openSite(item)))
     } else {
       options.push(option('Visualizar', 'tabler-eye', () => setPreviewFile(item)))
-      options.push(option('Baixar', 'tabler-download', () => downloadFile(item)))
+      if (item.canDownload !== false) options.push(option('Baixar', 'tabler-download', () => downloadFile(item)))
     }
 
     if (allowEdit) {
@@ -258,6 +292,7 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
       if (item.htmlEditable) options.push(option('Editar documento', 'tabler-pencil', () => editHtmlDocument(item)))
       options.push(option('Renomear', 'tabler-edit', () => setNameDialog({ mode: 'rename', item })))
       options.push(option('Mover', 'tabler-folder-share', () => setMoveItem(item)))
+      options.push(option('Gerenciar acesso', 'tabler-lock', () => setAccessItem(item)))
     }
 
     if (allowDelete) {
@@ -386,12 +421,34 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
         ) : (
           items.length > 0 && (
             <div className={`relative transition-opacity ${loading ? 'opacity-60 pointer-events-none' : ''}`}>
+              {selectedItems.length > 0 && (
+                <div
+                  role='status'
+                  className='sticky top-2 z-10 flex flex-wrap items-center gap-3 mb-3 px-4 py-3 rounded-xl border border-[var(--mui-palette-primary-main)] bg-[var(--mui-palette-background-paper)] shadow-md'
+                >
+                  <i className='tabler-checkbox text-xl text-[var(--mui-palette-primary-main)]' />
+                  <span className='flex-1 min-w-[160px] text-sm font-semibold text-[var(--mui-palette-text-primary)]'>
+                    {selectedItems.length} {selectedItems.length === 1 ? 'item selecionado' : 'itens selecionados'}
+                    <span className='block text-xs font-normal text-[var(--mui-palette-text-secondary)]'>
+                      A ação abaixo vale para todos os itens marcados
+                    </span>
+                  </span>
+                  <button type='button' onClick={() => setBulkAccessOpen(true)} className={btnPrimary}>
+                    <i className='tabler-lock text-base' />
+                    Gerenciar acesso de {selectedItems.length}
+                  </button>
+                  <button type='button' onClick={() => setSelected({})} className={btnOutlined}>
+                    Limpar seleção
+                  </button>
+                </div>
+              )}
               {viewMode === 'grid' ? (
                 <DocumentItemsGrid
                   items={items}
                   onOpen={openItem}
                   onOpenLocation={navigateTo}
                   getOptions={getItemOptions}
+                  selection={selection}
                 />
               ) : (
                 <DocumentItemsTable
@@ -399,6 +456,7 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
                   onOpen={openItem}
                   onOpenLocation={navigateTo}
                   getOptions={getItemOptions}
+                  selection={selection}
                 />
               )}
             </div>
@@ -439,6 +497,19 @@ const DocumentsView = ({ canCreate, canEdit, canDelete, maxFileSizeMb, sendActiv
       />
       <MoveDialog item={moveItem} workspaceId={workspaceId} onClose={() => setMoveItem(null)} onMoved={handleSaved} />
       <DeleteDialog item={deleteItem} onClose={() => setDeleteItem(null)} onDeleted={handleSaved} />
+      <AccessDialog
+        item={accessItem}
+        onClose={() => setAccessItem(null)}
+        onSaved={() => handleSaved('Acesso atualizado')}
+      />
+      <AccessDialog
+        items={bulkAccessOpen ? selectedItems : null}
+        onClose={() => setBulkAccessOpen(false)}
+        onSaved={result => {
+          setBulkAccessOpen(false)
+          handleSaved(`Acesso atualizado em ${result?.updated ?? selectedItems.length} itens`)
+        }}
+      />
       <PreviewDialog
         file={previewFile}
         onClose={() => setPreviewFile(null)}

@@ -46,7 +46,9 @@ async function handleGet(req, { params }) {
   }
 
   const data = serializeSitePage(page)
-  const files = await resolveSiteFileRefs(collectSiteFileIds(data.content), access.item.workspaceId)
+
+  // Arquivo que o leitor não pode ver (cargos da pasta/arquivo) volta como indisponível, sem nenhum dado
+  const files = await resolveSiteFileRefs(collectSiteFileIds(data.content), access.item.workspaceId, access.viewer)
 
   return jsonWithRequestId({ data, files }, { requestId, headers: { 'Cache-Control': 'private, no-store' } })
 }

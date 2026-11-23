@@ -11,6 +11,7 @@ import {
   resolveModuleWorkspaceScope
 } from '@/libs/workspaceAccess'
 import { canCreateDocuments, canDeleteDocuments, canEditDocuments, canViewDocuments } from '@/libs/documentPermissions'
+import { canViewerSeeItem, getDocumentViewer } from '@/libs/documentGrants'
 import {
   DOCUMENT_DEFAULT_MAX_FILE_SIZE_MB,
   HTML_DOCUMENT_MIME,
@@ -79,6 +80,7 @@ export function withDocumentErrorHandling(event, handler) {
 
 const ACTION_RULES = {
   view: { profile: canViewDocuments, workspace: canAccessWorkspace },
+  download: { profile: canViewDocuments, workspace: canAccessWorkspace },
   create: { profile: canCreateDocuments, workspace: canCreateWorkspaceContent },
   edit: { profile: canEditDocuments, workspace: canManageWorkspaceContent },
   delete: { profile: canDeleteDocuments, workspace: canManageWorkspaceContent }
@@ -161,6 +163,23 @@ export async function getAuthorizedDocumentItem({ kind, id, session, action }) {
 
   if (!workspace || !ACTION_RULES[action].workspace(session.user, workspace)) {
     return { ok: false, status: 403, message: 'Acesso negado a este workspace' }
+  }
+
+  // Ver e baixar dependem também dos cargos liberados na pasta/arquivo (documentGrants.js). Sem acesso: mesma
+  // resposta de antes, sem revelar nada do item. Baixar é uma permissão à parte: quem só vê não baixa. As demais
+  // ações já são só de SuperAdmin/SubAdmin.
+  if (action === 'view' || action === 'download') {
+    const viewer = await getDocumentViewer(session.user, workspace)
+
+    if (!canViewerSeeItem(viewer, kind, item)) {
+      return { ok: false, status: 403, message: 'Acesso negado' }
+    }
+
+    if (action === 'download' && (kind !== 'file' || !viewer.canDownloadFile(item))) {
+      return { ok: false, status: 403, message: 'Você não tem permissão para baixar este arquivo' }
+    }
+
+    return { ok: true, item, workspace, viewer }
   }
 
   return { ok: true, item, workspace }

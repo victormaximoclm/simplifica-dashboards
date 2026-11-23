@@ -28,6 +28,9 @@ const PreviewDialog = ({ file, onClose, onDownload, onEdit }) => {
   const isInline = !!file?.inlinePreview
   const isPdf = file?.mimeType === 'application/pdf'
 
+  // Ver não é baixar: sem a permissão de baixar (cargo da pasta/arquivo), o botão não aparece
+  const canDownload = file?.canDownload !== false
+
   useEffect(() => {
     if (!file || file.inlinePreview) return
 
@@ -67,15 +70,17 @@ const PreviewDialog = ({ file, onClose, onDownload, onEdit }) => {
             Editar
           </Button>
         )}
-        <Button
-          size='small'
-          variant='tonal'
-          startIcon={<i className='tabler-download' />}
-          onClick={() => onDownload(file)}
-          className='shrink-0'
-        >
-          Baixar
-        </Button>
+        {canDownload && (
+          <Button
+            size='small'
+            variant='tonal'
+            startIcon={<i className='tabler-download' />}
+            onClick={() => onDownload(file)}
+            className='shrink-0'
+          >
+            Baixar
+          </Button>
+        )}
         <IconButton size='small' onClick={onClose} aria-label='Fechar' className='shrink-0'>
           <i className='tabler-x' />
         </IconButton>
@@ -103,9 +108,11 @@ const PreviewDialog = ({ file, onClose, onDownload, onEdit }) => {
         {file && !isInline && state.error && (
           <div className='flex flex-col items-center gap-4 py-8'>
             <div className={formAlertErrorCls}>{state.error}</div>
-            <Button variant='contained' startIcon={<i className='tabler-download' />} onClick={() => onDownload(file)}>
-              Baixar arquivo
-            </Button>
+            {canDownload && (
+              <Button variant='contained' startIcon={<i className='tabler-download' />} onClick={() => onDownload(file)}>
+                Baixar arquivo
+              </Button>
+            )}
           </div>
         )}
         {file && !isInline && state.data && (

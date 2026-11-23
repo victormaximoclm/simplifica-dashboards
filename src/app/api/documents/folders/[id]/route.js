@@ -19,6 +19,7 @@ import {
   serializeFolder,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { deleteItemGrants } from '@/libs/documentGrants'
 
 // GET /api/documents/folders/:id - dados da pasta + contagem do conteúdo (usado antes de excluir)
 async function handleGet(req, { params }) {
@@ -29,6 +30,11 @@ async function handleGet(req, { params }) {
 
   if (!access.ok) {
     return jsonWithRequestId({ message: access.message }, { status: access.status, requestId })
+  }
+
+  // A contagem inclui itens que o leitor pode não ver: só quem enxerga tudo recebe (é usada ao excluir)
+  if (access.viewer?.mode !== 'all') {
+    return jsonWithRequestId({ ...serializeFolder(access.item), counts: null }, { requestId })
   }
 
   const { ids } = await getFolderSubtree(id)
@@ -156,6 +162,9 @@ async function handleDelete(req, { params }) {
 
       await tx.documentFile.deleteMany({ where: { folderId: { in: ids } } })
       await tx.documentFolder.deleteMany({ where: { id: { in: ids } } })
+
+      // Cargos liberados não têm chave estrangeira: saem junto com a pasta, as subpastas e os arquivos
+      await deleteItemGrants(tx, [...ids, ...files.map(file => file.id)])
 
       // Itens sem blob (Site) têm storageKey nulo e não entram na limpeza do storage
       return {

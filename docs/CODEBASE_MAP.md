@@ -97,7 +97,8 @@ graph TB
 
 **Entrada:** `src/app/api/documents/**`, `src/libs/documentAccess.js`, `documentPermissions.js`, `documentFileTypes.js`, `documentHtml.js`, `documentHtmlRequest.js`, `documentPreview.js`, `storage.js`, `zipReader.js`.
 
-- **Permissões:** `documentPermissions.js` é o único ponto de decisão por perfil (criar, editar e excluir = highAdmin; ver = qualquer logado). `documentAccess.js` combina perfil + regra de workspace em `ACTION_RULES` (`view/create/edit/delete`). Não há permissão por pasta ou arquivo: quem vê o workspace vê todos os arquivos dele.
+- **Permissões:** `documentPermissions.js` é o único ponto de decisão por perfil: criar, editar e excluir = highAdmin; ver depende de `getDocumentViewMode` (`all` = highAdmin e admin do próprio workspace; `grants` = usuário comum do próprio workspace; `none` = quem é de outro workspace sem ser highAdmin, inclusive convidado comum). `documentAccess.js` combina perfil + regra de workspace em `ACTION_RULES` (`view/create/edit/delete`) e, em `view`, aplica o acesso por cargo.
+- **Acesso por cargo** (`documentGrants.js`, mesmo modelo de Dashboards): `RolePermission(customRoleId, módulo "documents", action, resourceId = id da pasta ou arquivo)`, sem mudança de schema; a linha do módulo vem da migration `20261119120000`. Duas ações: `view` (ver) e `download` (baixar, sempre junto com `view`); a tela chama de "Só ver" e "Ver e baixar". Padrão restrito: item sem cargos só é visto por admin e acima. Estilo Google Drive: liberar uma pasta libera tudo dentro dela; item sem cargos próprios herda da pasta (com o mesmo nível); item com cargos próprios vale só pelo que foi dado a ele; liberar só um arquivo (ou subpasta) mostra as pastas até ele como caminho, listando apenas o que o cargo vê. `getDocumentViewer` resolve tudo uma vez por requisição e alimenta `canSeeFolder/canSeeFile/canDownloadFile`, os filtros de listagem, busca e árvore e as referências de arquivo em Sites (`resolveSiteFileRefs`). `GET /files/:id/download` usa a ação `download` de `getAuthorizedDocumentItem` (403 para quem só vê; pré-visualização continua sendo ver); a listagem traz `canDownload` e a tela esconde "Baixar". Gerenciar: `GET/PUT /api/documents/{folders,files}/:id/access` com `roles: [{ roleId, canDownload }]` (highAdmin; cargos validados no workspace do item; auditoria `DOCUMENT_ACCESS_UPDATE`); Em lote: `POST /api/documents/access` (`items`, `mode` add/replace/remove, `roles`; até 200 itens do mesmo workspace; um registro de auditoria por item com `bulk`), usado pela seleção na lista de Documentos. UI em `AccessDialog.jsx`. A tela de Funções mostra a contagem de documentos por função (`moduleCounts.documents`; downloads à parte). `resourceId` não tem chave estrangeira: excluir pasta/arquivo apaga as concessões (`deleteItemGrants`).
 - **Pastas:** lista de adjacência (`parentId`), profundidade máxima 10 (`MAX_FOLDER_DEPTH`, duplicada no cliente em `MoveDialog`), nomes únicos entre irmãos sem diferenciar maiúsculas, aplicados com `pg_advisory_xact_lock` + `assertNameAvailable`. Excluir apaga a subárvore em transação e depois os blobs.
 - **Upload** (`POST /api/documents/files`, multipart): limite de 55 MB no corpo, 20 arquivos por envio, tudo ou nada. Valida nome saneado, extensão permitida, MIME do navegador e tamanho; confere magic bytes (`matchesFileSignature`) e grava com chave gerada no servidor (`<workspaceId>/<uuid>`). O `mimeType` guardado é sempre o canônico da extensão.
 - **Tipos aceitos:** pdf, docx, xlsx, pptx, csv, txt, png, jpg, jpeg, webp, zip. `html` só nasce do editor (`uploadable: false`).
@@ -172,7 +173,7 @@ Migrations: `init` → permissões de módulo e admin → workspace privado/conv
 | Workspaces | `/api/apps/workspaces[/id]`, `/api/workspaces/[id]/integrations/[provider]` | acesso ao workspace |
 | Dashboards | `/api/apps/dashboards[/id]`, `/api/embed/dashboard/[id]`, `/api/audit/dashboard-view` | por dashboard |
 | Formulários | `/api/forms[/id|submit|links|datasource|public/[token]]` | por papel e token |
-| Documentos | `/api/documents`, `folders`, `files`, `html`, `html-templates` (+ `move`, `download`, `preview`, `preview-data`) | ver: workspace; escrever: highAdmin |
+| Documentos | `/api/documents`, `folders`, `files`, `html`, `html-templates` (+ `move`, `download`, `preview`, `preview-data`, `access`) | ver: workspace + cargo; escrever e gerenciar acesso: highAdmin |
 | Notificações e auditoria | `/api/apps/notifications`, `/api/audit-logs[/access|/admin]`, `/api/observability/error-events` | conforme papel |
 | Legado | `/api/legacy/*` (dados do `fake-db`), `/api/apps/permissions`, `user-list` e `/api/pages/profile` (410) | sobras do template |
 
@@ -240,7 +241,7 @@ sequenceDiagram
 - A pasta aberta em Documentos não fica na URL.
 
 **Restrições do módulo de Documentos**
-- Sem permissão por pasta ou arquivo; qualquer papel com acesso ao workspace vê, abre e baixa tudo.
+- Acesso por cargo é só de leitura (`view`): criar, editar, mover e excluir continuam só com highAdmin. Cargos não valem entre workspaces.
 - Excluir um workspace apaga as linhas de documentos mas **não** os blobs do disco **(não verificado)**.
 - Atualizar um documento HTML não renomeia o arquivo quando o título muda **(não verificado)**.
 
@@ -268,6 +269,7 @@ Estado depois do `eslint --fix` (ESLint 9.39.5, 2026-11-11): **2 erros e 36 avis
 |---|---|
 | Criar um endpoint de documentos | `src/app/api/documents/...`, usar `getAuthorizedDocumentItem`/`resolveDocumentsWorkspace`, exportar via `withDocumentErrorHandling`, auditar em `createAuditLog` e listar a ação em `audit-logs/admin/route.js` |
 | Mudar quem pode criar, editar ou excluir documentos | só `src/libs/documentPermissions.js` |
+| Mudar quem vê cada pasta ou arquivo | `src/libs/documentGrants.js` (regras) e `documentPermissions.js` (`getDocumentViewMode`) |
 | Permitir um novo tipo de arquivo | `src/libs/documentFileTypes.js` (tipo e MIME) + `FILE_SIGNATURES` em `documentAccess.js` + `documentPreview.js` se houver pré-visualização |
 | Trocar o storage para S3 | `getDriver()` em `src/libs/storage.js` (mesma interface) |
 | Alterar o limite de tamanho | `DOCUMENTS_MAX_FILE_SIZE_MB`; se passar de 50 MB, também `proxyClientMaxBodySize` e `DOCUMENTS_MAX_REQUEST_BYTES` |

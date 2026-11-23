@@ -17,8 +17,8 @@ const Roles = ({ workspaceId }) => {
           Funções
         </Typography>
         <Typography sx={theme => ({ ...(theme.palette.mode === 'light' && { color: '#808390' }) })}>
-          Gerencie as funções do sistema. Super Admin e Admin são funções fixas. Funções personalizadas são globais e
-          controlam a visibilidade dos dashboards.
+          Gerencie as funções do sistema. Super Admin e Admin são funções fixas. Funções personalizadas pertencem a um
+          único espaço de trabalho e controlam a visibilidade de dashboards, formulários e documentos.
         </Typography>
       </Grid>
       <Grid size={{ xs: 12 }}>

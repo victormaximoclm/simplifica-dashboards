@@ -26,3 +26,19 @@ export function canDeleteDocuments(user) {
 export function canViewDocuments(user) {
   return !!user
 }
+
+/**
+ * Quanto do conteúdo de um workspace o perfil enxerga (o workspace já foi validado por canAccessWorkspace):
+ * - 'all': tudo. SuperAdmin/SubAdmin (dentro do alcance do workspace) e admin do próprio workspace.
+ * - 'grants': só o que os cargos liberam (documentGrants.js). Usuário comum do próprio workspace.
+ * - 'none': nada. Quem não é do workspace e não é SuperAdmin/SubAdmin (por exemplo, convidado comum): os
+ *   documentos são isolados por workspace e os cargos de um workspace nunca valem em outro.
+ */
+export function getDocumentViewMode(user, workspace) {
+  if (!user || !workspace) return 'none'
+  if (isHighAdmin(user.role)) return 'all'
+  if (!user.workspaceId || user.workspaceId !== workspace.id) return 'none'
+  if (user.role === 'admin') return 'all'
+
+  return 'grants'
+}

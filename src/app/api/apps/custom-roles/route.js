@@ -47,6 +47,13 @@ export async function GET(req) {
     role.permissions.forEach(p => {
       const key = p.module.key
 
+      // Documentos: cada item liberado tem uma linha "view" e, se também baixa, uma "download" (conta à parte)
+      if (key === 'documents' && p.action === 'download') {
+        moduleCounts.documentDownloads = (moduleCounts.documentDownloads || 0) + 1
+
+        return
+      }
+
       moduleCounts[key] = (moduleCounts[key] || 0) + 1
     })
     

@@ -206,13 +206,14 @@ const RoleCards = ({ workspaceId }) => {
                   <TableCell align='center'>Usuários</TableCell>
                   <TableCell align='center'>Dashboards</TableCell>
                   <TableCell align='center'>Formulários</TableCell>
+                  <TableCell align='center'>Documentos</TableCell>
                   <TableCell align='right'>Ações</TableCell>
                 </TableRow>
               </TableHead>
               <TableBody>
                 {customRoles.length === 0 ? (
                   <TableRow>
-                    <TableCell colSpan={4} align='center'>
+                    <TableCell colSpan={6} align='center'>
                       <Typography variant='body2' color='text.secondary' sx={{ py: 4 }}>
                         Nenhuma função personalizada criada ainda.
                       </Typography>
@@ -232,6 +233,15 @@ const RoleCards = ({ workspaceId }) => {
                       </TableCell>
                       <TableCell align='center'>
                         <Chip label={role.moduleCounts?.forms || 0} size='small' variant='tonal' color='secondary' />
+                      </TableCell>
+                      <TableCell align='center'>
+                        <Chip
+                          label={role.moduleCounts?.documents || 0}
+                          size='small'
+                          variant='tonal'
+                          color='success'
+                          title={`Pastas e arquivos liberados (${role.moduleCounts?.documentDownloads || 0} também para baixar)`}
+                        />
                       </TableCell>
                       <TableCell align='right'>
                         <IconButton size='small' onClick={() => handleOpenEdit(role)}>

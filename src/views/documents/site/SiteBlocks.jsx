@@ -194,10 +194,12 @@ const FileBlock = ({ block, file, onOpenFile }) => {
             Visualizar
           </button>
         )}
-        <a href={`/api/documents/files/${file.id}/download`} rel='noopener' className={actionCls}>
-          <i className='tabler-download text-base' />
-          Baixar
-        </a>
+        {file.canDownload !== false && (
+          <a href={`/api/documents/files/${file.id}/download`} rel='noopener' className={actionCls}>
+            <i className='tabler-download text-base' />
+            Baixar
+          </a>
+        )}
       </div>
     </div>
   )

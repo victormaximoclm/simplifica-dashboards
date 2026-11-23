@@ -13,6 +13,7 @@ import path from 'path'
 import prismaPkg from '@prisma/client'
 
 import {
+  MOCK_ROLES,
   MOCK_USERS,
   MOCK_WORKSPACES,
   api,
@@ -199,6 +200,22 @@ async function main() {
     sandboxes[key] = res.body
   }
 
+  // Usuário comum só vê o que o cargo libera (item sem cargos = só admin e acima): as sandboxes de Alfa e Beta são
+  // liberadas para o cargo "Leitor" de cada um e tudo dentro herda. A do [MOCK] Privado fica sem cargos.
+  const roles = {}
+
+  for (const key of ['alfa', 'beta']) {
+    roles[key] = await prisma.customRole.findFirst({ where: { workspaceId: workspaces[key].id, name: MOCK_ROLES[key] } })
+
+    if (!roles[key]) throw new Error(`Cargo ${MOCK_ROLES[key]} não existe. Rode \`pnpm documents:mock\` antes.`)
+
+    const grant = await api(s.superAdmin, 'PUT', `/api/documents/folders/${sandboxes[key].id}/access`, {
+      json: { roles: [{ roleId: roles[key].id, canDownload: true }] }
+    })
+
+    if (grant.status !== 200) throw new Error(`não foi possível liberar a sandbox de ${key}: ${describe(grant)}`)
+  }
+
   // Alvos estáveis para as tentativas de escrita sem permissão
   const targets = {}
 
@@ -218,7 +235,7 @@ async function main() {
   }
 
   try {
-    await runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn })
+    await runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn, roles })
   } finally {
     console.log('\nRemovendo sandboxes [SMOKE]...')
 
@@ -238,7 +255,7 @@ async function main() {
 
 // ── Testes ──────────────────────────────────
 
-async function runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn }) {
+async function runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn, roles }) {
   const { alfa, beta, privado } = workspaces
   const alfaFile = await fileIn('alfa', 'Contrato de Prestação de Serviços.pdf')
   const alfaFolder = await folderIn('alfa', 'Contratos')
@@ -381,6 +398,33 @@ async function runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn })
         detail: `${f?.name}/${d?.name}`
       }
     })
+
+    // Convidado comum (não é SuperAdmin/SubAdmin nem do workspace): documentos são isolados por workspace e o cargo
+    // dele não vale aqui. Não vê nem abre nada, mesmo com a permissão "view" de convidado.
+    if (profile === 'convidado') {
+      await test('convidado: raiz lista vazia (200) e pasta/arquivo → 403, sem conteúdo', async () => {
+        const [root, inside, download, preview] = await Promise.all([
+          api(session, 'GET', `/api/documents?workspaceId=${workspace.id}`),
+          api(session, 'GET', `/api/documents?workspaceId=${workspace.id}&folderId=${sandbox.id}`),
+          api(session, 'GET', `/api/documents/files/${file.id}/download`),
+          api(session, 'GET', `/api/documents/files/${file.id}/preview`)
+        ])
+
+        return {
+          ok:
+            root.status === 200 &&
+            root.body?.data?.length === 0 &&
+            inside.status === 403 &&
+            download.status === 403 &&
+            preview.status === 403 &&
+            download.buffer.length < 200,
+          detail: [root, inside, download, preview].map(describe).join(' | ')
+        }
+      })
+
+      continue
+    }
+
     await test(`${profile}: lista o próprio workspace → 200 sem permissões de escrita`, async () => {
       const res = await api(session, 'GET', `/api/documents?workspaceId=${workspace.id}&folderId=${sandbox.id}`)
       const p = res.body?.permissions
@@ -2426,6 +2470,548 @@ async function runTests({ s, workspaces, sandboxes, targets, fileIn, folderIn })
 
     return { ok: !problems.length, detail: problems.join('; ') }
   })
+
+  // 15. Acesso por cargo ───────────────────
+  section('Acesso por cargo (pastas, arquivos e Sites)')
+
+  const accessRoot = (await createFolder(s.superAdmin, { workspaceId: alfa.id, name: `[SMOKE] ${runId} acesso` })).body
+  const hiddenRoot = (await createFolder(s.superAdmin, { workspaceId: alfa.id, name: `[SMOKE] ${runId} restrito` })).body
+
+  const otherRole = await prisma.customRole.create({
+    data: { name: `[SMOKE ${runId}] Outro cargo`, workspaceId: alfa.id }
+  })
+
+  const userAlfaRow = await prisma.user.findUnique({
+    where: { email: MOCK_USERS.userAlfa.email },
+    select: { id: true, customRoleId: true }
+  })
+
+  // Por padrão o cargo pode ver e baixar; `canDownload: false` deixa só ver
+  const setAccess = (session, kind, id, roleIds, canDownload = true) =>
+    api(session, 'PUT', `/api/documents/${kind}/${id}/access`, {
+      json: { roles: roleIds.map(roleId => ({ roleId, canDownload })) }
+    })
+
+  const grantRows = ids => prisma.rolePermission.count({ where: { resourceId: { in: ids } } })
+
+  const listIds = async (session, folderId, q = '') => {
+    const folderParam = folderId ? `&folderId=${folderId}` : ''
+    const queryParam = q ? `&q=${encodeURIComponent(q)}` : ''
+    const res = await api(session, 'GET', `/api/documents?workspaceId=${alfa.id}&pageSize=100${folderParam}${queryParam}`)
+
+    return { res, ids: (res.body?.data ?? []).map(item => item.id) }
+  }
+
+  const treeIds = async session => {
+    const res = await api(session, 'GET', `/api/documents/folders?workspaceId=${alfa.id}`)
+
+    return (res.body?.data ?? []).map(folder => folder.id)
+  }
+
+  const download = (session, id) => api(session, 'GET', `/api/documents/files/${id}/download`)
+
+  try {
+    const subFolder = (await createFolder(s.superAdmin, { workspaceId: alfa.id, parentId: accessRoot.id, name: 'Sub' }))
+      .body
+
+    const docA = (await upload(s.superAdmin, alfa.id, accessRoot.id, [txt('docA.txt', 'conteudo A')])).body.data[0]
+
+    const deep = (await upload(s.superAdmin, alfa.id, subFolder.id, [txt('profundo.txt', 'conteudo profundo')])).body
+      .data[0]
+
+    const secret = (await upload(s.superAdmin, alfa.id, hiddenRoot.id, [txt('segredo.txt', 'so admin')])).body.data[0]
+
+    await test('sem cargos, o item fica restrito: userAlfa não lista, não abre nem baixa (403); admin e subAdmin veem', async () => {
+      const inside = await listIds(s.userAlfa, accessRoot.id)
+      const root = await listIds(s.userAlfa, null)
+      const folderGet = await api(s.userAlfa, 'GET', `/api/documents/folders/${accessRoot.id}`)
+      const previewData = await api(s.userAlfa, 'GET', `/api/documents/files/${docA.id}/preview-data`)
+      const tree = await treeIds(s.userAlfa)
+      const admin = await listIds(s.adminAlfa, accessRoot.id)
+      const sub = await listIds(s.subAdmin, accessRoot.id)
+      const problems = []
+
+      if (inside.res.status !== 403) problems.push(`pasta: ${inside.res.status}`)
+      if (root.ids.includes(accessRoot.id)) problems.push('pasta aparece na raiz')
+      if (folderGet.status !== 403) problems.push(`GET pasta: ${folderGet.status}`)
+      if ((await download(s.userAlfa, docA.id)).status !== 403) problems.push('baixou arquivo restrito')
+      if (previewData.status !== 403) problems.push(`preview-data: ${previewData.status}`)
+      if (tree.includes(accessRoot.id) || tree.includes(subFolder.id)) problems.push('árvore expõe pastas restritas')
+      if (!admin.ids.includes(docA.id) || !admin.ids.includes(subFolder.id)) problems.push('adminAlfa não vê tudo')
+      if (!sub.ids.includes(docA.id)) problems.push('subAdmin não vê tudo')
+
+      return { ok: !problems.length, detail: problems.join('; ') }
+    })
+
+    await test('liberar o cargo na pasta: o conteúdo herda (subpasta, arquivos), baixa e busca recursiva acham', async () => {
+      const put = await setAccess(s.superAdmin, 'folders', accessRoot.id, [roles.alfa.id])
+      const root = await listIds(s.userAlfa, null)
+      const inside = await listIds(s.userAlfa, accessRoot.id)
+      const subList = await listIds(s.userAlfa, subFolder.id)
+      const found = await listIds(s.userAlfa, null, 'profundo')
+      const tree = await treeIds(s.userAlfa)
+      const problems = []
+
+      if (put.status !== 200) return { ok: false, detail: describe(put) }
+      if (!root.ids.includes(accessRoot.id)) problems.push('pasta não aparece na raiz')
+      if (!inside.ids.includes(docA.id) || !inside.ids.includes(subFolder.id)) problems.push('conteúdo não herdou')
+      if (!subList.ids.includes(deep.id)) problems.push('subpasta não herdou')
+      if ((await download(s.userAlfa, deep.id)).status !== 200) problems.push('não baixou arquivo herdado')
+      if (!found.ids.includes(deep.id)) problems.push('busca não achou')
+      if (!tree.includes(subFolder.id)) problems.push('árvore sem a subpasta')
+      if (inside.res.body?.permissions?.canEdit) problems.push('userAlfa ganhou permissão de edição')
+      if ('accessRoles' in (inside.res.body?.data?.[0] ?? {})) problems.push('userAlfa recebeu accessRoles')
+
+      return { ok: !problems.length, detail: problems.join('; ') }
+    })
+
+    await test('o admin vê os cargos de cada item na listagem (accessRoles)', async () => {
+      const root = await listIds(s.superAdmin, null)
+      const row = root.res.body?.data?.find(item => item.id === accessRoot.id)
+
+      return {
+        ok: row?.accessRoles?.length === 1 && row.accessRoles[0].id === roles.alfa.id,
+        detail: JSON.stringify(row?.accessRoles)
+      }
+    })
+
+    await test('filho com cargo próprio de outro cargo some para quem só tem o cargo da pasta', async () => {
+      const put = await setAccess(s.superAdmin, 'folders', subFolder.id, [otherRole.id])
+      const inside = await listIds(s.userAlfa, accessRoot.id)
+      const subList = await listIds(s.userAlfa, subFolder.id)
+      const found = await listIds(s.userAlfa, null, 'profundo')
+      const problems = []
+
+      if (put.status !== 200) return { ok: false, detail: describe(put) }
+      if (inside.ids.includes(subFolder.id)) problems.push('subpasta continua listada')
+      if (subList.res.status !== 403) problems.push(`subpasta: ${subList.res.status}`)
+      if ((await download(s.userAlfa, deep.id)).status !== 403) problems.push('baixou arquivo da subpasta restrita')
+      if (found.ids.includes(deep.id)) problems.push('busca vaza arquivo restrito')
+      if (!inside.ids.includes(docA.id)) problems.push('arquivo irmão sumiu')
+
+      return { ok: !problems.length, detail: problems.join('; ') }
+    })
+
+    await test('liberar só a subpasta mostra o caminho até ela: a pasta de cima lista apenas o caminho (Drive)', async () => {
+      await prisma.user.update({ where: { id: userAlfaRow.id }, data: { customRoleId: otherRole.id } })
+
+      try {
+        const [rootList, topList, subList, topGet, deepDownload, docDownload] = await Promise.all([
+          listIds(s.userAlfa, null),
+          listIds(s.userAlfa, accessRoot.id),
+          listIds(s.userAlfa, subFolder.id),
+          api(s.userAlfa, 'GET', `/api/documents/folders/${accessRoot.id}`),
+          download(s.userAlfa, deep.id),
+          download(s.userAlfa, docA.id)
+        ])
+
+        const problems = []
+
+        if (!rootList.ids.includes(accessRoot.id)) problems.push('pasta de passagem não aparece na raiz')
+        if (topList.res.status !== 200 || topList.ids.join() !== subFolder.id) problems.push(`pasta de cima: ${topList.ids}`)
+        if (!subList.ids.includes(deep.id)) problems.push('subpasta liberada não lista o arquivo')
+        if (topGet.status !== 200 || topGet.body?.counts !== null) problems.push(`GET pasta: ${describe(topGet)}`)
+        if (deepDownload.status !== 200) problems.push('não baixou o arquivo liberado')
+        if (docDownload.status !== 403) problems.push('baixou arquivo irmão não liberado')
+
+        return { ok: !problems.length, detail: problems.join('; ') }
+      } finally {
+        await prisma.user.update({ where: { id: userAlfaRow.id }, data: { customRoleId: userAlfaRow.customRoleId } })
+      }
+    })
+
+    await test('cargo próprio no arquivo sobrepõe a herança da pasta', async () => {
+      const put = await setAccess(s.superAdmin, 'files', docA.id, [otherRole.id])
+      const inside = await listIds(s.userAlfa, accessRoot.id)
+
+      return {
+        ok: put.status === 200 && (await download(s.userAlfa, docA.id)).status === 403 && !inside.ids.includes(docA.id),
+        detail: describe(put)
+      }
+    })
+
+    await test('esvaziar os cargos do filho e do arquivo volta a herdar da pasta', async () => {
+      const first = await setAccess(s.superAdmin, 'folders', subFolder.id, [])
+      const second = await setAccess(s.superAdmin, 'files', docA.id, [])
+      const info = await api(s.superAdmin, 'GET', `/api/documents/folders/${subFolder.id}/access`)
+      const problems = []
+
+      if (first.status !== 200 || second.status !== 200) problems.push(`${first.status}/${second.status}`)
+      if ((await download(s.userAlfa, deep.id)).status !== 200) problems.push('subpasta não voltou a herdar')
+      if ((await download(s.userAlfa, docA.id)).status !== 200) problems.push('arquivo não voltou a herdar')
+
+      if (info.body?.data?.roles?.length !== 0 || info.body?.data?.inherited?.id !== accessRoot.id)
+        problems.push(`GET access: ${JSON.stringify(info.body?.data)}`)
+
+      if (info.body?.data?.inherited?.roles?.[0]?.id !== roles.alfa.id) problems.push('cargo herdado errado')
+
+      return { ok: !problems.length, detail: problems.join('; ') }
+    })
+
+    await test('Site: herda a pasta; referência a arquivo restrito vem indisponível (admin vê o mesmo arquivo)', async () => {
+      const site = (await mkSite(s.superAdmin, alfa.id, accessRoot.id, 'Site acesso')).body
+
+      const page = await addPage(site.data.id, null, 'Início', 0, [
+        { id: 'a1', type: 'file', fileId: docA.id, label: 'Aberto', description: '' },
+        { id: 'a2', type: 'file', fileId: secret.id, label: 'Segredo', description: '' }
+      ])
+
+      const pageRoute = `/api/documents/sites/${site.data.id}/pages/${page.id}`
+      const asUser = await api(s.userAlfa, 'GET', pageRoute)
+      const asAdmin = await api(s.adminAlfa, 'GET', pageRoute)
+      const siteGet = await api(s.userAlfa, 'GET', `/api/documents/sites/${site.data.id}`)
+      const problems = []
+
+      if (siteGet.status !== 200 || asUser.status !== 200)
+        return { ok: false, detail: `${siteGet.status}/${asUser.status}` }
+
+      if (!asUser.body.files?.[docA.id]?.available) problems.push('arquivo liberado ficou indisponível')
+
+      const hidden = asUser.body.files?.[secret.id]
+
+      if (hidden?.available !== false || Object.keys(hidden ?? {}).sort().join() !== 'available,id')
+        problems.push(`restrito vazou: ${JSON.stringify(hidden)}`)
+
+      if (!asAdmin.body.files?.[secret.id]?.available) problems.push('admin não vê o arquivo')
+
+      // Restringir o Site a outro cargo: nem o Site nem as páginas abrem
+      const put = await setAccess(s.superAdmin, 'files', site.data.id, [otherRole.id])
+      const closedSite = await api(s.userAlfa, 'GET', `/api/documents/sites/${site.data.id}`)
+      const closedPage = await api(s.userAlfa, 'GET', pageRoute)
+
+      if (put.status !== 200 || closedSite.status !== 403 || closedPage.status !== 403)
+        problems.push(`Site restrito: ${put.status}/${closedSite.status}/${closedPage.status}`)
+
+      return { ok: !problems.length, detail: problems.join('; ') }
+    })
+
+    // Arquivo liberado sozinho (estilo Google Drive): as pastas até ele aparecem só como caminho
+    const soloRoot = (await createFolder(s.superAdmin, { workspaceId: alfa.id, name: `[SMOKE] ${runId} solo` })).body
+
+    try {
+      const innerFolder = (
+        await createFolder(s.superAdmin, { workspaceId: alfa.id, parentId: soloRoot.id, name: 'Interna' })
+      ).body
+
+      const [um, dois] = (
+        await upload(s.superAdmin, alfa.id, soloRoot.id, [txt('um.txt', 'um'), txt('dois.txt', 'dois')])
+      ).body.data
+
+      const tres = (await upload(s.superAdmin, alfa.id, innerFolder.id, [txt('tres.txt', 'tres')])).body.data[0]
+      const rowOf = (listing, id) => listing.res.body?.data?.find(item => item.id === id)
+
+      await test('liberar só um arquivo: a pasta abre e lista apenas ele; irmãos e subpastas ficam ocultos', async () => {
+        const put = await setAccess(s.superAdmin, 'files', um.id, [roles.alfa.id])
+        const root = await listIds(s.userAlfa, null)
+        const inside = await listIds(s.userAlfa, soloRoot.id)
+        const folderGet = await api(s.userAlfa, 'GET', `/api/documents/folders/${soloRoot.id}`)
+        const hiddenSearch = await listIds(s.userAlfa, null, 'dois')
+        const foundSearch = await listIds(s.userAlfa, null, 'um.txt')
+        const tree = await treeIds(s.userAlfa)
+        const problems = []
+
+        if (put.status !== 200) return { ok: false, detail: describe(put) }
+        if (!root.ids.includes(soloRoot.id)) problems.push('pasta não aparece na raiz')
+        if (inside.res.status !== 200 || inside.ids.join() !== um.id) problems.push(`conteúdo da pasta: ${inside.ids}`)
+        if (folderGet.status !== 200 || folderGet.body?.counts !== null) problems.push(`GET pasta: ${describe(folderGet)}`)
+        if (hiddenSearch.ids.includes(dois.id)) problems.push('busca vaza o arquivo irmão')
+        if (!foundSearch.ids.includes(um.id)) problems.push('busca não acha o arquivo liberado')
+        if (!tree.includes(soloRoot.id) || tree.includes(innerFolder.id)) problems.push('árvore de pastas errada')
+        if ((await download(s.userAlfa, um.id)).status !== 200) problems.push('não baixou o liberado')
+        if ((await download(s.userAlfa, dois.id)).status !== 403) problems.push('baixou o irmão')
+        if ((await download(s.userAlfa, tres.id)).status !== 403) problems.push('baixou arquivo de subpasta oculta')
+        if ((await listIds(s.userAlfa, innerFolder.id)).res.status !== 403) problems.push('abriu subpasta oculta')
+
+        return { ok: !problems.length, detail: problems.join('; ') }
+      })
+
+      await test('só ver não baixa: abre e pré-visualiza, mas o download é 403 e a lista marca canDownload=false', async () => {
+        const put = await setAccess(s.superAdmin, 'files', um.id, [roles.alfa.id], false)
+        const asUser = await listIds(s.userAlfa, soloRoot.id)
+        const asAdmin = await listIds(s.adminAlfa, soloRoot.id)
+        const meta = await api(s.userAlfa, 'GET', `/api/documents/files/${um.id}`)
+        const preview = await api(s.userAlfa, 'GET', `/api/documents/files/${um.id}/preview-data`)
+        const auditWhere = { action: 'DOCUMENT_FILE_DOWNLOAD', entityId: um.id, userId: userAlfaRow.id }
+        const loggedBefore = await prisma.auditLog.count({ where: auditWhere })
+        const blocked = await download(s.userAlfa, um.id)
+        const problems = []
+
+        if (put.status !== 200) return { ok: false, detail: describe(put) }
+        if (rowOf(asUser, um.id)?.canDownload !== false) problems.push('lista deveria marcar canDownload=false')
+        if (rowOf(asAdmin, um.id)?.canDownload !== true) problems.push('admin deveria baixar')
+        if (meta.status !== 200 || meta.body?.canDownload !== false) problems.push(`GET arquivo: ${describe(meta)}`)
+        if (preview.status !== 200) problems.push(`preview-data: ${preview.status}`)
+        if (blocked.status !== 403 || blocked.buffer.length > 300) problems.push(`download: ${describe(blocked)}`)
+
+        if ((await prisma.auditLog.count({ where: auditWhere })) !== loggedBefore)
+          problems.push('download negado gerou log de download')
+
+        return { ok: !problems.length, detail: problems.join('; ') }
+      })
+
+      await test('pasta liberada só para ver: tudo dentro herda "só ver"; arquivo com cargo próprio pode baixar', async () => {
+        await setAccess(s.superAdmin, 'files', um.id, [])
+        await setAccess(s.superAdmin, 'folders', soloRoot.id, [roles.alfa.id], false)
+
+        const inside = await listIds(s.userAlfa, soloRoot.id)
+        const problems = []
+
+        if (![um.id, dois.id, innerFolder.id].every(id => inside.ids.includes(id))) problems.push('não herdou tudo')
+        if ((await listIds(s.userAlfa, innerFolder.id)).ids.join() !== tres.id) problems.push('subpasta não lista o arquivo')
+        if ((await download(s.userAlfa, dois.id)).status !== 403) problems.push('baixou com só ver herdado')
+        if ((await download(s.userAlfa, tres.id)).status !== 403) problems.push('baixou na subpasta com só ver')
+
+        await setAccess(s.superAdmin, 'files', tres.id, [roles.alfa.id], true)
+
+        if ((await download(s.userAlfa, tres.id)).status !== 200) problems.push('cargo próprio não deu o download')
+        if ((await download(s.userAlfa, dois.id)).status !== 403) problems.push('vazou o download para o irmão')
+
+        return { ok: !problems.length, detail: problems.join('; ') }
+      })
+
+      await test('pasta liberada com download: tudo dentro baixa', async () => {
+        await setAccess(s.superAdmin, 'files', tres.id, [])
+        await setAccess(s.superAdmin, 'folders', soloRoot.id, [roles.alfa.id], true)
+
+        const statuses = [
+          (await download(s.userAlfa, um.id)).status,
+          (await download(s.userAlfa, dois.id)).status,
+          (await download(s.userAlfa, tres.id)).status
+        ]
+
+        return { ok: statuses.every(code => code === 200), detail: statuses.join('/') }
+      })
+
+      // Liberação em lote: vários itens (de pastas diferentes) de uma vez, sem repetir item por item
+      const bulk = (session, items, mode, roleEntries) =>
+        api(session, 'POST', '/api/documents/access', { json: { items, mode, roles: roleEntries } })
+
+      const asFiles = (...files) => files.map(file => ({ kind: 'file', id: file.id }))
+      const alfaRole = canDownload => [{ roleId: roles.alfa.id, canDownload }]
+
+      await test('lote (adicionar): vários arquivos de pastas diferentes de uma vez; reaplicar muda o nível sem duplicar', async () => {
+        await setAccess(s.superAdmin, 'folders', soloRoot.id, [])
+
+        const added = await bulk(s.superAdmin, asFiles(um, dois, tres), 'add', alfaRole(false))
+        const inside = await listIds(s.userAlfa, soloRoot.id)
+        const innerList = await listIds(s.userAlfa, innerFolder.id)
+        const problems = []
+
+        if (added.status !== 200 || added.body?.data?.updated !== 3) return { ok: false, detail: describe(added) }
+        if (![um.id, dois.id, innerFolder.id].every(id => inside.ids.includes(id))) problems.push('pasta não mostra os liberados')
+        if (innerList.ids.join() !== tres.id) problems.push('subpasta não mostra só o liberado')
+        if ((await download(s.userAlfa, um.id)).status !== 403) problems.push('baixou com só ver')
+
+        const upgraded = await bulk(s.superAdmin, asFiles(um, dois, tres), 'add', alfaRole(true))
+        const info = await api(s.superAdmin, 'GET', `/api/documents/files/${um.id}/access`)
+
+        if (upgraded.status !== 200) problems.push(`reaplicar: ${upgraded.status}`)
+        if (info.body?.data?.roles?.length !== 1 || info.body.data.roles[0].canDownload !== true)
+          problems.push(`cargos de um.txt: ${JSON.stringify(info.body?.data?.roles)}`)
+
+        for (const file of [um, dois, tres])
+          if ((await download(s.userAlfa, file.id)).status !== 200) problems.push(`não baixou ${file.id}`)
+
+        return { ok: !problems.length, detail: problems.join('; ') }
+      })
+
+      await test('lote (adicionar) preserva os outros cargos de cada item; (remover) retira só os escolhidos', async () => {
+        await setAccess(s.superAdmin, 'files', dois.id, [otherRole.id], false)
+        await bulk(s.superAdmin, asFiles(dois), 'add', alfaRole(true))
+
+        const both = (await api(s.superAdmin, 'GET', `/api/documents/files/${dois.id}/access`)).body?.data?.roles ?? []
+        const removed = await bulk(s.superAdmin, asFiles(um, dois), 'remove', alfaRole(false))
+        const afterDois = (await api(s.superAdmin, 'GET', `/api/documents/files/${dois.id}/access`)).body?.data?.roles ?? []
+        const inside = await listIds(s.userAlfa, soloRoot.id)
+        const problems = []
+
+        if (both.length !== 2) problems.push(`após adicionar: ${both.map(role => role.name)}`)
+        if (removed.status !== 200) problems.push(`remover: ${removed.status}`)
+        if (afterDois.length !== 1 || afterDois[0].id !== otherRole.id) problems.push('remover tirou o cargo errado')
+        if (inside.ids.includes(um.id) || inside.ids.includes(dois.id)) problems.push('itens removidos continuam visíveis')
+
+        return { ok: !problems.length, detail: problems.join('; ') }
+      })
+
+      await test('lote (substituir): lista vazia limpa os cargos dos itens; pasta no lote libera o conteúdo', async () => {
+        const cleared = await bulk(s.superAdmin, asFiles(dois, tres), 'replace', [])
+
+        const grantsLeft = await grantRows([dois.id, tres.id])
+        const folderBulk = await bulk(s.superAdmin, [{ kind: 'folder', id: soloRoot.id }], 'replace', alfaRole(false))
+        const inside = await listIds(s.userAlfa, soloRoot.id)
+        const problems = []
+
+        if (cleared.status !== 200 || grantsLeft !== 0) problems.push(`limpar: ${cleared.status}/${grantsLeft}`)
+        if (folderBulk.status !== 200 || ![um.id, dois.id, innerFolder.id].every(id => inside.ids.includes(id)))
+          problems.push('pasta em lote não liberou o conteúdo')
+
+        return { ok: !problems.length, detail: problems.join('; ') }
+      })
+
+      await test('lote: ajustar nível e remover cargos na mesma chamada (removeRoleIds); remover sem adicionar também vale', async () => {
+        await bulk(s.superAdmin, asFiles(um, dois), 'replace', [
+          { roleId: roles.alfa.id, canDownload: true },
+          { roleId: otherRole.id, canDownload: true }
+        ])
+
+        const rolesOf = async file =>
+          ((await api(s.superAdmin, 'GET', `/api/documents/files/${file.id}/access`)).body?.data?.roles ?? []).map(
+            role => `${role.name}:${role.canDownload}`
+          )
+
+        const mixed = await api(s.superAdmin, 'POST', '/api/documents/access', {
+          json: { items: asFiles(um, dois), mode: 'add', roles: alfaRole(false), removeRoleIds: [otherRole.id] }
+        })
+
+        const afterMixed = [await rolesOf(um), await rolesOf(dois)]
+
+        const onlyRemove = await api(s.superAdmin, 'POST', '/api/documents/access', {
+          json: { items: asFiles(um), mode: 'add', roles: [], removeRoleIds: [roles.alfa.id] }
+        })
+
+        const invalid = await api(s.superAdmin, 'POST', '/api/documents/access', {
+          json: { items: asFiles(um), mode: 'replace', roles: [], removeRoleIds: [roles.alfa.id] }
+        })
+
+        const problems = []
+
+        if (mixed.status !== 200) problems.push(`misto: ${describe(mixed)}`)
+
+        if (afterMixed.some(list => list.length !== 1 || !list[0].endsWith(':false')))
+          problems.push(`após misto: ${JSON.stringify(afterMixed)}`)
+
+        if (onlyRemove.status !== 200 || (await rolesOf(um)).length !== 0)
+          problems.push(`só remover: ${onlyRemove.status}`)
+
+        if (invalid.status !== 400) problems.push(`removeRoleIds com replace: ${invalid.status}`)
+
+        return { ok: !problems.length, detail: problems.join('; ') }
+      })
+
+      await test('lote: validações (workspaces misturados, cargo de fora, corpo inválido, vazio, limite, inexistente) → 4xx sem gravar', async () => {
+        const before = await grantRows([um.id, dois.id, tres.id, soloRoot.id])
+
+        const attempts = [
+          [await bulk(s.superAdmin, [...asFiles(um), ...asFiles(targets.beta.file)], 'add', alfaRole(true)), 400],
+          [await bulk(s.superAdmin, asFiles(um), 'add', [{ roleId: roles.beta.id, canDownload: true }]), 400],
+          [await bulk(s.superAdmin, asFiles(um), 'add', []), 400],
+          [await bulk(s.superAdmin, asFiles(um), 'mudar', alfaRole(true)), 400],
+          [await bulk(s.superAdmin, [], 'add', alfaRole(true)), 400],
+          [await bulk(s.superAdmin, [{ kind: 'x', id: um.id }], 'add', alfaRole(true)), 400],
+          [await bulk(s.superAdmin, Array.from({ length: 201 }, (_, index) => ({ kind: 'file', id: `x${index}` })), 'add', alfaRole(true)), 400],
+          [await bulk(s.superAdmin, [{ kind: 'file', id: 'inexistente' }], 'add', alfaRole(true)), 404],
+          [await bulk(s.adminAlfa, asFiles(um), 'add', alfaRole(true)), 403],
+          [await bulk(s.userAlfa, asFiles(um), 'add', alfaRole(true)), 403],
+          [await bulk(s.userBeta, asFiles(um), 'add', alfaRole(true)), 403]
+        ]
+
+        const wrong = attempts.map(([res, expected], index) => (res.status === expected ? null : `${index}:${res.status}`)).filter(Boolean)
+        const after = await grantRows([um.id, dois.id, tres.id, soloRoot.id])
+
+        return { ok: !wrong.length && before === after, detail: `fora do esperado: ${wrong.join(',')} grants ${before}→${after}` }
+      })
+
+      await test('lote: cada item vira um registro DOCUMENT_ACCESS_UPDATE com bulk=true', async () => {
+        const logs = await prisma.auditLog.findMany({
+          where: { action: 'DOCUMENT_ACCESS_UPDATE', entityId: { in: [um.id, dois.id, tres.id] } }
+        })
+
+        const bulkLogs = logs.filter(log => log.metadata?.bulk === true)
+
+        return { ok: bulkLogs.length >= 3 && bulkLogs.every(log => log.tenantId === alfa.id), detail: `${bulkLogs.length}` }
+      })
+    } finally {
+      await api(s.superAdmin, 'DELETE', `/api/documents/folders/${soloRoot.id}`)
+    }
+
+    await test('PUT /access: cargo de outro workspace, inexistente ou corpo inválido → 400; nada é gravado', async () => {
+      const before = await grantRows([subFolder.id])
+      const route = `/api/documents/folders/${subFolder.id}/access`
+
+      const attempts = [
+        await setAccess(s.superAdmin, 'folders', subFolder.id, [roles.beta.id]),
+        await setAccess(s.superAdmin, 'folders', subFolder.id, ['cargo-inexistente']),
+        await setAccess(s.superAdmin, 'folders', subFolder.id, [roles.alfa.id, roles.beta.id]),
+        await api(s.superAdmin, 'PUT', route, { json: { roles: 'x' } }),
+        await api(s.superAdmin, 'PUT', route, { json: { roles: [{ roleId: 1 }] } }),
+        await api(s.superAdmin, 'PUT', route, { json: {} })
+      ]
+
+      return {
+        ok: attempts.every(res => res.status === 400) && (await grantRows([subFolder.id])) === before,
+        detail: attempts.map(res => res.status).join('/')
+      }
+    })
+
+    await test('admin e user não gerenciam o acesso (GET/PUT → 403); subAdmin gerencia', async () => {
+      const calls = [
+        await setAccess(s.adminAlfa, 'folders', accessRoot.id, []),
+        await setAccess(s.userAlfa, 'folders', accessRoot.id, []),
+        await setAccess(s.userBeta, 'folders', accessRoot.id, []),
+        await api(s.userAlfa, 'GET', `/api/documents/folders/${accessRoot.id}/access`),
+        await api(s.adminAlfa, 'GET', `/api/documents/files/${docA.id}/access`),
+        await api(s.convidado, 'GET', `/api/documents/files/${docA.id}/access`)
+      ]
+
+      const sub = await setAccess(s.subAdmin, 'folders', subFolder.id, [])
+      const intact = (await listIds(s.userAlfa, accessRoot.id)).res.status === 200
+
+      return {
+        ok: calls.every(res => res.status === 403) && sub.status === 200 && intact,
+        detail: `${calls.map(res => res.status).join('/')} sub=${sub.status} intacto=${intact}`
+      }
+    })
+
+    await test('userBeta (outro workspace) continua sem acesso mesmo com a pasta liberada em Alfa', async () => {
+      const calls = [
+        await api(s.userBeta, 'GET', `/api/documents?workspaceId=${alfa.id}&folderId=${accessRoot.id}`),
+        await download(s.userBeta, docA.id),
+        await api(s.userBeta, 'GET', `/api/documents/folders/${accessRoot.id}`)
+      ]
+
+      return {
+        ok: calls.every(res => res.status === 403 || res.status === 404),
+        detail: calls.map(res => res.status).join('/')
+      }
+    })
+
+    await test('a mudança de acesso é auditada (DOCUMENT_ACCESS_UPDATE) com os cargos depois', async () => {
+      const log = await prisma.auditLog.findFirst({
+        where: { action: 'DOCUMENT_ACCESS_UPDATE', entityId: accessRoot.id },
+        orderBy: { createdAt: 'asc' }
+      })
+
+      return {
+        ok: !!log && log.tenantId === alfa.id && JSON.stringify(log.after ?? {}).includes(roles.alfa.id),
+        detail: JSON.stringify(log)
+      }
+    })
+
+    await test('excluir arquivo e pasta apaga as concessões (sem órfãos em RolePermission)', async () => {
+      await setAccess(s.superAdmin, 'files', deep.id, [roles.alfa.id])
+      await setAccess(s.superAdmin, 'folders', subFolder.id, [roles.alfa.id])
+
+      const ids = [accessRoot.id, subFolder.id, deep.id, docA.id]
+      const before = await grantRows(ids)
+      const delFile = await api(s.superAdmin, 'DELETE', `/api/documents/files/${deep.id}`)
+      const afterFile = await grantRows([deep.id])
+      const delFolder = await api(s.superAdmin, 'DELETE', `/api/documents/folders/${accessRoot.id}`)
+      const afterFolder = await grantRows(ids)
+
+      return {
+        ok: before >= 3 && delFile.status === 200 && afterFile === 0 && delFolder.status === 200 && afterFolder === 0,
+        detail: `antes=${before} arquivo=${delFile.status}/${afterFile} pasta=${delFolder.status}/${afterFolder}`
+      }
+    })
+  } finally {
+    await prisma.user.update({ where: { id: userAlfaRow.id }, data: { customRoleId: userAlfaRow.customRoleId } })
+
+    for (const folder of [accessRoot, hiddenRoot])
+      await api(s.superAdmin, 'DELETE', `/api/documents/folders/${folder.id}`)
+
+    // As concessões do cargo saem junto com ele (chave estrangeira em cascata)
+    await prisma.customRole.delete({ where: { id: otherRole.id } })
+  }
 }
 
 main()

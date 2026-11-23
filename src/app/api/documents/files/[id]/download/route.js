@@ -12,12 +12,12 @@ import {
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
 
-// GET /api/documents/files/:id/download - baixa o arquivo (todos os perfis com acesso ao workspace)
+// GET /api/documents/files/:id/download - baixa o arquivo (exige a permissão de baixar: ver não basta)
 async function handleGet(req, { params }) {
   const { id } = await params
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
-  const access = await getAuthorizedDocumentItem({ kind: 'file', id, session, action: 'view' })
+  const access = await getAuthorizedDocumentItem({ kind: 'file', id, session, action: 'download' })
 
   if (!access.ok) {
     logger.warn('document-file-download-denied', { requestId, fileId: id, status: access.status })

@@ -19,6 +19,7 @@ import {
   serializeFile,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { deleteItemGrants } from '@/libs/documentGrants'
 
 // GET /api/documents/files/:id - metadados do arquivo
 async function handleGet(req, { params }) {
@@ -31,7 +32,10 @@ async function handleGet(req, { params }) {
     return jsonWithRequestId({ message: access.message }, { status: access.status, requestId })
   }
 
-  return jsonWithRequestId(serializeFile(access.item), { requestId })
+  return jsonWithRequestId(
+    { ...serializeFile(access.item), canDownload: access.viewer.canDownloadFile(access.item) },
+    { requestId }
+  )
 }
 
 // PATCH /api/documents/files/:id - renomeia arquivo mantendo a extensão (SuperAdmin/SubAdmin)
@@ -158,7 +162,10 @@ async function handleDelete(req, { params }) {
   const existing = access.item
 
   try {
-    await prisma.documentFile.delete({ where: { id } })
+    await prisma.$transaction(async tx => {
+      await tx.documentFile.delete({ where: { id } })
+      await deleteItemGrants(tx, [id]) // sem chave estrangeira: os cargos liberados saem junto
+    })
   } catch (error) {
     logger.error('document-file-delete-error', { requestId, fileId: id, error: error.message })
 

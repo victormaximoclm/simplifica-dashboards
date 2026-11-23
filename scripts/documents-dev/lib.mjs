@@ -69,7 +69,9 @@ export const MOCK_USERS = {
   convidado: { email: 'mock.convidado@example.test', name: '[MOCK] Convidado', role: 'user', workspace: null }
 }
 
-export const MOCK_CUSTOM_ROLE_NAME = '[MOCK] Leitor Beta'
+/** Cargos do mock: cada um pertence a um workspace e é liberado nos itens da raiz (acesso por cargo, documentGrants.js) */
+export const MOCK_ROLES = { alfa: '[MOCK] Leitor Alfa', beta: '[MOCK] Leitor Beta' }
+export const MOCK_CUSTOM_ROLE_NAME = MOCK_ROLES.beta
 
 // Conteúdo no formato JSON do editor (Tiptap), o mesmo que a UI envia para /api/documents/html
 const text = (value, marks) =>

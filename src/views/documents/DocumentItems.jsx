@@ -1,5 +1,6 @@
 'use client'
 
+import Checkbox from '@mui/material/Checkbox'
 import Table from '@mui/material/Table'
 import TableBody from '@mui/material/TableBody'
 import TableCell from '@mui/material/TableCell'
@@ -55,6 +56,20 @@ const ItemLocation = ({ item, onOpenLocation, className = '' }) => {
   )
 }
 
+// Só quem gerencia recebe `accessRoles`: cadeado nos itens com cargos próprios (o nome dos cargos fica no title)
+const AccessBadge = ({ item }) => {
+  if (!item.accessRoles?.length) return null
+
+  return (
+    <i
+      className={`tabler-lock text-sm shrink-0 ${formMutedCls}`}
+      title={`Acesso restrito aos cargos: ${item.accessRoles
+        .map(role => `${role.name} (${role.canDownload ? 'ver e baixar' : 'só ver'})`)
+        .join(', ')}`}
+    />
+  )
+}
+
 const ellipsis = { overflow: 'hidden', textOverflow: 'ellipsis', whiteSpace: 'nowrap' }
 
 // Com table-layout fixo as larguras vêm do cabeçalho; "Nome" ocupa o restante e trunca nomes longos
@@ -69,14 +84,28 @@ const COLUMNS = {
   size: column(110, 'md'),
   updatedAt: column(140, 'md'),
   createdBy: column(180, 'lg'),
+  select: { width: 48, padding: 0 },
   actions: { width: 64 }
 }
 
-export const DocumentItemsTable = ({ items, onOpen, onOpenLocation, getOptions }) => (
+export const DocumentItemsTable = ({ items, onOpen, onOpenLocation, getOptions, selection = null }) => (
   <div className={`${formCardCls} overflow-hidden`}>
     <Table size='small' sx={{ tableLayout: 'fixed', width: '100%' }}>
       <TableHead>
         <TableRow>
+          {selection && (
+            <TableCell sx={COLUMNS.select}>
+              <Checkbox
+                size='small'
+                checked={items.length > 0 && items.every(item => selection.isSelected(item))}
+                indeterminate={
+                  items.some(item => selection.isSelected(item)) && !items.every(item => selection.isSelected(item))
+                }
+                onChange={() => selection.onToggleAll(items)}
+                inputProps={{ 'aria-label': 'Selecionar todos' }}
+              />
+            </TableCell>
+          )}
           <TableCell sx={ellipsis}>Nome</TableCell>
           <TableCell sx={COLUMNS.type}>Tipo</TableCell>
           <TableCell sx={COLUMNS.size}>Tamanho</TableCell>
@@ -87,7 +116,23 @@ export const DocumentItemsTable = ({ items, onOpen, onOpenLocation, getOptions }
       </TableHead>
       <TableBody>
         {items.map(item => (
-          <TableRow key={`${item.kind}-${item.id}`} hover sx={{ '&:last-child td': { borderBottom: 0 } }}>
+          <TableRow
+            key={`${item.kind}-${item.id}`}
+            hover
+            selected={!!selection?.isSelected(item)}
+            className={selection?.isSelected(item) ? 'bg-[var(--mui-palette-primary-lightOpacity)]' : ''}
+            sx={{ '&:last-child td': { borderBottom: 0 } }}
+          >
+            {selection && (
+              <TableCell sx={COLUMNS.select}>
+                <Checkbox
+                  size='small'
+                  checked={selection.isSelected(item)}
+                  onChange={() => selection.onToggle(item)}
+                  inputProps={{ 'aria-label': `Selecionar ${item.name}` }}
+                />
+              </TableCell>
+            )}
             <TableCell sx={ellipsis}>
               <button
                 type='button'
@@ -101,6 +146,7 @@ export const DocumentItemsTable = ({ items, onOpen, onOpenLocation, getOptions }
                   }`}
                 />
                 <span className={`min-w-0 truncate text-sm font-medium ${itemNameCls}`}>{item.name}</span>
+                <AccessBadge item={item} />
               </button>
               <ItemLocation item={item} onOpenLocation={onOpenLocation} className='mt-0.5 ps-8' />
             </TableCell>
@@ -120,13 +166,22 @@ export const DocumentItemsTable = ({ items, onOpen, onOpenLocation, getOptions }
   </div>
 )
 
-export const DocumentItemsGrid = ({ items, onOpen, onOpenLocation, getOptions }) => (
+export const DocumentItemsGrid = ({ items, onOpen, onOpenLocation, getOptions, selection = null }) => (
   <div className='grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4 gap-4'>
     {items.map(item => (
       <div
         key={`${item.kind}-${item.id}`}
-        className={`group relative min-w-0 overflow-hidden ${formCardCls} p-4 flex items-start gap-3 hover:border-[var(--mui-palette-primary-main)] hover:shadow-md transition-all`}
+        className={`group relative min-w-0 overflow-hidden ${formCardCls} p-4 flex items-start gap-3 hover:border-[var(--mui-palette-primary-main)] hover:shadow-md transition-all ${selection?.isSelected(item) ? 'border-[var(--mui-palette-primary-main)] bg-[var(--mui-palette-primary-lightOpacity)]' : ''}`}
       >
+        {selection && (
+          <Checkbox
+            size='small'
+            checked={selection.isSelected(item)}
+            onChange={() => selection.onToggle(item)}
+            inputProps={{ 'aria-label': `Selecionar ${item.name}` }}
+            sx={{ p: 0.5, ml: -1, mt: -0.5 }}
+          />
+        )}
         <div className='flex-1 min-w-0'>
           <button
             type='button'
@@ -138,7 +193,10 @@ export const DocumentItemsGrid = ({ items, onOpen, onOpenLocation, getOptions })
               <i className={`${getItemIcon(item)} text-xl text-[var(--mui-palette-primary-main)]`} />
             </div>
             <div className='flex-1 min-w-0'>
-              <h6 className={`truncate text-base font-semibold ${itemNameCls}`}>{item.name}</h6>
+              <h6 className={`flex items-center gap-1.5 text-base font-semibold ${itemNameCls}`}>
+                <span className='truncate'>{item.name}</span>
+                <AccessBadge item={item} />
+              </h6>
               <p className={`text-xs ${formMutedCls} mt-0.5 truncate`}>
                 {getItemSubtitle(item)}
                 {formatDate(item.updatedAt)}

@@ -8,6 +8,7 @@ import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { createFolderSchema, parseBody } from '@/libs/validations'
 import { canCreateDocuments } from '@/libs/documentPermissions'
+import { getDocumentViewer } from '@/libs/documentGrants'
 import {
   DocumentConflictError,
   MAX_FOLDER_DEPTH,
@@ -37,8 +38,10 @@ async function handleGet(req) {
     return jsonWithRequestId({ message: access.message }, { status: access.status, requestId })
   }
 
+  const viewer = await getDocumentViewer(session.user, access.workspace)
+
   const folders = await prisma.documentFolder.findMany({
-    where: { workspaceId: access.workspace.id },
+    where: { AND: [{ workspaceId: access.workspace.id }, viewer.folderWhere()] },
     select: { id: true, name: true, parentId: true },
     orderBy: { name: 'asc' }
   })

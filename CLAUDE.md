@@ -15,7 +15,7 @@ Para a arquitetura detalhada, veja [docs/CODEBASE_MAP.md](docs/CODEBASE_MAP.md).
 - Textos de interface e mensagens em português; só o menu lateral usa os dicionários de `src/data/dictionaries`.
 - Sem ponto e vírgula, aspas simples, 120 colunas (Prettier), linha em branco antes de `return`.
 - Papéis: `superAdmin > subAdmin > admin > user`. Regras de acesso por workspace ficam em `src/utils/roleHelpers.js` e `src/libs/workspaceAccess.js`.
-- Permissões de Documentos: um único ponto de decisão, `src/libs/documentPermissions.js`.
+- Permissões de Documentos: um único ponto de decisão por perfil, `src/libs/documentPermissions.js`; acesso por cargo a pastas e arquivos em `src/libs/documentGrants.js` (item sem cargos = só admin e acima; "ver" e "baixar" são permissões separadas).
 
 ## Comandos
 

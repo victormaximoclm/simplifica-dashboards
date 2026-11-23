@@ -205,16 +205,17 @@ const VerticalMenu = ({ dictionary, scrollMenu }) => {
             {dictionary['navigation'].documents || 'Documentos'}
           </MenuItem>
         )}
+        {/* Funções (cargos) pertencem a um workspace, como dashboards, formulários e documentos: ficam acima do divisor */}
+        {isHighAdmin && (
+          <MenuItem href={`/${locale}/apps/roles`} icon={<i className='tabler-lock' />}>
+            {dictionary['navigation'].roles}
+          </MenuItem>
+        )}
         {(isHighAdmin || isAdmin) && (
           <MenuSection label={dictionary['navigation'].appsPages}>
             <MenuItem href={`/${locale}/apps/user/list`} icon={<i className='tabler-user' />}>
               {dictionary['navigation'].list}
             </MenuItem>
-            {isHighAdmin && (
-              <MenuItem href={`/${locale}/apps/roles`} icon={<i className='tabler-lock' />}>
-                {dictionary['navigation'].roles}
-              </MenuItem>
-            )}
             {isHighAdmin && (
               <MenuItem href={`/${locale}/apps/workspaces`} icon={<i className='tabler-building' />}>
                 {dictionary['navigation'].workspaces}

@@ -51,9 +51,10 @@ export async function readSiteJsonBody(req) {
  * pode ver o quê: se o módulo ganhar permissão por arquivo, ela entra aqui.
  *
  * Cada id pedido volta no mapa. Disponível: metadados no formato da listagem (nunca storageKey). Excluído, de outro
- * workspace, sem blob ou Site: só { id, available: false }, sem nenhum dado (os três casos são indistinguíveis).
+ * workspace, sem blob, Site ou sem acesso do leitor (`viewer`, só na leitura): só { id, available: false }, sem
+ * nenhum dado (todos esses casos são indistinguíveis).
  */
-export async function resolveSiteFileRefs(fileIds, workspaceId) {
+export async function resolveSiteFileRefs(fileIds, workspaceId, viewer = null) {
   const files = {}
 
   for (const id of fileIds) files[id] = { id, available: false }
@@ -65,7 +66,16 @@ export async function resolveSiteFileRefs(fileIds, workspaceId) {
     include: documentCreatorInclude
   })
 
-  for (const row of rows) files[row.id] = { ...serializeFile(row), available: true }
+  for (const row of rows) {
+    // Na leitura, o acesso por cargo da pasta/arquivo vale também para referências dentro das páginas
+    if (viewer && !viewer.canSeeFile(row)) continue
+
+    files[row.id] = {
+      ...serializeFile(row),
+      available: true,
+      canDownload: viewer ? viewer.canDownloadFile(row) : true
+    }
+  }
 
   return files
 }

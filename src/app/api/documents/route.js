@@ -18,6 +18,7 @@ import {
   serializeFolder,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { getDocumentViewer, getGrantedRolesByResource } from '@/libs/documentGrants'
 
 // GET /api/documents?workspaceId=&folderId=&q=&page=&pageSize= - conteúdo de uma pasta (vazio = raiz);
 // com q, busca recursiva na pasta e subpastas
@@ -48,6 +49,8 @@ async function handleGet(req) {
   const { workspace } = access
 
   try {
+    // Quem enxerga o quê: cargos liberados por pasta/arquivo (documentGrants.js)
+    const viewer = await getDocumentViewer(session.user, workspace)
     let folder = null
 
     if (folderId) {
@@ -55,6 +58,10 @@ async function handleGet(req) {
 
       if (!folder) {
         return jsonWithRequestId({ message: 'Pasta não encontrada' }, { status: 404, requestId })
+      }
+
+      if (!viewer.canSeeFolder(folderId)) {
+        return jsonWithRequestId({ message: 'Acesso negado' }, { status: 403, requestId })
       }
     }
 
@@ -73,6 +80,9 @@ async function handleGet(req) {
       folderWhere = { workspaceId: workspace.id, ...nameFilter, ...(scope && { parentId: scope }) }
       fileWhere = { workspaceId: workspace.id, ...nameFilter, ...(scope && { folderId: scope }) }
     }
+
+    folderWhere = { AND: [folderWhere, viewer.folderWhere()] }
+    fileWhere = { AND: [fileWhere, viewer.fileWhere()] }
 
     const [folderTotal, fileTotal] = await Promise.all([
       prisma.documentFolder.count({ where: folderWhere }),
@@ -109,25 +119,37 @@ async function handleGet(req) {
     ])
 
     const total = folderTotal + fileTotal
+    const permissions = getDocumentPermissions(session.user, workspace)
+
+    // Quem gerencia vê, em cada item, os cargos liberados (a tela mostra o cadeado e abre "Gerenciar acesso")
+    const rolesByItem = permissions.canEdit
+      ? await getGrantedRolesByResource([...folders, ...files].map(item => item.id))
+      : null
 
     // Na busca, cada item informa onde está (caminho da pasta que o contém, a partir da raiz)
-    const withLocation = (item, parentId) =>
-      folderTree ? { ...item, location: buildFolderPath(folderTree, parentId) } : item
+    const decorate = (item, parentId) => ({
+      ...item,
+
+      // A tela só mostra "Baixar" para quem tem a permissão (o servidor confere de novo no download)
+      ...(item.kind === 'file' && { canDownload: viewer.canDownloadFile({ id: item.id, folderId: item.folderId }) }),
+      ...(folderTree && { location: buildFolderPath(folderTree, parentId) }),
+      ...(rolesByItem && { accessRoles: rolesByItem.get(item.id) ?? [] })
+    })
 
     logger.debug('documents-list-success', { requestId, userId: session.user.id, workspaceId: workspace.id, total })
 
     return jsonWithRequestId(
       {
         data: [
-          ...folders.map(folder => withLocation(serializeFolder(folder), folder.parentId)),
-          ...files.map(file => withLocation(serializeFile(file), file.folderId))
+          ...folders.map(folder => decorate(serializeFolder(folder), folder.parentId)),
+          ...files.map(file => decorate(serializeFile(file), file.folderId))
         ],
         search: q ? { query: q, recursive: true } : null,
         pagination: { page, pageSize, total, totalPages: Math.max(1, Math.ceil(total / pageSize)) },
         folder: folder ? { id: folder.id, name: folder.name, parentId: folder.parentId } : null,
         ancestors,
         workspace: { id: workspace.id, name: workspace.name },
-        permissions: getDocumentPermissions(session.user, workspace)
+        permissions
       },
       { requestId }
     )

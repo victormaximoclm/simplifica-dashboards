@@ -14,9 +14,9 @@ import prismaPkg from '@prisma/client'
 
 import {
   BASE_URL,
-  MOCK_CUSTOM_ROLE_NAME,
   MOCK_HTML_DOCUMENTS,
   MOCK_HTML_TEMPLATES,
+  MOCK_ROLES,
   MOCK_PASSWORD,
   MOCK_USERS,
   MOCK_WORKSPACES,
@@ -57,11 +57,15 @@ async function ensureBaseData() {
     })
   }
 
-  const customRole = await prisma.customRole.upsert({
-    where: { workspaceId_name: { workspaceId: workspaces.beta.id, name: MOCK_CUSTOM_ROLE_NAME } },
-    update: {},
-    create: { name: MOCK_CUSTOM_ROLE_NAME, workspaceId: workspaces.beta.id }
-  })
+  const roles = {}
+
+  for (const key of ['alfa', 'beta']) {
+    roles[key] = await prisma.customRole.upsert({
+      where: { workspaceId_name: { workspaceId: workspaces[key].id, name: MOCK_ROLES[key] } },
+      update: {},
+      create: { name: MOCK_ROLES[key], workspaceId: workspaces[key].id }
+    })
+  }
 
   const password = await bcrypt.hash(MOCK_PASSWORD, 10)
   const users = {}
@@ -73,7 +77,7 @@ async function ensureBaseData() {
       status: 'active',
       password,
       workspaceId: user.workspace ? workspaces[user.workspace].id : null,
-      customRoleId: key === 'userBeta' ? customRole.id : null,
+      customRoleId: key === 'userAlfa' ? roles.alfa.id : key === 'userBeta' ? roles.beta.id : null,
       termsAccepted: true,
       termsAcceptedAt: new Date()
     }
@@ -91,7 +95,7 @@ async function ensureBaseData() {
     create: { workspaceId: workspaces.privado.id, userId: users.convidado.id, permission: 'view' }
   })
 
-  return { workspaces, users }
+  return { workspaces, users, roles }
 }
 
 // ── Documentos (via API) ────────────────────
@@ -508,7 +512,7 @@ async function clean() {
   // Usuários antes dos workspaces (o convidado e o superAdmin [MOCK] não pertencem a nenhum)
   const users = await prisma.user.deleteMany({ where: { email: { in: mockEmails } } })
 
-  await prisma.customRole.deleteMany({ where: { name: MOCK_CUSTOM_ROLE_NAME } })
+  await prisma.customRole.deleteMany({ where: { name: { in: Object.values(MOCK_ROLES) } } })
 
   const deletedWorkspaces = await prisma.workspace.deleteMany({ where: { slug: { in: mockSlugs } } })
 
@@ -516,6 +520,35 @@ async function clean() {
     `\n✔ Limpeza concluída: ${deletedWorkspaces.count} workspaces, ${users.count} usuários, ` +
       `${audit.count} registros de auditoria e ${notifications.count} notificações [MOCK] removidos.`
   )
+}
+
+// Acesso por cargo: o cargo "Leitor" de Alfa e de Beta é liberado nos itens da raiz do próprio workspace (o conteúdo
+// das pastas herda). Sem isso, usuário comum não veria nada (item sem cargos = só admin e acima). Idempotente.
+// O [MOCK] Privado fica sem cargos de propósito: serve para testar o convidado, que não vê nada.
+async function ensureMockAccess(session, workspaces, roles) {
+  for (const key of ['alfa', 'beta']) {
+    const workspace = workspaces[key]
+    const accessRoles = [{ roleId: roles[key].id, canDownload: true }]
+
+    for (let page = 1; ; page++) {
+      const res = await api(session, 'GET', `/api/documents?workspaceId=${workspace.id}&pageSize=100&page=${page}`)
+      const body = expectStatus(res, 200, `listar ${workspace.name}`)
+
+      for (const item of body.data) {
+        const route = item.kind === 'folder' ? 'folders' : 'files'
+
+        expectStatus(
+          await api(session, 'PUT', `/api/documents/${route}/${item.id}/access`, { json: { roles: accessRoles } }),
+          200,
+          `liberar "${item.name}" para ${MOCK_ROLES[key]}`
+        )
+      }
+
+      if (page >= body.pagination.totalPages) break
+    }
+  }
+
+  console.log('  Acesso por cargo liberado nos itens da raiz de [MOCK] Alfa e [MOCK] Beta.')
 }
 
 // ── Execução ────────────────────────────────
@@ -529,7 +562,7 @@ async function main() {
 
   console.log('Criando base [MOCK] (workspaces, função e usuários)...')
 
-  const { workspaces } = await ensureBaseData()
+  const { workspaces, roles } = await ensureBaseData()
   const workspaceIds = Object.values(workspaces).map(ws => ws.id)
   const existing = await prisma.documentFolder.count({ where: { workspaceId: { in: workspaceIds } } })
 
@@ -560,6 +593,7 @@ async function main() {
   await ensureHtmlTemplates(session, workspaces)
   await ensureHtmlDocuments(session, workspaces)
   await ensureMockSite(session, workspaces)
+  await ensureMockAccess(session, workspaces, roles)
 
   // Dentro do serviço `tools` a app é "app:3000"; no navegador do host é localhost
   const browserUrl = BASE_URL.replace('//app:', '//localhost:')
