@@ -16,158 +16,151 @@ import { createRateLimit } from '@/libs/rateLimit'
 
 const submitLimiter = createRateLimit({ interval: 60_000, limit: 30 })
 
-/**
- * Registra o envio no AuditLog. Envio por link público fica com userId nulo (a coluna aponta para User) e guarda só
- * o id do link, nunca o token.
- */
-const auditSubmit = ({ action, session, form, requestId, isPublic, publicLinkId = null, after = {} }) =>
-  createAuditLog({
-    userId: session?.user?.id ?? null,
-    tenantId: form.workspaceId,
-    action,
-    entityType: 'form',
-    entityId: form.id,
-    after: { ...after, isPublicSubmission: isPublic, publicLinkId },
-    metadata: { requestId, name: form.title, via: isPublic ? 'public_link' : 'session' }
-  })
+// O n8n pode demorar (fluxos que só respondem no fim); sem limite, uma conexão travada nunca vira registro
+const WEBHOOK_TIMEOUT_MS = 60_000
 
+// Um registro de "muitos envios" por formulário a cada 5 min: um bloqueio em massa não enche a auditoria
+const RATE_LIMIT_AUDIT_WINDOW_MS = 5 * 60_000
+
+const LINK_REJECTION_MESSAGES = {
+  link_revoked: 'Link desativado. Não é possível enviar respostas.',
+  link_already_used: 'Link já utilizado. Não é possível enviar outra resposta.',
+  link_expired: 'Link expirado. Não é possível enviar respostas.'
+}
+
+/**
+ * Todo envio vira um registro no AuditLog, com sucesso ou não:
+ * - FORM_SUBMIT: chegou ao n8n
+ * - FORM_SUBMIT_REJECTED: recusado pelo pedido (link, permissão, campos, limite de envios)
+ * - FORM_SUBMIT_FAILED: o sistema falhou (n8n com erro, fora do ar, sem resposta, erro interno)
+ * `after.reason` diz o motivo. Envio por link público fica com userId nulo e guarda só o id do link, nunca o token.
+ */
 // POST /api/forms/[id]/submit - dispara webhook n8n
 export async function POST(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
+  let formId = null
+  let form = null
+  // null até ler o corpo: um bloqueio por limite ou um corpo ilegível não sabe se veio de link público
+  let isPublic = null
+  let publicLinkId = null
+
+  const reply = (status, body) => {
+    const response = NextResponse.json(body, { status })
+
+    response.headers.set('x-request-id', requestId)
+
+    return response
+  }
+
+  const audit = (action, after = {}) =>
+    createAuditLog({
+      userId: session?.user?.id ?? null,
+      tenantId: form?.workspaceId ?? null,
+      action,
+      entityType: 'form',
+      // O id vem da URL: num "formulário não encontrado" pode ser qualquer texto
+      entityId: formId ? String(formId).slice(0, 100) : null,
+      after: { ...after, isPublicSubmission: isPublic, publicLinkId },
+      metadata: {
+        requestId,
+        name: form?.title ?? null,
+        via: isPublic === null ? null : isPublic ? 'public_link' : 'session'
+      }
+    })
+
+  const reject = async (status, message, reason, extra = {}) => {
+    await audit('FORM_SUBMIT_REJECTED', { reason, message, ...extra })
+
+    return reply(status, { message })
+  }
+
   try {
+    formId = (await params).id
+
     const rate = await submitLimiter.check(req)
 
     if (!rate.success) {
-      logger.warn('form-submit-rate-limit', { requestId })
-      const response = NextResponse.json({ message: 'Muitos envios em sequência. Aguarde um instante.' }, { status: 429 })
+      logger.warn('form-submit-rate-limit', { requestId, formId })
 
-      response.headers.set('x-request-id', requestId)
-      
-return response
+      const alreadyLogged = await prisma.auditLog.findFirst({
+        where: {
+          action: 'FORM_SUBMIT_REJECTED',
+          entityType: 'form',
+          entityId: formId,
+          createdAt: { gte: new Date(Date.now() - RATE_LIMIT_AUDIT_WINDOW_MS) },
+          after: { path: ['reason'], equals: 'rate_limited' }
+        },
+        select: { id: true }
+      })
+
+      const message = 'Muitos envios em sequência. Aguarde um instante.'
+
+      return alreadyLogged ? reply(429, { message }) : reject(429, message, 'rate_limited')
     }
 
-    const { id } = await params
-    const body = await req.json()
-    const { data, fields: fieldsPayload, publicToken } = body
+    let body
+
+    try {
+      body = await req.json()
+    } catch {
+      return reject(400, 'Dados do formulário inválidos.', 'invalid_request')
+    }
+
+    const { data, fields: fieldsPayload, publicToken } = body ?? {}
     const fields = fieldsPayload ?? data ?? {}
 
-    const form = await prisma.form.findUnique({
-      where: { id },
-      include: { workspace: true }
-    })
+    // Desde já: um envio recusado ou com falha também diz se veio de link público
+    isPublic = Boolean(publicToken)
 
-    if (!form) {
-      const response = NextResponse.json({ message: 'Formulário não encontrado' }, { status: 404 })
+    form = await prisma.form.findUnique({ where: { id: formId }, include: { workspace: true } })
 
-      response.headers.set('x-request-id', requestId)
-      
-return response
+    if (!form) return reject(404, 'Formulário não encontrado', 'form_not_found')
+
+    // Identifica o link antes de tudo (sem consumir): qualquer recusa ou falha depois já diz qual link foi usado
+    const findLink = () =>
+      prisma.formPublicLink.findUnique({
+        where: { token: publicToken },
+        select: { id: true, used: true, revokedAt: true, formId: true }
+      })
+
+    if (publicToken) {
+      const link = await findLink()
+
+      if (!link || link.formId !== formId) return reject(403, 'Token inválido', 'invalid_token')
+
+      publicLinkId = link.id
     }
 
     // Só repassa ao n8n o que o formulário geraria: campos conhecidos, obrigatórios e regex conferidos
     const validation = validateSubmission(form.fields, fields)
 
     if (validation.error) {
-      logger.warn('form-submit-invalid', { requestId, formId: id, reason: validation.error })
-      const response = NextResponse.json({ message: validation.error }, { status: 400 })
+      logger.warn('form-submit-invalid', { requestId, formId, reason: validation.error })
 
-      response.headers.set('x-request-id', requestId)
-      
-return response
+      return reject(400, validation.error, 'invalid_fields')
     }
 
-    let isPublicSubmission = false
-    let publicLinkId = null
     let submitCtx = null
 
     if (publicToken) {
-      if (!form.allowPublicLink) {
-        const response = NextResponse.json({ message: 'Links públicos não habilitados' }, { status: 403 })
+      if (!form.allowPublicLink) return reject(403, 'Links públicos não habilitados', 'public_link_disabled')
 
-        response.headers.set('x-request-id', requestId)
-        
-return response
+      // Consome o link de uso único só agora, com os campos já válidos
+      if (!(await claimPublicLinkForSubmit({ token: publicToken, formId }))) {
+        // Estado lido depois do claim: cobre também outro envio que usou o link no mesmo instante
+        const link = await findLink()
+        const reason = link?.revokedAt ? 'link_revoked' : link?.used ? 'link_already_used' : 'link_expired'
+
+        return reject(403, LINK_REJECTION_MESSAGES[reason], reason)
       }
-
-      const claimed = await claimPublicLinkForSubmit({ token: publicToken, formId: id })
-
-      if (!claimed) {
-        const existing = await prisma.formPublicLink.findUnique({
-          where: { token: publicToken },
-          select: { id: true, used: true, revokedAt: true, expiresAt: true, formId: true }
-        })
-
-        if (!existing || existing.formId !== id) {
-          await auditSubmit({
-            action: 'FORM_SUBMIT_REJECTED',
-            session,
-            form,
-            requestId,
-            isPublic: true,
-            after: { reason: 'invalid_token' }
-          })
-
-          const response = NextResponse.json({ message: 'Token inválido' }, { status: 403 })
-
-          response.headers.set('x-request-id', requestId)
-          
-return response
-        }
-
-        const reason = existing.revokedAt ? 'link_revoked' : existing.used ? 'link_already_used' : 'link_expired'
-
-        const message = {
-          link_revoked: 'Link desativado. Não é possível enviar respostas.',
-          link_already_used: 'Link já utilizado. Não é possível enviar outra resposta.',
-          link_expired: 'Link expirado. Não é possível enviar respostas.'
-        }[reason]
-
-        await auditSubmit({
-          action: 'FORM_SUBMIT_REJECTED',
-          session,
-          form,
-          requestId,
-          isPublic: true,
-          publicLinkId: existing.id,
-          after: { reason }
-        })
-
-        const response = NextResponse.json({ message }, { status: 403 })
-
-        response.headers.set('x-request-id', requestId)
-        
-return response
-      }
-
-      const publicLink = await prisma.formPublicLink.findUnique({
-        where: { token: publicToken },
-        select: { id: true }
-      })
-
-      isPublicSubmission = true
-      publicLinkId = publicLink?.id ?? null
     } else {
-      if (!session) {
-        const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
-
-        response.headers.set('x-request-id', requestId)
-        
-return response
-      }
+      if (!session) return reject(401, 'Não autorizado', 'not_authenticated')
 
       submitCtx = await getUserFormContext(session.user.id)
 
-      const canSubmit = await canSubmitForm(session, form, submitCtx)
-
-      if (!canSubmit) {
-        const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
-
-        response.headers.set('x-request-id', requestId)
-        
-return response
-      }
+      if (!(await canSubmitForm(session, form, submitCtx))) return reject(403, 'Acesso negado', 'no_permission')
     }
 
     const webhookPayload = {
@@ -187,81 +180,57 @@ return response
     }
 
     let webhookResponse
+    const startedAt = Date.now()
 
     try {
       webhookResponse = await fetch(form.webhookUrl, {
         method: 'POST',
         headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.N8N_API_KEY}` },
-        body: JSON.stringify(webhookPayload)
+        body: JSON.stringify(webhookPayload),
+        signal: AbortSignal.timeout(WEBHOOK_TIMEOUT_MS)
       })
     } catch (error) {
-      // Webhook fora do ar ou endereço inválido: o envio falhou e precisa ficar no audit
-      logger.error('webhook-unreachable', { requestId, formId: id, error: error.message })
+      // Sem resposta do n8n: tempo esgotado, endereço inexistente, conexão recusada, falha de rede do servidor
+      const timedOut = error.name === 'TimeoutError'
+      const errorCode = error.cause?.code ?? error.name ?? null
 
-      await auditSubmit({
-        action: 'FORM_SUBMIT_FAILED',
-        session,
-        form,
-        requestId,
-        isPublic: isPublicSubmission,
-        publicLinkId,
-        after: { webhookStatus: null, reason: 'webhook_unreachable' }
+      logger.error('webhook-unreachable', { requestId, formId, timedOut, errorCode, error: error.message })
+
+      await audit('FORM_SUBMIT_FAILED', {
+        reason: timedOut ? 'webhook_timeout' : 'webhook_unreachable',
+        webhookStatus: null,
+        errorCode,
+        durationMs: Date.now() - startedAt
       })
 
-      const response = NextResponse.json({ message: 'Erro ao enviar dados' }, { status: 502 })
-
-      response.headers.set('x-request-id', requestId)
-
-      return response
+      return reply(502, { message: 'Erro ao enviar dados' })
     }
 
     if (!webhookResponse.ok) {
       const webhookError = await webhookResponse.text().catch(() => '')
 
-      logger.error('webhook-error', { requestId, formId: id, status: webhookResponse.status })
+      logger.error('webhook-error', { requestId, formId, status: webhookResponse.status })
 
-      await auditSubmit({
-        action: 'FORM_SUBMIT_FAILED',
-        session,
-        form,
-        requestId,
-        isPublic: isPublicSubmission,
-        publicLinkId,
-        after: { webhookStatus: webhookResponse.status }
+      await audit('FORM_SUBMIT_FAILED', {
+        reason: 'webhook_error',
+        webhookStatus: webhookResponse.status,
+        durationMs: Date.now() - startedAt
       })
 
-      const response = NextResponse.json(
-        { message: 'Erro ao enviar dados', webhookMessage: webhookError },
-        { status: 500 }
-      )
-
-      response.headers.set('x-request-id', requestId)
-      
-return response
+      return reply(500, { message: 'Erro ao enviar dados', webhookMessage: webhookError })
     }
 
-    await auditSubmit({
-      action: 'FORM_SUBMIT',
-      session,
-      form,
-      requestId,
-      isPublic: isPublicSubmission,
-      publicLinkId
-    })
+    await audit('FORM_SUBMIT', { durationMs: Date.now() - startedAt })
 
-    logger.info('form-submit-success', { requestId, formId: id, isPublicSubmission })
+    logger.info('form-submit-success', { requestId, formId, isPublicSubmission: isPublic })
 
-    const response = NextResponse.json({ message: 'Formulário enviado com sucesso' })
-
-    response.headers.set('x-request-id', requestId)
-    
-return response
+    return reply(200, { message: 'Formulário enviado com sucesso' })
   } catch (error) {
-    logger.error('form-submit-error', { requestId, error: error.message })
-    const response = NextResponse.json({ message: 'Erro ao enviar formulário' }, { status: 500 })
+    logger.error('form-submit-error', { requestId, formId, error: error.message })
 
-    response.headers.set('x-request-id', requestId)
-    
-return response
+    // Erro inesperado (banco, código): o registro guarda a mensagem, sem pilha
+    await audit('FORM_SUBMIT_FAILED', { reason: 'internal_error', error: String(error.message).slice(0, 300) })
+
+    return reply(500, { message: 'Erro ao enviar formulário' })
   }
 }

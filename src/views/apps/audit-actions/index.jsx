@@ -2,7 +2,8 @@ import AuditLogsTable from '@views/apps/audit-logs/AuditLogsTable'
 
 // O value é o grupo de ações em /api/apps/audit-logs/admin (ACTION_TYPES)
 const ACTION_TYPE_OPTIONS = [
-  { value: 'form_submit', label: 'Envios de formulário' },
+  { value: 'form_submit', label: 'Envios com sucesso' },
+  { value: 'form_submit_error', label: 'Envios com erro' },
   { value: 'form_manage', label: 'Gestão de formulários' },
   { value: 'documents', label: 'Documentos' },
   { value: 'dashboards', label: 'Dashboards' },

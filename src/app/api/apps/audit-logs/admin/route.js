@@ -11,7 +11,8 @@ import { isHighAdmin } from '@/utils/roleHelpers'
 // Ações: o que alguém fez no sistema, inclusive enviar formulário. Entrar, ver e baixar fica no Audit de Acesso.
 // Cada chave é uma opção do filtro "Tipo" da tela.
 const ACTION_TYPES = {
-  form_submit: ['FORM_SUBMIT', 'FORM_SUBMIT_FAILED', 'FORM_SUBMIT_REJECTED'],
+  form_submit: ['FORM_SUBMIT'],
+  form_submit_error: ['FORM_SUBMIT_FAILED', 'FORM_SUBMIT_REJECTED'],
   form_manage: ['FORM_CREATE', 'FORM_UPDATE', 'FORM_DELETE', 'FORM_LINK_CREATE', 'FORM_LINK_REVOKE'],
   documents: [
     'DOCUMENT_FOLDER_CREATE',

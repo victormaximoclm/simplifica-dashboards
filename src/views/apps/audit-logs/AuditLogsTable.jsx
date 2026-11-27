@@ -25,6 +25,38 @@ import Typography from '@mui/material/Typography'
 
 const linkTypeLabel = link => (link.permanent == null ? '' : link.permanent ? ' (permanente)' : ' (uso único)')
 
+/** Motivo de um envio recusado ou com falha (after.reason gravado pela rota de envio) */
+const SUBMIT_REASON_LABELS = {
+  rate_limited: () => 'Muitos envios em sequência',
+  invalid_request: () => 'Dados do envio ilegíveis',
+  form_not_found: () => 'Formulário não encontrado',
+  invalid_fields: after => after.message || 'Campos inválidos',
+  public_link_disabled: () => 'Links públicos desativados no formulário',
+  invalid_token: () => 'Link inválido',
+  link_revoked: () => 'Link revogado',
+  link_already_used: () => 'Link já usado',
+  link_expired: () => 'Link expirado',
+  not_authenticated: () => 'Sem login',
+  no_permission: () => 'Sem permissão para enviar',
+  webhook_error: after => `n8n respondeu com erro ${after.webhookStatus}`,
+  webhook_unreachable: after => `n8n fora do ar ou inacessível${after.errorCode ? ` (${after.errorCode})` : ''}`,
+  webhook_timeout: () => 'n8n não respondeu a tempo',
+  internal_error: after => `Erro interno${after.error ? `: ${after.error}` : ''}`
+}
+
+// Falha do sistema em vermelho, recusa do pedido em amarelo
+const ERROR_ACTION_COLORS = { FORM_SUBMIT_FAILED: 'error', FORM_SUBMIT_REJECTED: 'warning' }
+
+const submitReason = item => {
+  if (!item.action?.startsWith('FORM_SUBMIT_') || !item.after) return null
+  const { reason } = item.after
+
+  // Registros antigos de falha não tinham reason, só o status do n8n
+  if (!reason) return item.after.webhookStatus ? SUBMIT_REASON_LABELS.webhook_error(item.after) : null
+
+  return SUBMIT_REASON_LABELS[reason]?.(item.after) ?? reason
+}
+
 /** typeOptions: [{ value, label }] mostra o filtro "Tipo"; o value vai para a API como ?type= */
 export default function AuditLogsTable({
   title,
@@ -245,7 +277,22 @@ export default function AuditLogsTable({
                       <TableRow key={item.id}>
                         <TableCell>{new Date(item.createdAt).toLocaleString('pt-BR')}</TableCell>
                         <TableCell>
-                          <Chip label={item.action} size='small' />
+                          <Chip
+                            label={item.action}
+                            size='small'
+                            color={ERROR_ACTION_COLORS[item.action] ?? 'default'}
+                            variant={ERROR_ACTION_COLORS[item.action] ? 'tonal' : 'filled'}
+                          />
+                          {submitReason(item) && (
+                            <Typography
+                              variant='caption'
+                              color='text.secondary'
+                              display='block'
+                              sx={{ mt: 0.5, maxWidth: 260 }}
+                            >
+                              {submitReason(item)}
+                            </Typography>
+                          )}
                         </TableCell>
                         <TableCell>{item.entityType}</TableCell>
                         <TableCell>
