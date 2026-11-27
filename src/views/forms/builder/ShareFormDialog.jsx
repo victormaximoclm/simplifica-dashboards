@@ -7,10 +7,8 @@ import DialogTitle from '@mui/material/DialogTitle'
 import DialogContent from '@mui/material/DialogContent'
 import DialogActions from '@mui/material/DialogActions'
 import Button from '@mui/material/Button'
-import Autocomplete from '@mui/material/Autocomplete'
-import TextField from '@mui/material/TextField'
-import Chip from '@mui/material/Chip'
 
+import RoleMultiSelect, { toRoleIds } from '../RoleMultiSelect'
 
 const ShareFormDialog = ({ open, form, onClose }) => {
   const [roles, setRoles] = useState([])
@@ -63,14 +61,14 @@ const ShareFormDialog = ({ open, form, onClose }) => {
         const res = await fetch(`/api/apps/custom-roles?workspaceId=${form.workspaceId}`)
 
         if (!res.ok) {
-          throw new Error('Erro ao carregar cargos')
+          throw new Error('Erro ao carregar funções')
         }
 
         const data = await res.json()
 
         setRoles(data)
 
-        setSelectedRoles(form.allowedRoles ?? [])
+        setSelectedRoles(toRoleIds(form.allowedRoles, data))
       } catch (err) {
         setError(err.message)
       } finally {
@@ -89,49 +87,18 @@ const ShareFormDialog = ({ open, form, onClose }) => {
         <div className='flex flex-col gap-4'>
           <div>
             <p className='font-medium'>{form?.title}</p>
-            <p className='text-sm text-gray-500'>Selecione quais cargos podem visualizar este formulário.</p>
+            <p className='text-sm text-gray-500'>Escolha quais funções podem ver este formulário.</p>
           </div>
 
-          {loading && <p className='text-sm'>Carregando cargos...</p>}
+          {loading && <p className='text-sm'>Carregando funções...</p>}
 
           {error && <p className='text-sm text-red-500'>{error}</p>}
 
-          {!loading && roles.length === 0 && <p className='text-sm'>Nenhum cargo encontrado neste workspace.</p>}
+          {!loading && roles.length === 0 && <p className='text-sm'>Nenhuma função cadastrada neste workspace.</p>}
 
-          <Autocomplete
-            multiple
-            options={roles.filter(role => !selectedRoles.includes(role.id))}
-            value={[]}
-            onChange={(_, value) => {
-              if (value.length > 0) {
-                const role = value[value.length - 1]
-
-                setSelectedRoles(prev => (prev.includes(role.id) ? prev : [...prev, role.id]))
-              }
-            }}
-            getOptionLabel={option => option.name}
-            isOptionEqualToValue={(option, value) => option.id === value.id}
-            renderInput={params => <TextField {...params} label='Adicionar cargo' placeholder='Pesquisar cargo...' />}
-          />
-          <div className='mt-4'>
-            <p className='text-sm font-medium mb-2'>Cargos com acesso ao formulário</p>
-
-            <div className='flex flex-wrap gap-2'>
-              {selectedRoles.map(roleId => {
-                const role = roles.find(r => r.id === roleId)
-
-                if (!role) return null
-
-                return (
-                  <Chip
-                    key={role.id}
-                    label={role.name}
-                    onDelete={() => setSelectedRoles(prev => prev.filter(id => id !== role.id))}
-                  />
-                )
-              })}
-            </div>
-          </div>
+          {!loading && roles.length > 0 && (
+            <RoleMultiSelect roles={roles} value={selectedRoles} onChange={setSelectedRoles} />
+          )}
         </div>
       </DialogContent>
 

@@ -4,12 +4,14 @@
 
 import { useState, useCallback } from 'react'
 
+import Link from 'next/link'
 import { useRouter } from 'next/navigation'
 
 import { toast } from 'react-toastify'
 
 import FieldTypeSelector from './FieldTypeSelector'
 import FieldEditor from './FieldEditor'
+import RoleMultiSelect, { toRoleIds } from '../RoleMultiSelect'
 
 import {
   btnPrimary,
@@ -81,7 +83,7 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
   const [webhookUrl, setWebhookUrl] = useState(form?.webhookUrl ?? '')
   const [allowPublicLink, setAllowPublicLink] = useState(form?.allowPublicLink ?? false)
   const [allowedCargos, setAllowedCargos] = useState(form?.allowedCargos ?? [])
-  const [allowedRoles, setAllowedRoles] = useState(form?.allowedRoles ?? [])
+  const [allowedRoles, setAllowedRoles] = useState(() => toRoleIds(form?.allowedRoles, customRoles))
   const [fields, setFields] = useState(form?.fields ?? [])
   const [selectedFieldId, setSelectedFieldId] = useState(null)
   const [showTypeSelector, setShowTypeSelector] = useState(false)
@@ -142,10 +144,6 @@ const FormBuilder = ({ form, workspaceId, customRoles, lang }) => {
 return next
     })
   }, [])
-
-  const toggleRole = roleId => {
-    setAllowedRoles(prev => (prev.includes(roleId) ? prev.filter(r => r !== roleId) : [...prev, roleId]))
-  }
 
   const setCargosFromText = text => {
     setAllowedCargos(
@@ -328,25 +326,19 @@ return
           </Section>
 
           <Section title='Funções'>
-            {customRoles.length === 0 ? (
-              <p className={formCaptionCls}>Nenhuma função cadastrada.</p>
-            ) : (
-              <ul className='flex flex-col gap-1.5 list-none p-0 m-0'>
-                {customRoles.map(role => (
-                  <li key={role.id}>
-                    <label className='flex items-center gap-2 cursor-pointer'>
-                      <input
-                        type='checkbox'
-                        checked={allowedRoles.includes(role.id) || allowedRoles.includes(role.name)}
-                        onChange={() => toggleRole(role.id)}
-                        className='accent-[var(--mui-palette-primary-main)]'
-                      />
-                      <span className={formMutedCls}>{role.name}</span>
-                    </label>
-                  </li>
-                ))}
-              </ul>
-            )}
+            <RoleMultiSelect
+              roles={customRoles}
+              value={allowedRoles}
+              onChange={setAllowedRoles}
+              emptyRolesHint={
+                <p className={formCaptionCls}>
+                  Nenhuma função cadastrada.{' '}
+                  <Link href={`/${lang}/apps/roles`} className='text-[var(--mui-palette-primary-main)] hover:underline'>
+                    Criar funções
+                  </Link>
+                </p>
+              }
+            />
           </Section>
         </aside>
 
