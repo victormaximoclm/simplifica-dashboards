@@ -14,9 +14,34 @@ import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
 import { rolesBelongToWorkspace } from '@/libs/customRoleScope'
 import { inviteUserSchema, parseBody } from '@/libs/validations'
+import { withActionAudit } from '@/libs/auditedAction'
+
+/**
+ * E-mail do convite não saiu: o convite existe (o usuário foi criado ou o token renovado), então ele é registrado,
+ * e um USER_INVITE_EMAIL_FAILED marca a falha. A resposta continua 201, por isso o withActionAudit não a vê como erro.
+ */
+async function auditInviteEmailFailure({ action, session, requestId, tenantId, invitedUserId, error, metadata }) {
+  const base = { userId: session.user.id, tenantId, resource: 'user', resourceId: invitedUserId, requestId }
+
+  await createAuditLog({ ...base, action, after: { emailSent: false }, metadata: { requestId, ...metadata } })
+
+  await createAuditLog({
+    ...base,
+    action: 'USER_INVITE_EMAIL_FAILED',
+    after: {
+      message: 'Falha ao enviar o e-mail do convite',
+      // Erro de SMTP costuma citar o destinatário; a auditoria não guarda e-mails
+      error: (error instanceof Error ? error.message : String(error))
+        .replace(/[^\s@<>]+@[^\s@<>]+/g, '***')
+        .slice(0, 300),
+      resend: action === 'USER_INVITE_RESEND'
+    },
+    metadata: { requestId }
+  })
+}
 
 // POST /api/apps/users/invite - Invite user by email (high admins only)
-export async function POST(req) {
+async function handlePostAction(req) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -24,16 +49,16 @@ export async function POST(req) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const parsed = parseBody(inviteUserSchema, await req.json())
@@ -42,8 +67,8 @@ return response
     const response = NextResponse.json({ message: parsed.message }, { status: 400 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { email, workspaceId, role, customRoleId } = parsed.data
@@ -61,8 +86,8 @@ return response
       const response = NextResponse.json({ message: 'Espaço de trabalho é obrigatório' }, { status: 400 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
@@ -71,8 +96,8 @@ return response
       const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
   }
 
@@ -80,8 +105,8 @@ return response
     const response = NextResponse.json({ message: 'Você não tem permissão para atribuir este cargo' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // O cargo precisa pertencer ao workspace do convite (subAdmin não tem workspace, logo não tem cargo)
@@ -101,8 +126,8 @@ return response
       const response = NextResponse.json({ message: 'Este e-mail já está cadastrado e ativo' }, { status: 409 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     // User exists but is pending — resend invite
@@ -130,6 +155,16 @@ return response
         error: err instanceof Error ? err.message : 'unknown'
       })
 
+      await auditInviteEmailFailure({
+        action: 'USER_INVITE_RESEND',
+        session,
+        requestId,
+        tenantId: workspaceId || existingUser.workspaceId || null,
+        invitedUserId: existingUser.id,
+        error: err,
+        metadata: { assignedRole }
+      })
+
       const response = NextResponse.json(
         {
           message: 'Convite criado, mas houve falha ao enviar e-mail. Tente reenviar o convite.',
@@ -139,8 +174,8 @@ return response
       )
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     logger.info('invite-resent-success', { requestId, userId: session.user.id, email })
@@ -156,8 +191,8 @@ return response
     const response = NextResponse.json({ message: 'Convite reenviado com sucesso' })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Create new user with pending status
@@ -194,6 +229,16 @@ return response
       error: err instanceof Error ? err.message : 'unknown'
     })
 
+    await auditInviteEmailFailure({
+      action: 'USER_INVITE',
+      session,
+      requestId,
+      tenantId: workspaceId || user.workspace?.id || null,
+      invitedUserId: user.id,
+      error: err,
+      metadata: { role: user.role, status: user.status }
+    })
+
     const response = NextResponse.json(
       {
         message: 'Usuário criado, mas houve falha ao enviar e-mail. Tente reenviar o convite.',
@@ -204,8 +249,8 @@ return response
     )
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Emit notification
@@ -233,6 +278,8 @@ return response
   const response = NextResponse.json({ message: 'Convite enviado com sucesso', user }, { status: 201 })
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
+
+export const POST = withActionAudit('USER_INVITE', handlePostAction)

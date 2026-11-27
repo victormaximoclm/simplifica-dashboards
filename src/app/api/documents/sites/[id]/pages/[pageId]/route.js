@@ -24,6 +24,7 @@ import {
   resolveSiteFileRefs
 } from '@/libs/documentSiteAccess'
 import { withDocumentErrorHandling } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // GET /api/documents/sites/:id/pages/:pageId - conteúdo de uma página e os arquivos que ela referencia. A página
 // precisa pertencer ao Site da URL: um id de página de outro Site (ou de outro workspace) responde 404.
@@ -244,5 +245,11 @@ async function handleDelete(req, { params }) {
 }
 
 export const GET = withDocumentErrorHandling('document-site-page-read-unhandled-error', handleGet)
-export const PATCH = withDocumentErrorHandling('document-site-page-update-unhandled-error', handlePatch)
-export const DELETE = withDocumentErrorHandling('document-site-page-delete-unhandled-error', handleDelete)
+export const PATCH = withActionAudit(
+  'DOCUMENT_SITE_PAGE_UPDATE',
+  withDocumentErrorHandling('document-site-page-update-unhandled-error', handlePatch)
+)
+export const DELETE = withActionAudit(
+  'DOCUMENT_SITE_PAGE_DELETE',
+  withDocumentErrorHandling('document-site-page-delete-unhandled-error', handleDelete)
+)

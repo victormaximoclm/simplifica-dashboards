@@ -15,6 +15,7 @@ import { buildFormListWhereForRole, getUserFormContext } from '@/libs/formAccess
 import { canCreateFormInWorkspace, resolveFormWorkspaceId } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
 import { resolveModuleWorkspaceScope, getAccessibleWorkspaceIds } from '@/libs/workspaceAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // GET /api/forms - lista forms do workspace filtrado por cargo ou customRole
 export async function GET(req) {
@@ -25,8 +26,8 @@ export async function GET(req) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   try {
@@ -47,8 +48,8 @@ return response
           const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
 
           response.headers.set('x-request-id', requestId)
-          
-return response
+
+          return response
         }
 
         workspaceId = scope.workspaceId
@@ -63,8 +64,8 @@ return response
             const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
 
             response.headers.set('x-request-id', requestId)
-            
-return response
+
+            return response
           }
 
           workspaceId = scope.workspaceId
@@ -100,20 +101,20 @@ return response
     const response = NextResponse.json(forms)
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   } catch (error) {
     logger.error('forms-list-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao listar formulários' }, { status: 500 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 }
 
 // POST /api/forms - cria form (admin do workspace)
-export async function POST(req) {
+async function handlePostAction(req) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -121,16 +122,16 @@ export async function POST(req) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!canManageForms(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   try {
@@ -153,8 +154,8 @@ return response
       const response = NextResponse.json({ message: 'Campos obrigatórios ausentes' }, { status: 400 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     const workspace = await prisma.workspace.findUnique({ where: { id: workspaceId } })
@@ -163,8 +164,8 @@ return response
       const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     // Impede subAdmin/convidado sem nível "create" de criar form dentro de um workspace privado
@@ -177,8 +178,8 @@ return response
       const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     if (!(await rolesBelongToWorkspace(allowedRoles, workspaceId))) {
@@ -244,14 +245,16 @@ return response
     const response = NextResponse.json(form, { status: 201 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   } catch (error) {
     logger.error('form-create-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao criar formulário' }, { status: 500 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 }
+
+export const POST = withActionAudit('FORM_CREATE', handlePostAction)

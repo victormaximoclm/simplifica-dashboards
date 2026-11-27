@@ -8,9 +8,10 @@ import { createAuditLog } from '@/libs/auditService'
 import { getRequestId, logger } from '@/libs/logger'
 import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // PUT /api/apps/users/[id]/reset-password - Admin resets user password
-export async function PUT(req, { params }) {
+async function handlePutAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -18,16 +19,16 @@ export async function PUT(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { id } = await params
@@ -38,8 +39,8 @@ return response
     const response = NextResponse.json({ message: 'Nova senha deve ter pelo menos 6 caracteres' }, { status: 400 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const targetUser = await prisma.user.findUnique({
@@ -51,8 +52,8 @@ return response
     const response = NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Cannot reset own password via this endpoint
@@ -63,17 +64,20 @@ return response
     )
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // SubAdmin can only reset passwords for admin and user roles
   if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
-    const response = NextResponse.json({ message: 'SubAdmin não pode alterar senha de SuperAdmin ou SubAdmin' }, { status: 403 })
+    const response = NextResponse.json(
+      { message: 'SubAdmin não pode alterar senha de SuperAdmin ou SubAdmin' },
+      { status: 403 }
+    )
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const hashedPassword = await bcrypt.hash(newPassword, 10)
@@ -96,6 +100,8 @@ return response
   const response = NextResponse.json({ message: 'Senha alterada com sucesso' })
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
+
+export const PUT = withActionAudit('USER_PASSWORD_RESET', handlePutAction)

@@ -12,6 +12,7 @@ import { prisma } from '@/libs/prisma'
 import { sanitizeWorkspaceIntegration } from '@/app/constants/integration'
 import { getWorkspaceIntegration, upsertWorkspaceIntegration } from '@/libs/workspaceIntegrations'
 import { authOptions } from '@/libs/auth'
+import { withActionAudit } from '@/libs/auditedAction'
 
 export async function GET(req, { params }) {
   console.log('GET integration route called')
@@ -22,8 +23,8 @@ export async function GET(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   try {
@@ -33,8 +34,8 @@ return response
       const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     const integration = await getWorkspaceIntegration(id, provider)
@@ -43,8 +44,8 @@ return response
     const response = NextResponse.json(payload)
 
     response.headers.set('x-request-id', getRequestId(req))
-    
-return response
+
+    return response
   } catch (error) {
     console.error(error)
 
@@ -64,7 +65,7 @@ return response
 }
 
 //PUT
-export async function PUT(req, { params }) {
+async function handlePutAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -72,16 +73,16 @@ export async function PUT(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   try {
@@ -126,8 +127,8 @@ return response
     const response = NextResponse.json(integration)
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   } catch (error) {
     console.error(error)
 
@@ -145,3 +146,5 @@ return response
     return response
   }
 }
+
+export const PUT = withActionAudit('INTEGRATION_UPSERT', handlePutAction)

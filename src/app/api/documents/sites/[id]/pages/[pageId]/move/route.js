@@ -9,6 +9,7 @@ import { prisma } from '@/libs/prisma'
 import { compareSitePages, pickHomePageId, planSitePageMove, serializeSitePageSummary } from '@/libs/documentSite'
 import { getAuthorizedSite, lockSite, readSiteJsonBody } from '@/libs/documentSiteAccess'
 import { withDocumentErrorHandling } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // POST /api/documents/sites/:id/pages/:pageId/move - { parentId: string|null, index: number }
 // Move a página para dentro de outra (ou para a raiz) na posição `index` entre as irmãs. "Subir" e "descer" são
@@ -91,4 +92,7 @@ async function handlePost(req, { params }) {
   )
 }
 
-export const POST = withDocumentErrorHandling('document-site-page-move-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_SITE_PAGE_MOVE',
+  withDocumentErrorHandling('document-site-page-move-unhandled-error', handlePost)
+)

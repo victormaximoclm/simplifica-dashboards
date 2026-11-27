@@ -81,7 +81,8 @@ export async function withResourceLabels(rows) {
 
     if (r.entityType?.startsWith('document_')) resourceLabel = documentNameById.get(r.entityId) || loggedName(r)
     else if (r.entityType === 'form') resourceLabel = labels.form.get(r.entityId) || loggedName(r)
-    else if (labels[r.entityType] && r.entityId) resourceLabel = labels[r.entityType].get(r.entityId) || null
+    // Sem item no banco (criação recusada, item excluído): o nome que ficou no registro
+    else resourceLabel = (r.entityId && labels[r.entityType]?.get(r.entityId)) || loggedName(r)
 
     return { ...r, resourceLabel, publicLink: publicLinkOf(r) }
   })

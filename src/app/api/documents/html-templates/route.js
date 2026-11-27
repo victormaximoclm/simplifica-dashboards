@@ -16,6 +16,7 @@ import {
   readHtmlDocumentBody,
   serializeHtmlTemplate
 } from '@/libs/documentHtmlRequest'
+import { withActionAudit } from '@/libs/auditedAction'
 
 const nameTaken = requestId =>
   jsonWithRequestId({ message: 'Já existe um template com esse nome neste workspace' }, { status: 409, requestId })
@@ -120,4 +121,7 @@ async function handlePost(req) {
 }
 
 export const GET = withDocumentErrorHandling('document-template-list-unhandled-error', handleGet)
-export const POST = withDocumentErrorHandling('document-template-create-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_TEMPLATE_CREATE',
+  withDocumentErrorHandling('document-template-create-unhandled-error', handlePost)
+)

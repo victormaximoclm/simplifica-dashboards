@@ -8,13 +8,14 @@ import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { isHighAdmin } from '@/utils/roleHelpers'
 
+// Toda ação feita por uma rota com withActionAudit também pode ter registro de recusa (4xx) ou falha (5xx)
+const withErrors = actions => actions.flatMap(action => [action, `${action}_REJECTED`, `${action}_FAILED`])
+
 // Ações: o que alguém fez no sistema, inclusive enviar formulário. Entrar, ver e baixar fica no Audit de Acesso.
-// Cada chave é uma opção do filtro "Tipo" da tela.
-const ACTION_TYPES = {
-  form_submit: ['FORM_SUBMIT'],
-  form_submit_error: ['FORM_SUBMIT_FAILED', 'FORM_SUBMIT_REJECTED'],
-  form_manage: ['FORM_CREATE', 'FORM_UPDATE', 'FORM_DELETE', 'FORM_LINK_CREATE', 'FORM_LINK_REVOKE'],
-  documents: [
+// Cada chave é uma opção do filtro "Tipo" da tela; cada área traz também os próprios erros.
+const AREA_TYPES = {
+  form_manage: withErrors(['FORM_CREATE', 'FORM_UPDATE', 'FORM_DELETE', 'FORM_LINK_CREATE', 'FORM_LINK_REVOKE']),
+  documents: withErrors([
     'DOCUMENT_FOLDER_CREATE',
     'DOCUMENT_FOLDER_RENAME',
     'DOCUMENT_FOLDER_MOVE',
@@ -35,22 +36,39 @@ const ACTION_TYPES = {
     'DOCUMENT_TEMPLATE_CREATE',
     'DOCUMENT_TEMPLATE_UPDATE',
     'DOCUMENT_TEMPLATE_DELETE'
-  ],
-  dashboards: ['DASHBOARD_CREATE', 'DASHBOARD_UPDATE', 'DASHBOARD_DELETE'],
+  ]),
+  dashboards: withErrors(['DASHBOARD_CREATE', 'DASHBOARD_UPDATE', 'DASHBOARD_DELETE']),
   users: [
-    'USER_INVITE',
+    ...withErrors([
+      'USER_INVITE',
+      'USER_UPDATE',
+      'USER_DELETE',
+      'USER_PASSWORD_RESET',
+      'CUSTOM_ROLE_CREATE',
+      'CUSTOM_ROLE_UPDATE',
+      'CUSTOM_ROLE_DELETE'
+    ]),
     'USER_INVITE_RESEND',
-    'USER_UPDATE',
-    'USER_DELETE',
-    'USER_PASSWORD_RESET',
-    'CUSTOM_ROLE_CREATE',
-    'CUSTOM_ROLE_UPDATE',
-    'CUSTOM_ROLE_DELETE'
+    'USER_INVITE_EMAIL_FAILED',
+    'USER_INVITE_EXPIRED'
   ],
-  workspaces: ['WORKSPACE_CREATE', 'WORKSPACE_UPDATE', 'WORKSPACE_DELETE']
+  workspaces: withErrors(['WORKSPACE_CREATE', 'WORKSPACE_UPDATE', 'WORKSPACE_DELETE']),
+  integrations: withErrors(['INTEGRATION_UPSERT', 'CLICKUP_INTEGRATION_DISCONNECT']).concat(
+    'CLICKUP_INTEGRATION_CONNECT'
+  )
 }
 
-const ACTION_ACTIONS = Object.values(ACTION_TYPES).flat()
+const isError = action => /_(FAILED|REJECTED)$/.test(action) || action === 'USER_INVITE_EMAIL_FAILED'
+
+const ACTION_TYPES = {
+  form_submit: ['FORM_SUBMIT'],
+  form_submit_error: ['FORM_SUBMIT_FAILED', 'FORM_SUBMIT_REJECTED'],
+  ...AREA_TYPES,
+  // Todas as recusas e falhas, de qualquer área (inclusive envios de formulário)
+  errors: ['FORM_SUBMIT_FAILED', 'FORM_SUBMIT_REJECTED', ...Object.values(AREA_TYPES).flat().filter(isError)]
+}
+
+const ACTION_ACTIONS = [...new Set(Object.values(ACTION_TYPES).flat())]
 
 export async function GET(req) {
   const requestId = getRequestId(req)

@@ -1,6 +1,7 @@
 import { Readable } from 'stream'
 
 import { createAuditLog, createDedupedAuditLog } from '@/libs/auditService'
+import { setAuditContext } from '@/libs/auditedAction'
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import * as storage from '@/libs/storage'
@@ -70,6 +71,9 @@ export function withDocumentErrorHandling(event, handler) {
       }
 
       logger.error(event, { requestId, error: error instanceof Error ? error.message : String(error) })
+
+      // A resposta é genérica; a auditoria de ações (withActionAudit) guarda o erro real
+      setAuditContext({ error: (error instanceof Error ? error.message : String(error)).slice(0, 300) })
 
       return jsonWithRequestId({ message: 'Erro interno ao processar a solicitação' }, { status: 500, requestId })
     }

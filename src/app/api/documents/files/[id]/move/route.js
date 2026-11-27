@@ -18,6 +18,7 @@ import {
   serializeFile,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // POST /api/documents/files/:id/move - move arquivo para outra pasta ou para a raiz (SuperAdmin/SubAdmin)
 async function handlePost(req, { params }) {
@@ -105,4 +106,7 @@ async function handlePost(req, { params }) {
   return jsonWithRequestId(serializeFile(file), { requestId })
 }
 
-export const POST = withDocumentErrorHandling('document-file-move-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_FILE_MOVE',
+  withDocumentErrorHandling('document-file-move-unhandled-error', handlePost)
+)

@@ -15,6 +15,7 @@ import {
 } from '@/libs/documentSite'
 import { getAuthorizedSite, lockSite, readSiteJsonBody } from '@/libs/documentSiteAccess'
 import { withDocumentErrorHandling } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // POST /api/documents/sites/:id/pages - cria página (ou subpágina, com parentId) no fim das irmãs
 async function handlePost(req, { params }) {
@@ -70,7 +71,12 @@ async function handlePost(req, { params }) {
       }
 
       if (getSitePageDepth(pages, parentId) >= DOCUMENT_SITE_LIMITS.maxDepth) {
-        return { error: { status: 400, message: `O site pode ter no máximo ${DOCUMENT_SITE_LIMITS.maxDepth} níveis de páginas` } }
+        return {
+          error: {
+            status: 400,
+            message: `O site pode ter no máximo ${DOCUMENT_SITE_LIMITS.maxDepth} níveis de páginas`
+          }
+        }
       }
     }
 
@@ -90,7 +96,12 @@ async function handlePost(req, { params }) {
     return jsonWithRequestId({ message: result.error.message }, { status: result.error.status, requestId })
   }
 
-  logger.info('document-site-page-create-success', { requestId, userId: session.user.id, fileId: id, pageId: result.page.id })
+  logger.info('document-site-page-create-success', {
+    requestId,
+    userId: session.user.id,
+    fileId: id,
+    pageId: result.page.id
+  })
   await createAuditLog({
     userId: session.user.id,
     tenantId: access.item.workspaceId,
@@ -105,4 +116,7 @@ async function handlePost(req, { params }) {
   return jsonWithRequestId({ data: serializeSitePage(result.page) }, { status: 201, requestId })
 }
 
-export const POST = withDocumentErrorHandling('document-site-page-create-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_SITE_PAGE_CREATE',
+  withDocumentErrorHandling('document-site-page-create-unhandled-error', handlePost)
+)

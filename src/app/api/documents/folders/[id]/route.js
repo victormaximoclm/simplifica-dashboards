@@ -20,6 +20,7 @@ import {
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
 import { deleteItemGrants } from '@/libs/documentGrants'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // GET /api/documents/folders/:id - dados da pasta + contagem do conteúdo (usado antes de excluir)
 async function handleGet(req, { params }) {
@@ -217,5 +218,11 @@ async function handleDelete(req, { params }) {
 }
 
 export const GET = withDocumentErrorHandling('document-folder-read-unhandled-error', handleGet)
-export const PATCH = withDocumentErrorHandling('document-folder-rename-unhandled-error', handlePatch)
-export const DELETE = withDocumentErrorHandling('document-folder-delete-unhandled-error', handleDelete)
+export const PATCH = withActionAudit(
+  'DOCUMENT_FOLDER_RENAME',
+  withDocumentErrorHandling('document-folder-rename-unhandled-error', handlePatch)
+)
+export const DELETE = withActionAudit(
+  'DOCUMENT_FOLDER_DELETE',
+  withDocumentErrorHandling('document-folder-delete-unhandled-error', handleDelete)
+)

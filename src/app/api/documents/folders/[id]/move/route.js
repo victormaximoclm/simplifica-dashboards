@@ -21,6 +21,7 @@ import {
   serializeFolder,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // POST /api/documents/folders/:id/move - move pasta para outra pasta ou para a raiz (SuperAdmin/SubAdmin)
 async function handlePost(req, { params }) {
@@ -130,4 +131,7 @@ async function handlePost(req, { params }) {
   return jsonWithRequestId(serializeFolder(folder), { requestId })
 }
 
-export const POST = withDocumentErrorHandling('document-folder-move-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_FOLDER_MOVE',
+  withDocumentErrorHandling('document-folder-move-unhandled-error', handlePost)
+)

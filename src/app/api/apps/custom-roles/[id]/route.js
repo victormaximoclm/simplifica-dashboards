@@ -9,13 +9,14 @@ import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { createCustomRoleSchema, parseBody } from '@/libs/validations'
 import { canManageWorkspaceContentById } from '@/libs/workspaceAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // Cargo sem workspace (legado) só pode ser gerenciado por superAdmin
 const canManageRoleWorkspace = async (session, workspaceId) =>
   workspaceId ? canManageWorkspaceContentById(session, workspaceId) : session.user.role === 'superAdmin'
 
 // PUT /api/apps/custom-roles/[id] - Update custom role (superAdmin/subAdmin)
-export async function PUT(req, { params }) {
+async function handlePutAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -76,12 +77,12 @@ export async function PUT(req, { params }) {
     metadata: { requestId },
     requestId
   })
-  
-return jsonWithRequestId(role, { requestId })
+
+  return jsonWithRequestId(role, { requestId })
 }
 
 // DELETE /api/apps/custom-roles/[id] - Delete custom role (superAdmin/subAdmin)
-export async function DELETE(req, { params }) {
+async function handleDeleteAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -128,6 +129,9 @@ export async function DELETE(req, { params }) {
     metadata: { requestId },
     requestId
   })
-  
-return jsonWithRequestId({ message: 'Cargo excluído' }, { requestId })
+
+  return jsonWithRequestId({ message: 'Cargo excluído' }, { requestId })
 }
+
+export const PUT = withActionAudit('CUSTOM_ROLE_UPDATE', handlePutAction)
+export const DELETE = withActionAudit('CUSTOM_ROLE_DELETE', handleDeleteAction)

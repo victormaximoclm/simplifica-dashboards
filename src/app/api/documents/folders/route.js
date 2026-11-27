@@ -21,6 +21,7 @@ import {
   serializeFolder,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // GET /api/documents/folders?workspaceId= - todas as pastas do workspace (árvore do diálogo "Mover")
 async function handleGet(req) {
@@ -148,4 +149,7 @@ async function handlePost(req) {
 }
 
 export const GET = withDocumentErrorHandling('document-folders-tree-unhandled-error', handleGet)
-export const POST = withDocumentErrorHandling('document-folder-create-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_FOLDER_CREATE',
+  withDocumentErrorHandling('document-folder-create-unhandled-error', handlePost)
+)

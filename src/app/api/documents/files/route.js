@@ -27,6 +27,7 @@ import {
   validateUploadFile,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { setAuditContext, withActionAudit } from '@/libs/auditedAction'
 
 async function removeBlobs(keys, requestId) {
   const results = await Promise.allSettled(keys.map(key => storage.delete(key)))
@@ -87,6 +88,9 @@ async function handlePost(req) {
 
   const { workspaceId } = parsed.data
   const folderId = parsed.data.folderId || null
+
+  // Upload é multipart: a auditoria de erros não lê o corpo, então o workspace vem daqui
+  setAuditContext({ tenantId: workspaceId })
 
   const access = await resolveDocumentsWorkspace(session, workspaceId, 'create')
 
@@ -246,4 +250,7 @@ async function handlePost(req) {
   return jsonWithRequestId({ data: files.map(serializeFile) }, { status: 201, requestId })
 }
 
-export const POST = withDocumentErrorHandling('document-file-upload-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_FILE_UPLOAD',
+  withDocumentErrorHandling('document-file-upload-unhandled-error', handlePost)
+)

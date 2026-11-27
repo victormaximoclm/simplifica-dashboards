@@ -14,6 +14,7 @@ import { rolesBelongToWorkspace } from '@/libs/customRoleScope'
 import { createDashboardSchema, parseBody } from '@/libs/validations'
 import { resolveFormWorkspaceId } from '@/libs/formWorkspace'
 import { resolveModuleWorkspaceScope, workspaceAccessInclude } from '@/libs/workspaceAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 function sanitizeDashboardTitle(value) {
   return String(value || 'Dashboard sem título')
@@ -57,8 +58,8 @@ export async function GET(req) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { searchParams } = new URL(req.url)
@@ -76,8 +77,8 @@ return response
         const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
 
         response.headers.set('x-request-id', requestId)
-        
-return response
+
+        return response
       }
 
       where.workspaceId = scope.workspaceId
@@ -89,8 +90,8 @@ return response
         const response = NextResponse.json([])
 
         response.headers.set('x-request-id', requestId)
-        
-return response
+
+        return response
       }
 
       const scope = await resolveModuleWorkspaceScope(session, activeWorkspaceId)
@@ -99,8 +100,8 @@ return response
         const response = NextResponse.json({ message: scope.error.message }, { status: scope.error.status })
 
         response.headers.set('x-request-id', requestId)
-        
-return response
+
+        return response
       }
 
       where.workspaceId = scope.workspaceId
@@ -120,8 +121,8 @@ return response
       const response = NextResponse.json([])
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     const dashboardModule = await prisma.module.findUnique({ where: { key: 'dashboards' } })
@@ -137,8 +138,8 @@ return response
       const response = NextResponse.json([])
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     where.id = { in: allowedDashboardIds }
@@ -181,12 +182,12 @@ return response
   const response = NextResponse.json(result.map(stripDashboardSensitiveFields))
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
 
 // POST /api/apps/dashboards - Create dashboard (superAdmin only)
-export async function POST(req) {
+async function handlePostAction(req) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -195,8 +196,8 @@ export async function POST(req) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
@@ -204,8 +205,8 @@ return response
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const parsed = parseBody(createDashboardSchema, await req.json())
@@ -214,8 +215,8 @@ return response
     const response = NextResponse.json({ message: parsed.message }, { status: 400 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { iframeCode, workspaceId, allowedRoleIds, title: customTitle } = parsed.data
@@ -230,8 +231,8 @@ return response
     const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Impede subAdmin/convidado sem permissão "create" de criar dashboard num workspace privado
@@ -244,8 +245,8 @@ return response
     const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const iframeParsed = parseIframe(iframeCode)
@@ -257,8 +258,8 @@ return response
     )
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!(await rolesBelongToWorkspace(allowedRoleIds, workspaceId))) {
@@ -328,6 +329,8 @@ return response
   const response = NextResponse.json(stripDashboardSensitiveFields(dashboard), { status: 201 })
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
+
+export const POST = withActionAudit('DASHBOARD_CREATE', handlePostAction)

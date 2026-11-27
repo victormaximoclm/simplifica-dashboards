@@ -44,17 +44,33 @@ const SUBMIT_REASON_LABELS = {
   internal_error: after => `Erro interno${after.error ? `: ${after.error}` : ''}`
 }
 
+// Quem fez, quando não há usuário: envio por link público ou rotina agendada do servidor
+const VIA_LABELS = { public_link: 'Link público', cron: 'Sistema' }
+
 // Falha do sistema em vermelho, recusa do pedido em amarelo
-const ERROR_ACTION_COLORS = { FORM_SUBMIT_FAILED: 'error', FORM_SUBMIT_REJECTED: 'warning' }
+const errorColor = action => {
+  if (/_FAILED$/.test(action ?? '')) return 'error'
+  if (/_REJECTED$/.test(action ?? '')) return 'warning'
 
-const submitReason = item => {
-  if (!item.action?.startsWith('FORM_SUBMIT_') || !item.after) return null
-  const { reason } = item.after
+  return null
+}
 
-  // Registros antigos de falha não tinham reason, só o status do n8n
-  if (!reason) return item.after.webhookStatus ? SUBMIT_REASON_LABELS.webhook_error(item.after) : null
+/** Texto do erro mostrado abaixo da ação */
+const errorReason = item => {
+  if (!errorColor(item.action) || !item.after) return null
+  const after = item.after
 
-  return SUBMIT_REASON_LABELS[reason]?.(item.after) ?? reason
+  if (item.action.startsWith('FORM_SUBMIT_')) {
+    // Registros antigos de falha não tinham reason, só o status do n8n
+    if (!after.reason) return after.webhookStatus ? SUBMIT_REASON_LABELS.webhook_error(after) : null
+
+    return SUBMIT_REASON_LABELS[after.reason]?.(after) ?? after.reason
+  }
+
+  // Demais ações (withActionAudit): a mensagem que a pessoa viu e, na falha, o erro real
+  const parts = [after.message, after.error && after.error !== after.message ? after.error : null].filter(Boolean)
+
+  return parts.length ? parts.join(': ') : after.status ? `Erro ${after.status}` : null
 }
 
 /** typeOptions: [{ value, label }] mostra o filtro "Tipo"; o value vai para a API como ?type= */
@@ -280,17 +296,17 @@ export default function AuditLogsTable({
                           <Chip
                             label={item.action}
                             size='small'
-                            color={ERROR_ACTION_COLORS[item.action] ?? 'default'}
-                            variant={ERROR_ACTION_COLORS[item.action] ? 'tonal' : 'filled'}
+                            color={errorColor(item.action) ?? 'default'}
+                            variant={errorColor(item.action) ? 'tonal' : 'filled'}
                           />
-                          {submitReason(item) && (
+                          {errorReason(item) && (
                             <Typography
                               variant='caption'
                               color='text.secondary'
                               display='block'
                               sx={{ mt: 0.5, maxWidth: 260 }}
                             >
-                              {submitReason(item)}
+                              {errorReason(item)}
                             </Typography>
                           )}
                         </TableCell>
@@ -310,9 +326,7 @@ export default function AuditLogsTable({
                           )}
                         </TableCell>
                         <TableCell>
-                          {item.user?.name ||
-                            item.user?.email ||
-                            (item.metadata?.via === 'public_link' ? 'Link público' : '-')}
+                          {item.user?.name || item.user?.email || VIA_LABELS[item.metadata?.via] || '-'}
                         </TableCell>
                         <TableCell>{item.tenant?.name || '-'}</TableCell>
                         <TableCell>{item.entityId || '-'}</TableCell>

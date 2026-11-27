@@ -23,6 +23,7 @@ import {
   serializeFile,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 const notHtmlDocument = requestId =>
   jsonWithRequestId({ message: 'Este arquivo não é um documento editável' }, { status: 415, requestId })
@@ -202,4 +203,7 @@ async function handlePut(req, { params }) {
 }
 
 export const GET = withDocumentErrorHandling('document-html-read-unhandled-error', handleGet)
-export const PUT = withDocumentErrorHandling('document-html-update-unhandled-error', handlePut)
+export const PUT = withActionAudit(
+  'DOCUMENT_HTML_UPDATE',
+  withDocumentErrorHandling('document-html-update-unhandled-error', handlePut)
+)

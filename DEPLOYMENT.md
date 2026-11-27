@@ -23,6 +23,16 @@
 
 SMTP e OAuth Google são opcionais conforme recursos usados.
 
+## Rotinas agendadas
+
+O próprio app roda as rotinas ao subir (`src/instrumentation.js`), sem container ou cron externo:
+
+| Rotina | O que faz | Variável |
+|--------|-----------|----------|
+| Limpeza de convites | Remove usuários convidados que não criaram a conta em 7 dias (convite expirado; reenviar renova o prazo). Cada remoção fica em Audit de Ações Críticas como `USER_INVITE_EXPIRED`. | `INVITE_CLEANUP_INTERVAL_MINUTES`: intervalo em minutos (padrão `60`; `0` desliga). |
+
+Com mais de uma instância do app, só uma executa cada rodada (lock no Postgres).
+
 ## Armazenamento de Documentos
 
 > **⚠️ OBRIGATÓRIO NO EASYPANEL:** crie um *Volume/Mount* persistente apontando para **`/app/storage`** no serviço da app.

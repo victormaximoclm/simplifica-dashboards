@@ -10,9 +10,10 @@ import { isSuperOnly } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { createAuditLog } from '@/libs/auditService'
 import { revokePublicLink } from '@/libs/formlinkservice'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // DELETE /api/forms/[id]/links/[linkId] - desativa um link público
-export async function DELETE(req, { params }) {
+async function handleDeleteAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -20,8 +21,8 @@ export async function DELETE(req, { params }) {
     const response = NextResponse.json(body, { status })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!session) return respond({ message: 'Não autorizado' }, 401)
@@ -57,7 +58,9 @@ return response
     return respond(revoked, 200)
   } catch (error) {
     logger.error('form-link-revoke-error', { requestId, error: error.message })
-    
-return respond({ message: 'Erro ao desativar link' }, 500)
+
+    return respond({ message: 'Erro ao desativar link' }, 500)
   }
 }
+
+export const DELETE = withActionAudit('FORM_LINK_REVOKE', handleDeleteAction)

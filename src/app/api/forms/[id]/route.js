@@ -16,6 +16,7 @@ import { canManageFormInWorkspace } from '@/libs/formWorkspace'
 import { canManageForms } from '@/libs/formPermissions'
 import { workspaceAccessInclude } from '@/libs/workspaceAccess'
 import { toClientForm } from '@/libs/formSanitize'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // GET /api/forms/[id]
 export async function GET(req, { params }) {
@@ -26,8 +27,8 @@ export async function GET(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   try {
@@ -45,8 +46,8 @@ return response
       const response = NextResponse.json({ message: 'Formulário não encontrado' }, { status: 404 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     const role = session.user.role
@@ -57,16 +58,16 @@ return response
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
         response.headers.set('x-request-id', requestId)
-        
-return response
+
+        return response
       }
     } else {
       if (form.workspaceId !== session.user.workspaceId) {
         const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
         response.headers.set('x-request-id', requestId)
-        
-return response
+
+        return response
       }
 
       const ctx = role !== 'admin' ? await getUserFormContext(session.user.id) : {}
@@ -78,8 +79,8 @@ return response
           const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
           response.headers.set('x-request-id', requestId)
-          
-return response
+
+          return response
         }
 
         const perm = await prisma.rolePermission.findFirst({
@@ -90,8 +91,8 @@ return response
           const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
           response.headers.set('x-request-id', requestId)
-          
-return response
+
+          return response
         }
       }
     }
@@ -100,20 +101,20 @@ return response
     const response = NextResponse.json(canManageForms(role) ? form : toClientForm(form))
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   } catch (error) {
     logger.error('form-get-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao buscar formulário' }, { status: 500 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 }
 
 // PUT /api/forms/[id]
-export async function PUT(req, { params }) {
+async function handlePutAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -121,8 +122,8 @@ export async function PUT(req, { params }) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   try {
@@ -147,16 +148,16 @@ return response
       const response = NextResponse.json({ message: 'Formulário não encontrado' }, { status: 404 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     if (!(await canManageFormInWorkspace(session, form.workspaceId))) {
       const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     if (!(await rolesBelongToWorkspace(allowedRoles, form.workspaceId))) {
@@ -220,20 +221,20 @@ return response
     const response = NextResponse.json(updated)
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   } catch (error) {
     logger.error('form-update-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao atualizar formulário' }, { status: 500 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 }
 
 // DELETE /api/forms/[id]
-export async function DELETE(req, { params }) {
+async function handleDeleteAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -241,8 +242,8 @@ export async function DELETE(req, { params }) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   try {
@@ -254,16 +255,16 @@ return response
       const response = NextResponse.json({ message: 'Formulário não encontrado' }, { status: 404 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     if (!(await canManageFormInWorkspace(session, form.workspaceId))) {
       const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     await prisma.rolePermission.deleteMany({
@@ -293,14 +294,17 @@ return response
     const response = NextResponse.json({ message: 'Formulário deletado' })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   } catch (error) {
     logger.error('form-delete-error', { requestId, error: error.message })
     const response = NextResponse.json({ message: 'Erro ao deletar formulário' }, { status: 500 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 }
+
+export const PUT = withActionAudit('FORM_UPDATE', handlePutAction)
+export const DELETE = withActionAudit('FORM_DELETE', handleDeleteAction)

@@ -9,6 +9,7 @@ import { isHighAdmin } from '@/utils/roleHelpers'
 import { prisma } from '@/libs/prisma'
 import { createWorkspaceSchema, parseBody } from '@/libs/validations'
 import { getAccessibleWorkspaces, withCreatorOnPrivateGuestList } from '@/libs/workspaceAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // GET /api/apps/workspaces - List workspaces (apenas os que o usuário pode acessar)
 export async function GET(req) {
@@ -19,8 +20,8 @@ export async function GET(req) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Only high admins can list workspaces
@@ -28,8 +29,8 @@ return response
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Nunca lista workspaces privados aos quais o usuário não foi convidado
@@ -41,12 +42,12 @@ return response
   const response = NextResponse.json(workspaces.map(({ guests: _guests, ...ws }) => ws))
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
 
 // POST /api/apps/workspaces - Create workspace
-export async function POST(req) {
+async function handlePostAction(req) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -54,16 +55,16 @@ export async function POST(req) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const parsed = parseBody(createWorkspaceSchema, await req.json())
@@ -72,8 +73,8 @@ return response
     const response = NextResponse.json({ message: parsed.message }, { status: 400 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { name, isPrivate, guests } = parsed.data
@@ -91,8 +92,8 @@ return response
     const response = NextResponse.json({ message: 'Já existe um espaço de trabalho com esse nome' }, { status: 409 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const guestList = withCreatorOnPrivateGuestList(!!isPrivate, guests, session.user.id, session.user.role)
@@ -120,6 +121,8 @@ return response
   const response = NextResponse.json(workspace, { status: 201 })
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
+
+export const POST = withActionAudit('WORKSPACE_CREATE', handlePostAction)

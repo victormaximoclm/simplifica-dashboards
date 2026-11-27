@@ -28,6 +28,7 @@ import {
   serializeFile,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // POST /api/documents/html - cria documento HTML a partir do editor (SuperAdmin/SubAdmin)
 async function handlePost(req) {
@@ -182,4 +183,7 @@ async function handlePost(req) {
   return jsonWithRequestId({ data: serializeFile(file) }, { status: 201, requestId })
 }
 
-export const POST = withDocumentErrorHandling('document-html-create-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_HTML_CREATE',
+  withDocumentErrorHandling('document-html-create-unhandled-error', handlePost)
+)

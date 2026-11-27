@@ -20,6 +20,7 @@ import {
   serializeFile,
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // POST /api/documents/sites - cria um Site (SuperAdmin/SubAdmin). O Site é um item do Drive sem blob: o conteúdo
 // fica nas páginas, no banco; a primeira página é criada junto.
@@ -121,7 +122,13 @@ async function handlePost(req) {
     requestId
   })
 
-  return jsonWithRequestId({ data: serializeFile(file), pageId: file.site.pages[0]?.id ?? null }, { status: 201, requestId })
+  return jsonWithRequestId(
+    { data: serializeFile(file), pageId: file.site.pages[0]?.id ?? null },
+    { status: 201, requestId }
+  )
 }
 
-export const POST = withDocumentErrorHandling('document-site-create-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_SITE_CREATE',
+  withDocumentErrorHandling('document-site-create-unhandled-error', handlePost)
+)

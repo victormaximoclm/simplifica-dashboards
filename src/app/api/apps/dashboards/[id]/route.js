@@ -12,6 +12,7 @@ import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
 import { pruneForeignRolePermissions, rolesBelongToWorkspace } from '@/libs/customRoleScope'
 import { workspaceAccessInclude } from '@/libs/workspaceAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 function sanitizeDashboardTitle(value) {
   return String(value || 'Dashboard sem título')
@@ -57,8 +58,8 @@ export async function GET(req, { params }) {
     const response = NextResponse.json({ message: access.message }, { status: access.status })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   logger.debug('dashboard-read-success', { requestId, dashboardId: id, userId: session?.user?.id })
@@ -76,12 +77,12 @@ return response
   const response = NextResponse.json(stripDashboardSensitiveFields(dashboardWithPerms))
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
 
 // PUT /api/apps/dashboards/:id (superAdmin only)
-export async function PUT(req, { params }) {
+async function handlePutAction(req, { params }) {
   const { id } = await params
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
@@ -90,16 +91,16 @@ export async function PUT(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const body = await req.json()
@@ -111,8 +112,8 @@ return response
     const response = NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const existingWorkspace = await prisma.workspace.findUnique({
@@ -125,8 +126,8 @@ return response
     const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const updateData = {}
@@ -138,8 +139,8 @@ return response
       const response = NextResponse.json({ message: 'Não foi possível extrair a URL do iframe' }, { status: 400 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     updateData.iframeCode = iframeCode
@@ -156,16 +157,16 @@ return response
       const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     if (!canManageWorkspaceContent(session.user, ws)) {
       const response = NextResponse.json({ message: 'Acesso negado ao workspace de destino' }, { status: 403 })
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     updateData.workspaceId = workspaceId
@@ -251,12 +252,12 @@ return response
   const response = NextResponse.json(stripDashboardSensitiveFields(dashboard))
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
 
 // DELETE /api/apps/dashboards/:id (superAdmin only)
-export async function DELETE(req, { params }) {
+async function handleDeleteAction(req, { params }) {
   const { id } = await params
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
@@ -265,16 +266,16 @@ export async function DELETE(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const existing = await prisma.dashboard.findUnique({ where: { id } })
@@ -283,8 +284,8 @@ return response
     const response = NextResponse.json({ message: 'Dashboard não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const existingWorkspace = await prisma.workspace.findUnique({
@@ -297,8 +298,8 @@ return response
     const response = NextResponse.json({ message: 'Acesso negado a este workspace' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   await prisma.dashboard.delete({ where: { id } })
@@ -328,6 +329,9 @@ return response
   const response = NextResponse.json({ message: 'Dashboard excluído' })
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
+
+export const PUT = withActionAudit('DASHBOARD_UPDATE', handlePutAction)
+export const DELETE = withActionAudit('DASHBOARD_DELETE', handleDeleteAction)

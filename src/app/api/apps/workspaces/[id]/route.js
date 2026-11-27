@@ -9,6 +9,7 @@ import { canAccessWorkspace, canManageWorkspaceSettings } from '@/utils/roleHelp
 import { prisma } from '@/libs/prisma'
 import { createWorkspaceSchema, parseBody } from '@/libs/validations'
 import { withCreatorOnPrivateGuestList, workspaceAccessInclude } from '@/libs/workspaceAccess'
+import { withActionAudit } from '@/libs/auditedAction'
 
 const guestInclude = {
   guests: {
@@ -25,8 +26,8 @@ export async function GET(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { id } = await params
@@ -43,27 +44,27 @@ return response
     const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!canAccessWorkspace(session.user, workspace)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const response = NextResponse.json(workspace)
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
 
 // PUT /api/apps/workspaces/[id] - Update workspace
-export async function PUT(req, { params }) {
+async function handlePutAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -71,8 +72,8 @@ export async function PUT(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { id } = await params
@@ -86,16 +87,16 @@ return response
     const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!canManageWorkspaceSettings(session.user, currentWorkspace)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const parsed = parseBody(createWorkspaceSchema, await req.json())
@@ -104,8 +105,8 @@ return response
     const response = NextResponse.json({ message: parsed.message }, { status: 400 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { name, isPrivate, guests } = parsed.data
@@ -125,8 +126,8 @@ return response
     const response = NextResponse.json({ message: 'Já existe um espaço de trabalho com esse nome' }, { status: 409 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const guestList = withCreatorOnPrivateGuestList(!!isPrivate, guests, session.user.id, session.user.role)
@@ -169,12 +170,12 @@ return response
   const response = NextResponse.json(workspace)
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
 
 // DELETE /api/apps/workspaces/[id] - Delete workspace
-export async function DELETE(req, { params }) {
+async function handleDeleteAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -182,8 +183,8 @@ export async function DELETE(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { id } = await params
@@ -203,16 +204,16 @@ return response
     const response = NextResponse.json({ message: 'Espaço de trabalho não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!canManageWorkspaceSettings(session.user, workspace)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Cascade: delete all related users, dashboards, notifications, convites
@@ -240,6 +241,9 @@ return response
   })
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
+
+export const PUT = withActionAudit('WORKSPACE_UPDATE', handlePutAction)
+export const DELETE = withActionAudit('WORKSPACE_DELETE', handleDeleteAction)

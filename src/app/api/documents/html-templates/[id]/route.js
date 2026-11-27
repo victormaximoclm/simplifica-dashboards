@@ -17,6 +17,7 @@ import {
   readHtmlDocumentBody,
   serializeHtmlTemplate
 } from '@/libs/documentHtmlRequest'
+import { withActionAudit } from '@/libs/auditedAction'
 
 const PROFILE_RULES = { edit: canEditDocuments, delete: canDeleteDocuments }
 
@@ -138,5 +139,11 @@ async function handleDelete(req, { params }) {
   return jsonWithRequestId({ data: { id } }, { requestId })
 }
 
-export const PUT = withDocumentErrorHandling('document-template-update-unhandled-error', handlePut)
-export const DELETE = withDocumentErrorHandling('document-template-delete-unhandled-error', handleDelete)
+export const PUT = withActionAudit(
+  'DOCUMENT_TEMPLATE_UPDATE',
+  withDocumentErrorHandling('document-template-update-unhandled-error', handlePut)
+)
+export const DELETE = withActionAudit(
+  'DOCUMENT_TEMPLATE_DELETE',
+  withDocumentErrorHandling('document-template-delete-unhandled-error', handleDelete)
+)

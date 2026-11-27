@@ -10,6 +10,7 @@ import { prisma } from '@/libs/prisma'
 import { loadWorkspaceForAccess } from '@/libs/workspaceAccess'
 import { canAccessWorkspace, canManageWorkspaceContent } from '@/utils/roleHelpers'
 import { createCustomRoleSchema, parseBody } from '@/libs/validations'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // GET /api/apps/custom-roles - List all custom roles (workspace)
 export async function GET(req) {
@@ -56,16 +57,15 @@ export async function GET(req) {
 
       moduleCounts[key] = (moduleCounts[key] || 0) + 1
     })
-    
-return { ...role, moduleCounts }
+
+    return { ...role, moduleCounts }
   })
 
-  
-return jsonWithRequestId(rolesWithCounts, { requestId })
+  return jsonWithRequestId(rolesWithCounts, { requestId })
 }
 
 // POST /api/apps/custom-roles - Create custom role (superAdmin only)
-export async function POST(req) {
+async function handlePostAction(req) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -111,6 +111,8 @@ export async function POST(req) {
     metadata: { requestId },
     requestId
   })
-  
-return jsonWithRequestId(role, { status: 201, requestId })
+
+  return jsonWithRequestId(role, { status: 201, requestId })
 }
+
+export const POST = withActionAudit('CUSTOM_ROLE_CREATE', handlePostAction)

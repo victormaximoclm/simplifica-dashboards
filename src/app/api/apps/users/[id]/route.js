@@ -10,9 +10,10 @@ import { isHighAdmin, getAssignableRoles } from '@/utils/roleHelpers'
 import { createNotification } from '@/libs/notifications'
 import { prisma } from '@/libs/prisma'
 import { rolesBelongToWorkspace } from '@/libs/customRoleScope'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // PUT /api/apps/users/[id] - Update user (high admins only)
-export async function PUT(req, { params }) {
+async function handlePutAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -20,8 +21,8 @@ export async function PUT(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
@@ -29,8 +30,8 @@ return response
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { id } = await params
@@ -46,8 +47,8 @@ return response
     const response = NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
@@ -57,8 +58,8 @@ return response
     )
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Super Admin cannot change their own role
@@ -68,8 +69,8 @@ return response
     const response = NextResponse.json({ message: 'Super Admin não pode alterar o próprio cargo' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const updateData = {}
@@ -85,8 +86,8 @@ return response
       )
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     updateData.role = role
@@ -101,8 +102,8 @@ return response
       )
 
       response.headers.set('x-request-id', requestId)
-      
-return response
+
+      return response
     }
 
     updateData.status = status
@@ -119,8 +120,8 @@ return response
         const response = NextResponse.json({ message: 'Workspace não encontrado' }, { status: 404 })
 
         response.headers.set('x-request-id', requestId)
-        
-return response
+
+        return response
       }
 
       updateData.workspaceId = workspaceId
@@ -151,8 +152,8 @@ return response
     const response = NextResponse.json({ message: 'Nenhum campo para atualizar' }, { status: 400 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Get original user data for notification
@@ -215,12 +216,12 @@ return response
   const response = NextResponse.json(user)
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
 
 // DELETE /api/apps/users/[id] - Delete user (high admins only)
-export async function DELETE(req, { params }) {
+async function handleDeleteAction(req, { params }) {
   const requestId = getRequestId(req)
   const session = await getServerSession(authOptions)
 
@@ -228,16 +229,16 @@ export async function DELETE(req, { params }) {
     const response = NextResponse.json({ message: 'Não autorizado' }, { status: 401 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (!isHighAdmin(session.user.role)) {
     const response = NextResponse.json({ message: 'Acesso negado' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   const { id } = await params
@@ -251,16 +252,16 @@ return response
     const response = NextResponse.json({ message: 'Usuário não encontrado' }, { status: 404 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   if (session.user.role === 'subAdmin' && (targetUser.role === 'superAdmin' || targetUser.role === 'subAdmin')) {
     const response = NextResponse.json({ message: 'SubAdmin não pode deletar SuperAdmin ou SubAdmin' }, { status: 403 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Prevent deleting own account
@@ -270,8 +271,8 @@ return response
     const response = NextResponse.json({ message: 'Não é possível deletar sua própria conta' }, { status: 400 })
 
     response.headers.set('x-request-id', requestId)
-    
-return response
+
+    return response
   }
 
   // Get user data before deleting for notification
@@ -307,6 +308,9 @@ return response
   const response = NextResponse.json({ message: 'Usuário deletado' })
 
   response.headers.set('x-request-id', requestId)
-  
-return response
+
+  return response
 }
+
+export const PUT = withActionAudit('USER_UPDATE', handlePutAction)
+export const DELETE = withActionAudit('USER_DELETE', handleDeleteAction)

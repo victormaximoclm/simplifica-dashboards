@@ -20,6 +20,7 @@ import {
   withDocumentErrorHandling
 } from '@/libs/documentAccess'
 import { deleteItemGrants } from '@/libs/documentGrants'
+import { withActionAudit } from '@/libs/auditedAction'
 
 // GET /api/documents/files/:id - metadados do arquivo
 async function handleGet(req, { params }) {
@@ -197,5 +198,11 @@ async function handleDelete(req, { params }) {
 }
 
 export const GET = withDocumentErrorHandling('document-file-read-unhandled-error', handleGet)
-export const PATCH = withDocumentErrorHandling('document-file-rename-unhandled-error', handlePatch)
-export const DELETE = withDocumentErrorHandling('document-file-delete-unhandled-error', handleDelete)
+export const PATCH = withActionAudit(
+  'DOCUMENT_FILE_RENAME',
+  withDocumentErrorHandling('document-file-rename-unhandled-error', handlePatch)
+)
+export const DELETE = withActionAudit(
+  'DOCUMENT_FILE_DELETE',
+  withDocumentErrorHandling('document-file-delete-unhandled-error', handleDelete)
+)

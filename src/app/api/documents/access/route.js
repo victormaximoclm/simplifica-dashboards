@@ -10,6 +10,7 @@ import { getGrantedRolesByResource, replaceItemGrants } from '@/libs/documentGra
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import { loadWorkspaceForAccess } from '@/libs/workspaceAccess'
+import { setAuditContext, withActionAudit } from '@/libs/auditedAction'
 
 const MAX_ITEMS = 200
 const MAX_ROLES = 100
@@ -73,10 +74,7 @@ async function handlePost(req) {
   const unique = [...new Map(items.map(item => [`${item.kind}:${item.id}`, item])).values()]
 
   if (unique.length > MAX_ITEMS) {
-    return jsonWithRequestId(
-      { message: `Selecione no máximo ${MAX_ITEMS} itens por vez` },
-      { status: 400, requestId }
-    )
+    return jsonWithRequestId({ message: `Selecione no máximo ${MAX_ITEMS} itens por vez` }, { status: 400, requestId })
   }
 
   const incoming = [...new Map(rawRoles.map(entry => [entry.roleId, entry.canDownload === true])).entries()].map(
@@ -91,8 +89,14 @@ async function handlePost(req) {
   const fileIds = unique.filter(item => item.kind === 'file').map(item => item.id)
 
   const [folders, files] = await Promise.all([
-    prisma.documentFolder.findMany({ where: { id: { in: folderIds } }, select: { id: true, name: true, workspaceId: true } }),
-    prisma.documentFile.findMany({ where: { id: { in: fileIds } }, select: { id: true, name: true, workspaceId: true } })
+    prisma.documentFolder.findMany({
+      where: { id: { in: folderIds } },
+      select: { id: true, name: true, workspaceId: true }
+    }),
+    prisma.documentFile.findMany({
+      where: { id: { in: fileIds } },
+      select: { id: true, name: true, workspaceId: true }
+    })
   ])
 
   if (folders.length !== folderIds.length || files.length !== fileIds.length) {
@@ -100,6 +104,9 @@ async function handlePost(req) {
   }
 
   const workspaceIds = new Set([...folders, ...files].map(item => item.workspaceId))
+
+  // Rota em lote, sem id na URL: o workspace dos itens vai para a auditoria de erros
+  setAuditContext({ tenantId: [...workspaceIds][0] })
 
   if (workspaceIds.size !== 1) {
     return jsonWithRequestId({ message: 'Os itens precisam ser do mesmo workspace' }, { status: 400, requestId })
@@ -115,7 +122,12 @@ async function handlePost(req) {
     return jsonWithRequestId({ message: 'Acesso negado' }, { status: 403, requestId })
   }
 
-  if (!(await rolesBelongToWorkspace(incoming.map(entry => entry.roleId), workspaceId))) {
+  if (
+    !(await rolesBelongToWorkspace(
+      incoming.map(entry => entry.roleId),
+      workspaceId
+    ))
+  ) {
     return jsonWithRequestId({ message: 'Há cargos que não pertencem a este workspace' }, { status: 400, requestId })
   }
 
@@ -168,4 +180,7 @@ async function handlePost(req) {
   return jsonWithRequestId({ data: { updated: targets.length } }, { requestId })
 }
 
-export const POST = withDocumentErrorHandling('document-access-bulk-unhandled-error', handlePost)
+export const POST = withActionAudit(
+  'DOCUMENT_ACCESS_UPDATE',
+  withDocumentErrorHandling('document-access-bulk-unhandled-error', handlePost)
+)
