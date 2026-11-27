@@ -10,7 +10,7 @@ const LOCK_KEY = 72_011_001
  * convite já expirou. O convite vale 7 dias desde o envio (invite/route.js) e cada reenvio renova o prazo, então um
  * convite reenviado recentemente não é removido. Convites sem data de expiração não são tocados.
  *
- * Cada remoção vira um USER_INVITE_EXPIRED na auditoria (Ações Críticas), feito pelo sistema.
+ * Cada remoção vira um USER_INVITE_EXPIRED na auditoria (Ações Críticas), feito pelo sistema, com o e-mail do convidado.
  */
 export async function cleanupExpiredInvites({ now = new Date() } = {}) {
   const result = await prisma.$transaction(async tx => {
@@ -20,7 +20,7 @@ export async function cleanupExpiredInvites({ now = new Date() } = {}) {
 
     const expired = await tx.user.findMany({
       where: { status: 'pending', lastLoginAt: null, inviteTokenExpiry: { lt: now } },
-      select: { id: true, role: true, workspaceId: true, customRoleId: true, inviteTokenExpiry: true }
+      select: { id: true, email: true, role: true, workspaceId: true, customRoleId: true, inviteTokenExpiry: true }
     })
 
     if (expired.length === 0) return { skipped: false, removed: [] }
@@ -53,7 +53,9 @@ export async function cleanupExpiredInvites({ now = new Date() } = {}) {
         customRoleId: user.customRoleId,
         inviteTokenExpiry: user.inviteTokenExpiry
       },
-      metadata: { via: 'cron', job: 'invite-cleanup' }
+      // O usuário deixa de existir: o e-mail fica como nome do registro (campos "email" são mascarados pela
+      // auditoria), para a tela mostrar e a busca encontrar quem era o convidado
+      metadata: { via: 'cron', job: 'invite-cleanup', name: user.email }
     })
   }
 
