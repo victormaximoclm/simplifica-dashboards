@@ -23,7 +23,16 @@ import TableRow from '@mui/material/TableRow'
 import TextField from '@mui/material/TextField'
 import Typography from '@mui/material/Typography'
 
-export default function AuditLogsTable({ title, subheader, endpoint, searchLabel = 'Buscar ação/ID' }) {
+const linkTypeLabel = link => (link.permanent == null ? '' : link.permanent ? ' (permanente)' : ' (uso único)')
+
+/** typeOptions: [{ value, label }] mostra o filtro "Tipo"; o value vai para a API como ?type= */
+export default function AuditLogsTable({
+  title,
+  subheader,
+  endpoint,
+  searchLabel = 'Buscar ação/ID',
+  typeOptions = null
+}) {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [rows, setRows] = useState([])
@@ -31,6 +40,7 @@ export default function AuditLogsTable({ title, subheader, endpoint, searchLabel
   const [pagination, setPagination] = useState({ totalPages: 1, total: 0 })
 
   const [q, setQ] = useState('')
+  const [type, setType] = useState('')
   const [tenantId, setTenantId] = useState('')
   const [userId, setUserId] = useState('')
   const [from, setFrom] = useState('')
@@ -74,6 +84,7 @@ export default function AuditLogsTable({ title, subheader, endpoint, searchLabel
         })
 
         if (query) params.set('q', query)
+        if (type) params.set('type', type)
         if (tenantId) params.set('tenantId', tenantId)
         if (userId) params.set('userId', userId)
         if (from) params.set('from', from)
@@ -96,11 +107,10 @@ export default function AuditLogsTable({ title, subheader, endpoint, searchLabel
 
     fetchData()
 
-    
-return () => {
+    return () => {
       active = false
     }
-  }, [endpoint, page, query, tenantId, userId, from, to])
+  }, [endpoint, page, query, type, tenantId, userId, from, to])
 
   return (
     <Card>
@@ -116,6 +126,27 @@ return () => {
             }}
             size='small'
           />
+
+          {typeOptions && (
+            <FormControl size='small' sx={{ minWidth: 200 }}>
+              <InputLabel>Tipo</InputLabel>
+              <Select
+                label='Tipo'
+                value={type}
+                onChange={e => {
+                  setPage(1)
+                  setType(e.target.value)
+                }}
+              >
+                <MenuItem value=''>Todos</MenuItem>
+                {typeOptions.map(option => (
+                  <MenuItem key={option.value} value={option.value}>
+                    {option.label}
+                  </MenuItem>
+                ))}
+              </Select>
+            </FormControl>
+          )}
 
           <FormControl size='small' sx={{ minWidth: 220 }}>
             <InputLabel>Workspace</InputLabel>
@@ -217,8 +248,25 @@ return () => {
                           <Chip label={item.action} size='small' />
                         </TableCell>
                         <TableCell>{item.entityType}</TableCell>
-                        <TableCell>{item.resourceLabel || '-'}</TableCell>
-                        <TableCell>{item.user?.name || item.user?.email || '-'}</TableCell>
+                        <TableCell>
+                          {item.resourceLabel || '-'}
+                          {item.publicLink && (
+                            <Typography
+                              variant='caption'
+                              color='text.secondary'
+                              display='block'
+                              sx={{ wordBreak: 'break-all' }}
+                            >
+                              {item.publicLink.url ?? `Link excluído (${item.publicLink.id})`}
+                              {linkTypeLabel(item.publicLink)}
+                            </Typography>
+                          )}
+                        </TableCell>
+                        <TableCell>
+                          {item.user?.name ||
+                            item.user?.email ||
+                            (item.metadata?.via === 'public_link' ? 'Link público' : '-')}
+                        </TableCell>
                         <TableCell>{item.tenant?.name || '-'}</TableCell>
                         <TableCell>{item.entityId || '-'}</TableCell>
                       </TableRow>
@@ -249,4 +297,3 @@ return () => {
     </Card>
   )
 }
-

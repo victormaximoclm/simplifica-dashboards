@@ -1,12 +1,23 @@
 import AuditLogsTable from '@views/apps/audit-logs/AuditLogsTable'
 
+// O value é o grupo de ações em /api/apps/audit-logs/admin (ACTION_TYPES)
+const ACTION_TYPE_OPTIONS = [
+  { value: 'form_submit', label: 'Envios de formulário' },
+  { value: 'form_manage', label: 'Gestão de formulários' },
+  { value: 'documents', label: 'Documentos' },
+  { value: 'dashboards', label: 'Dashboards' },
+  { value: 'users', label: 'Usuários e funções' },
+  { value: 'workspaces', label: 'Workspaces' }
+]
+
 const AuditActionsPageView = () => {
   return (
     <AuditLogsTable
       title='Audit de Ações Críticas'
-      subheader='Ações administrativas em usuários, workspaces e documentos, incluindo quem abriu e baixou cada arquivo (SubAdmin e SuperAdmin)'
+      subheader='O que foi feito: envios de formulário e mudanças em usuários, workspaces, dashboards, formulários e documentos (SubAdmin e SuperAdmin)'
       endpoint='/api/apps/audit-logs/admin'
-      searchLabel='Buscar ação, ID ou documento'
+      searchLabel='Buscar ação, ID, documento ou formulário'
+      typeOptions={ACTION_TYPE_OPTIONS}
     />
   )
 }

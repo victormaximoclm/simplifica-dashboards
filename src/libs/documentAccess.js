@@ -1,6 +1,6 @@
 import { Readable } from 'stream'
 
-import { createDedupedAuditLog } from '@/libs/auditService'
+import { createAuditLog, createDedupedAuditLog } from '@/libs/auditService'
 import { getRequestId, jsonWithRequestId, logger } from '@/libs/logger'
 import { prisma } from '@/libs/prisma'
 import * as storage from '@/libs/storage'
@@ -521,20 +521,24 @@ const FILE_ACCESS_ACTIONS = { view: 'DOCUMENT_FILE_VIEW', download: 'DOCUMENT_FI
 
 /**
  * Registra no AuditLog quem abriu (`view`) ou baixou (`download`) um arquivo.
- * O mesmo usuário no mesmo arquivo conta uma vez a cada 15 min (reaberturas e requisições repetidas do
- * visualizador não poluem o log). Falha no log nunca derruba a resposta.
+ * Abrir: o mesmo usuário no mesmo arquivo conta uma vez a cada 15 min (reaberturas e requisições repetidas do
+ * visualizador não poluem o log). Baixar: todo download conta, pois cada um é uma cópia que sai do sistema.
+ * Falha no log nunca derruba a resposta.
  */
 export async function recordDocumentFileAccess({ session, file, kind, requestId }) {
+  const entry = {
+    userId: session.user.id,
+    tenantId: file.workspaceId,
+    action: FILE_ACCESS_ACTIONS[kind],
+    resource: 'document_file',
+    resourceId: file.id,
+    metadata: { requestId, name: file.name, folderId: file.folderId },
+    requestId
+  }
+
   try {
-    await createDedupedAuditLog({
-      userId: session.user.id,
-      tenantId: file.workspaceId,
-      action: FILE_ACCESS_ACTIONS[kind],
-      resource: 'document_file',
-      resourceId: file.id,
-      metadata: { requestId, name: file.name, folderId: file.folderId },
-      requestId
-    })
+    if (kind === 'download') await createAuditLog(entry)
+    else await createDedupedAuditLog(entry)
   } catch (error) {
     logger.error('document-file-access-audit-error', { requestId, fileId: file.id, kind, error: error.message })
   }

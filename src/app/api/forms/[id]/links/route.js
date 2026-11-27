@@ -11,7 +11,7 @@ import { prisma } from '@/libs/prisma'
 import { createAuditLog } from '@/libs/auditService'
 import { canNonHighAdminAccessForm, getUserFormContext, isFormHighAdminOnly } from '@/libs/formAccess'
 import { canGeneratePublicLinks } from '@/libs/formPermissions'
-import { generatePublicLink } from '@/libs/formlinkservice'
+import { formPublicUrl, generatePublicLink } from '@/libs/formlinkservice'
 
 // GET /api/forms/[id]/links - lista links gerados
 export async function GET(req, { params }) {
@@ -66,14 +66,7 @@ return response
       take: 50
     })
 
-    const baseUrl = process.env.NEXT_PUBLIC_APP_URL || ''
-
-    const response = NextResponse.json(
-      links.map(link => ({
-        ...link,
-        publicUrl: `${baseUrl}/f/${link.token}`
-      }))
-    )
+    const response = NextResponse.json(links.map(link => ({ ...link, publicUrl: formPublicUrl(link.token) })))
 
     response.headers.set('x-request-id', requestId)
     

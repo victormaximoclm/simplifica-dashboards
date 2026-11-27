@@ -16,6 +16,21 @@ import { createRateLimit } from '@/libs/rateLimit'
 
 const submitLimiter = createRateLimit({ interval: 60_000, limit: 30 })
 
+/**
+ * Registra o envio no AuditLog. Envio por link público fica com userId nulo (a coluna aponta para User) e guarda só
+ * o id do link, nunca o token.
+ */
+const auditSubmit = ({ action, session, form, requestId, isPublic, publicLinkId = null, after = {} }) =>
+  createAuditLog({
+    userId: session?.user?.id ?? null,
+    tenantId: form.workspaceId,
+    action,
+    entityType: 'form',
+    entityId: form.id,
+    after: { ...after, isPublicSubmission: isPublic, publicLinkId },
+    metadata: { requestId, name: form.title, via: isPublic ? 'public_link' : 'session' }
+  })
+
 // POST /api/forms/[id]/submit - dispara webhook n8n
 export async function POST(req, { params }) {
   const requestId = getRequestId(req)
@@ -81,18 +96,17 @@ return response
       if (!claimed) {
         const existing = await prisma.formPublicLink.findUnique({
           where: { token: publicToken },
-          select: { used: true, revokedAt: true, expiresAt: true, formId: true }
+          select: { id: true, used: true, revokedAt: true, expiresAt: true, formId: true }
         })
 
         if (!existing || existing.formId !== id) {
-          await createAuditLog({
-            userId: `public:${publicToken}`,
-            tenantId: form.workspaceId,
+          await auditSubmit({
             action: 'FORM_SUBMIT_REJECTED',
-            entityType: 'form',
-            entityId: id,
-            after: { reason: 'invalid_token' },
-            metadata: { requestId }
+            session,
+            form,
+            requestId,
+            isPublic: true,
+            after: { reason: 'invalid_token' }
           })
 
           const response = NextResponse.json({ message: 'Token inválido' }, { status: 403 })
@@ -110,14 +124,14 @@ return response
           link_expired: 'Link expirado. Não é possível enviar respostas.'
         }[reason]
 
-        await createAuditLog({
-          userId: `public:${publicToken}`,
-          tenantId: form.workspaceId,
+        await auditSubmit({
           action: 'FORM_SUBMIT_REJECTED',
-          entityType: 'form',
-          entityId: id,
-          after: { reason },
-          metadata: { requestId }
+          session,
+          form,
+          requestId,
+          isPublic: true,
+          publicLinkId: existing.id,
+          after: { reason }
         })
 
         const response = NextResponse.json({ message }, { status: 403 })
@@ -172,28 +186,48 @@ return response
       fields: validation.fields
     }
 
-    const webhookResponse = await fetch(form.webhookUrl, {
-      method: 'POST',
-      headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.N8N_API_KEY}` },
-      body: JSON.stringify(webhookPayload)
-    })
+    let webhookResponse
+
+    try {
+      webhookResponse = await fetch(form.webhookUrl, {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json', Authorization: `Bearer ${process.env.N8N_API_KEY}` },
+        body: JSON.stringify(webhookPayload)
+      })
+    } catch (error) {
+      // Webhook fora do ar ou endereço inválido: o envio falhou e precisa ficar no audit
+      logger.error('webhook-unreachable', { requestId, formId: id, error: error.message })
+
+      await auditSubmit({
+        action: 'FORM_SUBMIT_FAILED',
+        session,
+        form,
+        requestId,
+        isPublic: isPublicSubmission,
+        publicLinkId,
+        after: { webhookStatus: null, reason: 'webhook_unreachable' }
+      })
+
+      const response = NextResponse.json({ message: 'Erro ao enviar dados' }, { status: 502 })
+
+      response.headers.set('x-request-id', requestId)
+
+      return response
+    }
 
     if (!webhookResponse.ok) {
       const webhookError = await webhookResponse.text().catch(() => '')
 
       logger.error('webhook-error', { requestId, formId: id, status: webhookResponse.status })
 
-      // ✅ Audit log de falha — cobre sessão autenticada e link público
-      const auditUserId = session?.user?.id ?? `public:${publicLinkId ?? publicToken}`
-
-      await createAuditLog({
-        userId: auditUserId,
-        tenantId: form.workspaceId,
+      await auditSubmit({
         action: 'FORM_SUBMIT_FAILED',
-        entityType: 'form',
-        entityId: id,
-        after: { isPublicSubmission, publicLinkId, webhookStatus: webhookResponse.status },
-        metadata: { requestId }
+        session,
+        form,
+        requestId,
+        isPublic: isPublicSubmission,
+        publicLinkId,
+        after: { webhookStatus: webhookResponse.status }
       })
 
       const response = NextResponse.json(
@@ -206,17 +240,13 @@ return response
 return response
     }
 
-    // ✅ Audit log de sucesso — removida a guarda `if (session)`, cobre os dois fluxos
-    const auditUserId = session?.user?.id ?? `public:${publicLinkId ?? publicToken}`
-
-    await createAuditLog({
-      userId: auditUserId,
-      tenantId: form.workspaceId,
+    await auditSubmit({
       action: 'FORM_SUBMIT',
-      entityType: 'form',
-      entityId: id,
-      after: { isPublicSubmission, publicLinkId },
-      metadata: { requestId }
+      session,
+      form,
+      requestId,
+      isPublic: isPublicSubmission,
+      publicLinkId
     })
 
     logger.info('form-submit-success', { requestId, formId: id, isPublicSubmission })

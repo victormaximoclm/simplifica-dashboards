@@ -1,5 +1,8 @@
 import { prisma } from '@/libs/prisma'
 
+/** Endereço do link público, o mesmo mostrado na página de links do formulário e na auditoria */
+export const formPublicUrl = token => `${process.env.NEXT_PUBLIC_APP_URL || ''}/f/${token}`
+
 /** Motivo pelo qual o link não aceita visualização/envio (null = ativo) */
 export function getPublicLinkInactiveReason(link) {
   if (!link) return 'invalid'
